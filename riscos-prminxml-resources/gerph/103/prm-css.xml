@@ -230,6 +230,9 @@ section.definition::before {
 }
 .register-name {
 }
+.processor-flag-name {
+  text-align: right;
+}
 .definition-syntax-line {
   font-family: monospace;
 }
@@ -335,6 +338,10 @@ table {
 
 th, td {
   vertical-align: top;
+}
+
+td > p:first-of-type {
+    margin-top: 0em;
 }
 
 figure {
@@ -1572,8 +1579,11 @@ ul > li::marker {
 ul > li {
     padding-left: 0.375em;
 }
-ul {
+article ul {
     padding-left: 0.25em;
+}
+nav ul ul {
+    padding-left: 0.75em;
 }
 ]]></css>
 
