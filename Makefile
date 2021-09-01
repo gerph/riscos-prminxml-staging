@@ -6,6 +6,10 @@ TOOL = riscos-prminxml
 
 all: pdf
 
+lint: dirs
+	${TOOL} --lint -f index -L logs index.xml
+	cat logs/2-build.log
+
 output: dirs
 	${TOOL} -f index -L logs index.xml
 	cat logs/2-build.log
