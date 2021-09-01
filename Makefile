@@ -1,17 +1,20 @@
 # Build all the documentation using the PRM-in-XML tools
 
-.PHONY: output pdf
+.PHONY: output pdf dirs
 
 TOOL = riscos-prminxml
 
 all: pdf
 
-output:
+output: dirs
 	${TOOL} -f index -L logs index.xml
 	cat logs/2-build.log
 
 pdf: output
 	cd output/html && prince --verbose -o ../index.pdf -l filelist.txt
+
+dirs:
+	mkdir -p logs
 
 zip: output
 	rm -f src.zip output.zip

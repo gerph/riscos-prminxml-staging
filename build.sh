@@ -66,7 +66,11 @@ if ! type -p riscos-prminxml >/dev/null 2>&1 ; then
     # riscos-prminxml isn't installed, so let's get a copy.
     if [[ ! -x './prminxml-snapshot' ]] ; then
         echo +++ Obtaining riscos-prminxml
-        git merge prminxml-snapshot
+        if [[ ! -f ~/.gitconfig ]] ; then
+            git config --local user.email 'nobody@nowhere.com'
+            git config --local user.name 'Automated merge'
+        fi
+        git merge origin/prminxml-snapshot
     fi
     export PATH="${scriptdir}:$PATH"
 fi
@@ -106,7 +110,7 @@ if ! type -p prince >/dev/null 2>&1 ; then
 
         # Download the prince installation
         archive="/tmp/prince-${PRINCE_VERSION}.${ext}"
-        wget -O "${archive}" "$url"
+        wget -q -O "${archive}" "$url"
         # Now extract it.
         if [[ "${ext}" = 'zip' ]] ; then
             unzip "${archive}"
