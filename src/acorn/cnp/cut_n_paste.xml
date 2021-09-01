@@ -1,0 +1,1954 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="Cut-and-Paste">
+<section title="1. Overview">
+<subsection title ="1.1 This Document">
+
+<p>This document supersedes the cut-and-paste and drag-and-drop protocol application notes [1] and [2], and specifies the cut-and-paste / drag-and-drop abilities to be added to the Wimp, plus the Clipboard module that supports the Wimp (and whose facilities will also be of use to future applications intended to support the protocols).</p>
+
+<p>Key terms are defined and some familiar terms are also redefined more precisely in the glossary (§13), and the reader is recommended to read this first.</p>
+
+<p>Where information is fundamentally new in this specification - non-obvious consequences of and clarifications and extensions to the existing protocol, the relevant section is underlined to bring attention to the fact.</p>
+
+<p>The document may be slightly weighted towards text-handling applications, but this is because the user interface is generally more complicated in such cases. It is expected that the reader be able to extrapolate meanings to apply to any possible fundamental type of data.</p>
+</subsection>
+
+<subsection title="1.2 Cut-and-Paste">
+
+<p>Global-clipboard-based or cut-and-paste data transfer involves data being removed or copied from any document in the desktop to a notional "clipboard", then pasted from the clipboard into the same document, or any other document in the desktop, whether managed by the same application or not. On the way, data translation is performed in such a way as to minimise the information loss about the data.</p>
+
+<p>This interface involves three operations, cut, copy and paste, which may be performed in any order. Any one data transfer will require at least two of these operations, in addition to the choice of the original selection and the destination point; the process is somewhat clumsy (and unintuitive, since the clipboard is hidden from view), so this is the least preferred technique of the two described in this document. However, it must still be provided, as it does allow some operations which cannot be achieved in any other way, and can perform other operations faster than by drag-and-drop.</p>
+</subsection>
+
+<subsection title ="1.3 Drag-and-Drop">
+
+<p>Drag-and-drop is similar to cut-and-paste, but with the cut/copy performed by pressing a mouse button, and the paste by releasing the button at the destination. Full drag-and-drop compliance combines the features of conventional, simple drag-and-drop, as commonly used in Save dialogue boxes, with the data translation abilities of the global clipboard, and overcomes the abstract nature of the global clipboard by the displaying throughout the drag a bounding box, dithered sprite/object or representation of the insertion point.</p>
+
+<p>The user interface is simpler to use - consisting typically of two mouse drags (one to select and one to move or copy), with a requirement for at most one keypress (the Shift key swaps the meaning of copying and moving). However, the programming interface is more complicated, because continuously negotiated transferable data types, destination positioning and rendering of objects and pointers are required in addition to everything needed for cut-and-paste. This complexity is possibly responsible for the low implementation rate of the protocol to date.</p>
+</subsection>
+
+<subsection title ="1.4 General">
+
+<p>The Clipboard module is primarily to enable cut-and-paste and drag-and-drop to be reliably implemented for writable icons, which are handled automatically by the Wimp. (The fundamental problem is that the established cut-and-paste and drag-and-drop systems are Wimp-message-based, and the Wimp itself is poorly equipped to send and receive messages.)</p>
+
+<p>However, the module is secondarily to handle the complex protocols on behalf of any application that chooses to do so - and in the process, producing a more uniform user interface. This is to be the preferred method of implementing the protocols in future, although in special cases, the tasks it performs can be split into four separate areas, any combination of which can be taken advantage of by the same application:<list>
+
+<item>clipboard management - supporting cut and copy operations</item>
+<item>clipboard procurement - supporting paste operations</item>
+<item>sending drag-and-drop data</item>
+<item>receiving drag-and-drop data</item>
+</list>
+</p>
+</subsection>
+</section>
+
+<section title="2. Outstanding Issues">
+<subsection title="2.1 Bounding Box Discrepancies">
+
+<p>It is possible that data may have different "real life" bounding boxes in different data types - for example, a DrawFile sprite object may be transformed and/or scaled, and thus have a different bounding box to the underlying sprite. Thus if a transformed sprite object were dragged from Draw to a sprite editor window, the bounding box would not represent the final position of the sprite.</p>
+</subsection>
+</section>
+
+<section title="3. Technical Background">
+<subsection title="3.1 This Document">
+
+<p>Some important pre-existing technical terms are rigorously defined in the context of cut-and-paste / drag-and-drop in the Glossary in §13, along with some new terms introduced in this document.</p>
+
+<p>Where technical background information is relatively straightforward (no more than one or two short paragraphs), it is included alongside the appropriate part of §4 or §5, for ease of reference.</p>
+</subsection>
+
+<subsection title="3.2 Previous Documents">
+<p>Simple drag-and-drop operations, such as those employed by Save dialogue boxes, do not employ any inter-task negotiation during the drag, and use the plain DataSave/DataLoad protocol during the drop, as described in the Programmer's Reference Manual [3].</p>
+
+<p>The Style Guide [4] first indicates selection models, then describes an overview of cut-and-paste and drag-and-drop behaviour, before referring the reader to the relevant Support Group Application Notes [1] and [2].</p>
+</subsection>
+
+<subsection title="3.3 Previous Applications">
+
+<p>Old-style selection model / copy-and-move implementations are still in existence, especially so in the case of text editors, (e.g. Zap, StrongEd, SrcEdit) which have often followed Edit's example. Such schemes typically involve only three actions to perform an operation (select region, position caret, move/copy keypress) rather than the four (select region, cut/copy keypress, position caret, paste keypress), but have the disadvantage that they can present both a caret and a selection to the user at the same time, which is potentially confusing. Old behaviour will remain deprecated, but new cut-and-paste / drag-and-drop applications must be able to interact with tasks that use it.</p>
+
+<p>Other applications may support just cut-and-paste, or just drag-and-drop. Drag-and-drop will be the favoured technique in future, due to the simpler actions required (select region, drag region), but cut-and-paste must also be supported as well, to cater for cases when drag-and-drop cannot be used (e.g. when copying on to a menu tree).</p>
+
+<p>Some aspects (e.g. pointer shape, window) of applications already written to the application note guidelines (e.g. DataPower, EasiWriter/TechWriter) are already inconsistent, due to the lack of detail in the application notes. Applications will in future be encouraged to follow the more detailed specification herein.</p>
+</subsection>
+</section>
+
+
+<section title="4.User Interface">
+<subsection title="4.1 Selection">
+<subsubsection title="4.1.1 Protocol">
+
+<category title="4.1.1.1 Rendering">
+
+<p>Selection is rendered either by a recolouring an object (with its photographic negative or otherwise) or by drawing a bounding box, typically in red, and optionally with one or more "handles" for resizing and/or rotating operations as appropriate:</p>
+
+<image src="Pic4.gif" type="png" caption="" />
+<image src="Pic6.gif" type="png" caption="" />
+<image src="Pic5.gif" type="png" caption="" />
+<image src="Pic7.gif" type="png" caption="" />
+
+
+<p>It should be emphasised that a caret must never appear within the same window as a selection at any time, not even during the selecting drag. Placing a new caret or selection removes any caret or selection previously active in the same window. (The definition of a window for these purposes is a top-level window and its panes and all their child windows.)</p>
+
+<p>However, if during (or immediately after) the selection process, the selection would have to be drawn with zero width (i.e. for text selections, when the two ends snap to the same character boundary), a caret must be displayed instead. It is helpful to consider the caret as a zero-width selection; only one selection may be present within one window at a time, so the exclusivity of the caret and selection is an extension of this concept.</p>
+
+<p>When either a caret or a selection is placed in a document, the window must gain the input focus. This will happen automatically for a Wimp-drawn user caret, but in the case of application-drawn carets and selections, the application must position the Wimp caret in the window, but marked as invisible, in order to achieve the same effect. Simply changing the window border colour (as is possible in Wimps since RISC OS 4) is not acceptable.</p>
+
+<p>When a caret or selection is placed in a different drag-and-drop window, the old selection must be redrawn as a shaded selection, not left as is or removed entirely. The caret must be removed entirely (or optionally redrawn as a shadow caret); if the application uses a Wimp-drawn user caret, the caret will be removed for it automatically. The LoseCaret and GainCaret events must not be used to determine when this is necessary, as the Wimp may "borrow" the caret temporarily while a menu is open. A Wimp message exists to indicate when removal or redraw of the caret and selection is necessary, and must be used in preference to the events (see §5.1.1).</p>
+
+<p>Note that a selection may also be non-shaded but not have the input focus if an application not adhering to the cut-and-paste / drag-and-drop protocols had grabbed the Wimp caret (and therefore the input focus). Similarly, non-Wimp-drawn carets may be deprived of the input focus under similar circumstances while neither being removed, nor being replaced with a shadow caret.</p>
+</category>
+
+<category title="4.1.1.2 Mouse Events">
+
+<p>Non-contiguous selections (just about everything except text and DTP documents) will continue to be handled as described in the Style Guide [4], with the proviso that clicking Select over an already-selected object must not deselect anything, as a Select click event always precedes the Select drag event which initiates a drag-and-drop operation. Appropriate action must also be taken to un-shade shaded selections when necessary.</p>
+
+<p>On the other hand, a more detailed behaviour for contiguous selections must be adhered to in future. In summary:<list>
+    <item>Select click outside the selection (or when there is no selection, or at one end of a selection): position the caret at the pointer position, and flag the next Select drag as creating a selection.</item>
+    <item>Select click on a selection: if the selection was shaded, un-shade it. Make sure the window has the input focus. Flag the next Select drag as being a drag-and-drop drag.</item>
+    <item>Select click in a "dead" region of a window (e.g. in a page border): un-shade any selection or replace any shadow caret with the caret, if either exists. Make sure the window has the input focus. Optionally, flag the next Select drag as causing an window scroll operation (as Impression, TechWriter etc. do as present), but certainly not as starting a selection or drag-and-drop operation.</item>
+    <item>Select drag-start event: remove the caret, and set the selection from the old caret position to the current pointer position. Alternatively, start the drag-and-drop operation (see §4.4.1). The exact meaning is determined by the flag that was set at the Select click stage.</item>
+    <item>During Select drag: if creating a selection, adjust the most recently touched end of the selection to the pointer position at regular intervals; autoscroll the window if necessary, using the SWI Wimp_AutoScroll introduced in the RISC OS 4 Wimp. For what to do during a drag-and-drop drag, see §4.4.1.</item>
+    <item>Select double-click: select a word (as defined in the Style Guide), irrespective of whether the click is on an existing selection or not.</item>
+    <item>Select click-drag (button pressed, then released, then pressed again within the double-click limits, then held or moved according to the drag limits): equivalent to a normal selection-delimiting drag, except that the selection limits are rounded to word boundaries (excluding whitespace at either end).</item>
+    <item>Adjust click when there is no caret or selection: position the caret at the pointer position, unless there was a shadow caret, in which case, position the caret where the shadow caret was. Set a flag to indicate that there was no caret or selection before the Adjust click (the shadow caret doesn't count); do not rely on the fact that there is no selection displayed when the drag event is generated to flag this, as a zero-width selection may have been displayed as a caret instead.</item>
+    <item>Adjust click when there is a caret: remove the caret, and set the selection from the old caret position to the current pointer position.</item>
+    <item>Adjust click when there is a selection: grow or shrink the selection so that the nearest end of the selection moves to the pointer position. (Remember to un-shade the selection and/or gain the input focus if necessary.)</item>
+    <item>Adjust click in a "dead" region of a window: the same as Select in these circumstances.</item>
+    <item>Adjust drag-start event: unless there was no caret or selection before the preceding Adjust click, adjust the most recently touched end of the selection to the pointer position.</item>
+    <item>During Adjust drag: unless there was no caret or selection before the preceding Adjust click, adjust the most recently touched end of the selection to the pointer position at regular intervals; autoscroll the window if necessary, using SWI Wimp_AutoScroll.</item></list>
+</p>
+
+<p>Other operations (including Adjust double-clicks, higher-multiple-clicks and combinations with shifting keys) are left to the application to respond to as it sees fit - they might select a line of text, or select something in another layer, or whatever. Typically, higher-multiple clicks of Select will select progressively larger blocks of text. For single-line items such as writable icons, three clicks means select the entire line. Once the maximum number of clicks is reached, the next click is interpreted as for a single click, so for writable icons, a quadruple-click sets the position of the caret.</p>
+
+<p>In order to make selections over a larger area than can be displayed in a window, during selecting drags of contiguous selections and select box drags of non-contiguous selections, autoscrolling can be implemented. However, since there is rarely a meaning to making a selection spanning several windows, there is only one meaning to moving the pointer off the window, and so there must be no need for a pause over the autoscrolling zone to precede commencement of scrolling, as this would merely slow down the user's actions.</p>
+</category>
+
+<category title="4.1.1.3 Keypresses">
+<p>There are some special keypresses relating to cut-and-paste that affect the selection. Obviously, these only apply to selections that have the input focus (and therefore never apply to a shaded selection). The keypresses are:<list>
+
+    <item>Ctrl-Z: clear the selection (i.e. undraw the highlights), and place the caret (if appropriate) at the right-hand end of the old selection (or the left-hand end in a right-to-left language).</item>
+    <item>Ctrl-V or Insert: delete (not cut) the selected data, and place the caret (if appropriate) at the end of the newly inserted text.</item>
+    <item>Ctrl-X, Backspace or Delete: cut the selected data and place the caret (if appropriate) where the selection was.</item>
+    <item>Ctrl-K: delete (not cut) the selected data and place the caret (if appropriate) where the selection was.</item></list>
+</p>
+
+<p>Then there are a number of special behaviours for textual regions:<list>
+
+    <item>Left-arrow/up-arrow: clear the selection, and process the keypress as though the caret had been at the left of the selection.</item>
+    <item>Right-arrow/down-arrow: clear the selection, and process the keypress as though the caret had been at the right of the selection.</item>
+    <item>Any other repositioning keypresses (Home, Tab etc.) behave along similar lines, as appropriate to the application.</item>
+    <item>Any other keypresses that would normally insert one or more characters: perform a cut operation, then position the caret where the selection was, and process the keypress as normal.</item></list>
+</p>
+
+<p>Any other keypresses must not affect the selection.</p>
+
+<p>During drags (both those that set a selection and those that copy or move one), no keypresses that would normally affect the selection must be acted upon.</p>
+</category>
+
+<category title="4.1.1.4 Scope">
+
+<p>When a caret or selection is placed in the same window where one already exists, the old one is removed (not just re-rendered as a shaded selection). In order for this to be consistent with the use of input focus colouring of windows, all carets and selections must be unique within a group of windows characterised thus: a top-level (non-nested) window, all its panes, and all windows nested within the window or one of its panes. If a task does its own selection handling but the window or one of its panes also uses writable icons, the task will need to monitor caret/selection updates to the writable icons in order to deselect its own selections.</p>
+
+<p>Carets and selections must not be preserved when a window is closed, deleted or iconized (check for Open_Window_Requests with handle-to-open-behind of -3 to detect iconization). The Wimp takes care of everything for Wimp-drawn carets, and automatically removes the input focus in any case. If a selection can be made in a dialogue box opened from a menu, then the task must act as though the window were being closed when receiving Message_MenusDeleted, as tasks are not sent the usual Close_Window_Request for such windows.</p>
+
+<p>When the window is being closed or deleted, application-drawn carets and selections must be marked as absent, but when it the window is being iconized, carets and selections drawn by the application must be flagged as a shadow caret (if supported) or a shaded selection, respectively, ready for the next redraw request.</p>
+</category>
+</subsubsection>
+
+<subsubsection title="4.1.2 Clipboard Module">
+<p>The Clipboard is not involved in the selection process.</p>
+</subsubsection>
+
+<subsection title="4.1.3 Writable Icons">
+<p>Up to one writable icon selection may exist in each window, and the selection will only be un-shaded if the window has the input focus.</p>
+</subsection>
+
+<category title="4.1.3.1 Rendering">
+
+<p>Carets within writable icons will be Wimp colour 11 (red), irrespective of the background colour of the icon. This will be achieved by using (Wimp colour 11 EOR background colour), calculated in GCOL space, as the colour to EOR on to the icon.</p>
+
+<p>Selections and shaded selections will be drawn by switching the foreground and background colours, then fading them if appropriate. A gap of 4 OS units will be left before the top and bottom borders (if any) of the icon. Therefore, a typical writable icon will look like this in its three states:</p>
+<image src="Pic8.gif" type="png" caption="" />
+
+<p>Using this method is better than EORing a block of colour, especially in the shaded selection case, where the anti-aliasing of the text is destroyed by an EOR operation. It also means that non-standard writable icons are catered for sensibly as well with no extra effort:</p>
+<image src="Pic9.gif" type="png" caption="" />
+
+<p>In the past, during writable icon redraws caused by scrolling of the icon (caused, for example, by repositioning of the caret), there has been a certain amount of flicker, both of the text, and of the caret itself, especially for large writable icons. This will be exaggerated substantially if the same technique is used to draw selections; to reduce flicker in both cases, a new algorithm will be written to deal with icon updates following caret / selection / ghost caret changes, utilising block copies wherever possible.</p>
+</category>
+
+<category title="4.1.3.2 Scrolling">
+
+<p>Icons where the text is less wide than the icon are relatively simple; the text has a fixed position, irrespective of caret and selection position. But it is likely that where the text is wider than the icon, occasions will arise where the user needs access to areas of the text string that are normally hidden, in order to set one or both ends of a selection. The matter is similar to the requirement for icon scrolling to position the ghost caret during a drag-and-drop selection (see §4.4).</p>
+
+<p>So, while the user is delimiting a selection, or when a ghost caret is displayed in the icon, an autoscrolling scheme will be followed, directly analogous to that used for windows in Wimp_AutoScroll.</p>
+
+<p>Note in particular:<list>
+
+    <item>The speed of scrolling is proportional to the distance the pointer has moved beyond the inside edge of the autoscrolling "pause" zone. This is because this scheme allows fine user control of both acceleration and deceleration.</item>
+    <item>When delimiting a selection, autoscrolling will start as soon as the pointer enters the "pause" zone - i.e. a pause time of zero is used. Conversely, to start autoscrolling during a drag-and-drop operation, the pointer must be held over the pause zone for the configured pause time. This matches the equivalent behaviour for autoscrolling of windows.</item>
+    <item>While document windows are generally of a comparable size, hence the similar pause zone widths, the size of writable icons can vary dramatically from icon to icon - compare, for example, a writable icon that is part of a numeric field, with the URL at the top of a web browser window. Scrolling speeds that would suit a small icon would be painfully slow for a very large one, and usable speeds for a large icon would scroll a small icon far too quickly. Therefore, the scrolling speed of a writable icon when the pointer is at one end will be proportional to its width. However, it is also desirable that the scrolling speed ramp up at the same rate, irrespective of icon size; these two constraints imply that a fixed proportion of the width of any icon needs to be allocated as the autoscroll pause zone - we will use 1/4 of the width at each end, as illustrated to scale below:</item>
+</list></p>
+<image src="Pic10.gif" type="png" caption="" />
+
+<p>Below, the autoscrolling zone is cross-hatched; the autoscrolling pause zone is the intersection of the autoscrolling zone with the icon bounding box:</p>
+<image src="Pic22.gif" type="png" caption="" />
+</category>
+
+
+<category title="4.1.3.3 Mouse Events">
+
+<p>Mouse events in writable icons will follow the general behaviour, as specified in §4.1.1.2, but with a couple of slight changes. The definition of a word will match that used for Shift-arrow navigation, i.e. treating both spaces and the '.' character as word delimiters.</p>
+
+<p>On the second click of a double click with Adjust, the selection established by the first Adjust click will be extended outwards at both ends to include complete words.</p>
+
+<p>Clicks with either Select or Adjust will not affect the text origin, unless they are setting the caret position (which will still be centred as far as possible, for consistency with old Wimps). Neither double-click operation will affect the text origin either, unless a scroll was caused by the first click of the two.</p>
+
+<p>During a drag, while the pointer is over the central zone between the autoscrolling zones, no scrolling occurs. The autoscrolling zones act just like those of windows. After each scroll step (not before), the selection end is determined by the closest character boundary to the pointer.</p>
+
+<p>When a drag starts, any movement of the text which was performed at the time of the click event is undone. This is necessary because otherwise we have introduced a relative movement between the text and the pointer which was not intended by the user, and the alternative (moving the pointer) is less in the style of the RISC OS user interface. Consider, for example, if the user clicks Select at the right hand end of an icon where there is a lot of text further to the right which is clipped out of view: if the user starts dragging to the left, but as a result of the initial click, the text had jumped quickly to the left of the pointer and so the user is now creating a selection to its right; worse still, if the pointer is still over the autoscrolling zone, the initial character may start scrolling off the left of the icon, leaving a large selection in the opposite direction to that intended by the user!</p>
+</category>
+
+<category title="4.1.3.4 Keypresses">
+
+<p>These will in general be handled as in §4.1.1.3. Note in particular:<list>
+
+    <item>Only keypresses as specified in the validation string would normally insert characters, so any others (except Ctrl-X and its synonyms, of course) will not cut any selected text.</item>
+    <item>Whenever a keypress (including Ctrl-X and synonyms) causes the caret to be repositioned, a traditional, centred caret will be used.</item>
+    <item>When a paste is performed, and so an entirely new selection is set, the selection will be centred within the icon (unless it is wider than the icon, in which it will be right-aligned).</item></list>
+</p>
+</category>
+
+<category title="4.1.3.5 Wimp Selections and Menus">
+
+<p>When the pointer moves over a writable menu item, or when a dialogue box containing writable icons is opened from a menu, the Wimp automatically places the caret in the menu item, or the first writable icon, respectively. The Wimp remembers the position of the caret before it does this, and then returns the caret to its old location afterwards.</p>
+
+<p>This behaviour will be extended to check for Wimp selections that have the input focus before the caret is placed. If the same selection still exists afterwards (i.e. a selection has not been made within the menu structure in the meantime), then the input focus will be returned to it.</p>
+
+<p>Note that selections cannot be made in writable menu items, as any clicks are considered as choices from the menu tree before being considered as requests to set the caret position, let alone setting a selection. Also note that drags cannot be made to an icon in a menu structure, as the click that starts the drag will close the menu structure before the drag begins!</p>
+
+<p>Cut and paste will work as specified for writable icons in dialogue boxes in menu trees, and pasting (but obviously not cut or copy) will work for writable menu items.</p>
+</category>
+
+<category title="4.1.3.6 Password icons">
+
+<p>Cutting, copying and dragging from a password icon, or pasting or dragging into one, is not permitted for security reasons. To give the user some feedback, the Wimp issues a system beep if the user attempts to do so. Selecting text in a password icon is permitted, although the only action that can be performed on it is deletion.</p>
+</category>
+
+<category title="4.1.3.7 Application-altered Indirected Data">
+
+<p>On occasions, the text of a writable icon is altered by code other than the Wimp's writable icon handling code (and as a prerequisite, the text data has to be indirected). A common example of this is the writable numeric range, where adjuster arrows may be used to alter the value inside the accompanying writable icon.</p>
+
+<p>Altering the data does not, in itself, cause any screen updates to be done; applications have to force a redraw of the icon for the new value to be displayed. During the redraw, the caret is redrawn, but only using the last work-area-origin-relative co-ordinates calculated the last time the caret was positioned. If the new data requires a different text origin, the caret will then appear incorrectly positioned. To cater for this, nearly if not all applications set the position of the caret again, as well as forcing a redraw of the icon.</p>
+
+<p>A similar situation could arise with selections (and even ghost carets) - but since no existing applications know about selections, they will not be able to cater for the "feature" in the API. For example, suppose the value 99 was selected in a centred numeric range, then the up-arrow was pressed; the result would be as below:</p>
+<image src="Pic1.gif" type="png" caption="" />
+
+<p>To work around this, separate checksums will be kept for the text of the icon currently containing the selection and the ghost caret. Each time an icon is redrawn, a new checksum is calculated, and if the checksum has changed, the selection or ghost caret will be removed. This is because the change to the text has probably invalidated the selected text anyway.</p>
+
+<p>A variant on this approach will be used to fix the equivalent long-standing bug in the case of carets. One potential fix which we have to reject is to simply remove the caret when the text changes, because in many cases the application already has its own workaround whereby it reapplies the caret, so with each change of the text, the window's title bar would flicker due to losing and re-gaining the input focus. Instead, the Wimp will recalculate the caret position, assuming the same index into the string is required - unless the icon's numeric flag (icon flag bit 20) is set, in which the caret will be kept at the same index from the end of the string, to preserve the decimal place being edited. This way, future applications need not include the workaround at all.</p>
+</category>
+
+<category title="4.1.3.8 Scope">
+
+<p>In addition to the rules in §4.1.1.4., any combination of caret, ghost caret and selection must be removed when an icon is deleted. Also, when a menu is closed, any selection in a dialogue box linked to the menu must be removed (the caret already is removed in these cases).</p>
+
+<p>It will not be possible for any caret, selection or ghost caret to be placed in a writable icon that is shaded. If any caret, selection or ghost caret is present in a writable icon when it becomes shaded, they will be removed.</p>
+
+<p>The Wimp selection and both carets will be removed when the Wimp font is changed, but this will be the responsibility of the task that is changing the font - namely !Configure (or more precisely, a configure plug-in).</p>
+
+<p>If an icon is resized using Wimp_ResizeIcon, any of the caret, ghost caret and selection which are present in the icon will be marked absent (although no redrawing will occur immediately, because Wimp_ResizeIcon expects to be followed by a separate redraw operation anyway).</p>
+</category>
+
+<category title="4.1.3.9 Draggable-Writable (Type 14) Icons">
+
+<p>Type 14 (draggable) writable icons are much rarer than standard, type 15 writable icons, and in the past, have only differed in that drag events are reported to the task. Some applications (such as Fresco) have taken advantage of these icons to implement a simpler form of drag-and-drop; such behaviour would be broken if the steps described above were employed for type 14 icons. Type 14 icons could also be a useful special case, where sub-units of the information in the icon have no meaning on their own, and where only the entire text can logically be dragged-and-dropped.</p>
+
+<p>Therefore, all of the rest of §4.x.3 and §5.x.3 (with the exception of developments specific to carets, such as the bugfix in §4.1.3.7) will only apply to type 15 writable icons.</p>
+</category>
+</subsection>
+<subsection title="4.2. Cut and Copy">
+
+<subsubsection title="4.2.1. Protocol">
+
+<p>"Cut" and "Copy" menu options, if provided, must be placed as described in the Style Guide; the options must be shaded if there is currently no selection in the window.</p>
+
+<p>A cut operation must be performed when the task receives a Ctrl-X, Backspace or Delete keypress (i.e. Wimp key codes &hex;008, &hex;018 and &hex;07F) or when "Cut" is chosen from the menu. When a keypress suitable for inserting data is received, or when data is dragged-and-dropped on to the selection's window, or pasted when a selection is active, the selection must also be cut prior to performing the raw operation.</p>
+
+<p>A copy operation must be performed when "Copy" is chosen from the menu, or when the task receives a Ctrl-C keypress (Wimp key code &hex;003) - but not when Wimp key code &hex;18B is received, because although it resulted from a press of the "Copy" key on the Archimedes, A30x0, A4000 and A5000, on all other machines it will be generated by the "End" key.</p>
+
+<p>Both cut and copy will cause a copy of the selected data to be placed on the clipboard overwriting any data already there. (See §13 for a definition of clipboard in this context.) No attempt must be made to render the clipboard; it is a hidden, abstract entity. The data on the clipboard is of indeterminate data type; a data type to use for the transfer is negotiated between the clipboard owner and the pasting task at paste-time, and may involve either or both tasks performing data translation.</p>
+
+<p>The only difference between cut and copy is that the selected data must be removed from the main document in the case of a cut operation. The selection remains unchanged in the case of a copy operation (i.e. it is not deselected).</p>
+
+<p>If the data cut or copied to the clipboard is of type text, the newlines (if any) must be represented by ASCII &hex;0A.</p>
+</subsubsection>
+
+<subsubsection title="4.2.2. Clipboard Module">
+
+<p>The use, or not, of the Clipboard module to handle cut and copy operations will not affect the cut or copy user interfaces, even though this entails some complication of the programming interface (see §5.2.2).</p>
+</subsubsection>
+
+<subsubsection title="4.2.3. Writable Icons">
+<p>Keypresses will be honoured as described in §4.2.1 - although individual icons don't and shouldn't have menus, so the description of performing cuts and copies via a menu is inappropriate. The data held in the writable icon will always be plain text, and the exported data can only be the same, so management of the clipboard can and will be delegated to the Clipboard (and as a consequence of this, a Message_ClaimEntity 4 will be issued by the Clipboard every time data is cut or copied to the clipboard from a writable icon, including those in menu structures).</p>
+</subsubsection>
+</subsection>
+
+<subsection title="4.3. Paste">
+<subsubsection title="4.3.1. Protocol">
+<p>A"Paste" menu option, if provided, must be placed as described in the Style Guide; the option must be shaded if there is no data on the clipboard suitable for pasting into the document, even though this may entail a slight delay before opening of the submenu while the application interrogates the current owner of the clipboard.</p>
+
+<p>The keypresses Ctrl-V and Insert (Wimp key codes &hex;016 and &hex;1CD) are both equivalent to choosing "Paste" from the menu.</p>
+
+<p>If there is a selection present in the window before the paste operation, it must be deleted before the paste takes place; swapping the clipboard contents and the selection would prevent the same data being pasted multiple times. The new data is inserted at the caret, or where the old selection was positioned, and the pasted data is automatically selected, so that the user can immediately cut it again, should it be so desired.</p>
+
+<p>If the data pasted from the clipboard is of type text, any instances of ASCII &hex;0A, &hex;0D, or both codes adjacently in either order must be treated equally, as a single newline.</p>
+</subsubsection>
+
+<subsubsection title="4.3.2. Clipboard Module">
+<p>The use, or not, of the Clipboard module to handle paste operations will not affect the paste user interface.</p>
+</subsubsection>
+
+<subsubsection title="4.3.3. Writable Icons">
+
+<p>Keypresses will be honoured as described in §4.3.1 - although individual icons don't and shouldn't have menus, so the description of performing pastes via a menu is inappropriate. Handling the protocol for obtaining the pasted data will be delegated to the Clipboard.</p>
+
+<p>Pasted data must be available in text (data type &hex;FFF) form, or else the keypress will be ignored. Only text up to the first instance of ASCII &hex;00, &hex;0A or &hex;0D, or the length of the spare space in the data buffer (plus the length of any selection), will be considered; if this string contains other control characters, or characters forbidden by the validation string, the operation will be faulted with a beep. In this case, no characters are inserted and any pre-existing selection is neither deselected nor deleted.</p>
+</subsubsection>
+</subsection>
+
+<subsection title="4.4. Drag">
+<subsubsection title="4.4.1. Protocol">
+<category title="4.4.1.1. General">
+
+<p>When the user starts a drag-and-drop drag (which will always be with the Select button, at least for text selections), the selection is not deselected. When the drag ends, the new data is selected, which means that, unless the drag was a move operation, or the destination is in the same window as the source, the old selection will subsequently be redrawn as a shaded selection.</p>
+
+<p>If, during any drag operation, the Escape key is pressed, the drag must be aborted. Any other keypresses during a drag must be ignored (except of course for the status of the Shift key at the beginning of the drag, which is responsible for exchanging the meanings of copy and move operations).</p>
+</category>
+
+<category title="4.4.1.2. Pointers">
+
+<p>During a drag, the pointer shape is changed to the new standard alternative pointer shape ptr_drop; this must be used instead of the alternatives employed by DataPower, TechWriter and others. The new pointer shape will be added to the Wimp's RAM sprite pool by the Clipboard module, so that it is always available for tasks to use.</p>
+<image src="Pic11.gif" type="png" caption="" />
+
+<p>The new pointer retains the styling of the default pointer, plus the handed-ness of it, while implying a lifting operation consistent with the drop shadows added by the DragASprite and DragAnObject modules, and yet is not completely dissimilar to the existing third party pointers.</p>
+
+<p>The ptr_drop pointer must remain in use throughout the drag operation, with the sole exception of during an autoscroll, when the Wimp's autoscroll pointers are used in preference - see §4.4.1.5.</p>
+</category>
+
+<category title="4.4.1.3. Dragboxes">
+<p>Linked to the pointer position, there will be at all times during the drag either a representation of the (potential) drop position, or of the original data, but not both. Which is used depends on both the sending and (potentially-) receiving tasks, and on the type of data being dragged: if the receiving task understands at least one of the the data types, it will draw the drop position; if not, the sending task is responsible for the representation of the original data.</p>
+
+<p>The representation of the original data, when required, can take the form of either a rotating-dash Wimp box of the same size as the original selection, or of a DragASprite or DragAnObject rendering. As ever, if the CMOS indicates as such, a dragbox must be used instead of a DragASprite or DragAnObject drag. If a selection consisting of multiple, non-contiguous objects is to be represented without using a dragbox, the Wimp sprite "package" must be used, to match the Filer's behaviour.</p>
+<image src="Pic13.gif" type="png" caption="" />
+<image src="Pic14.gif" type="png" caption="" />
+
+<p>Whether a dragbox is to be used or not, the representation is (of course) updated automatically by the Wimp to follow the pointer. The box, sprite or object must always keep the same position relative to the pointer's active point as the original bounding box did at the click that started the drag - except that in the special case of the "package" sprite, the sprite must always be centred over the pointer's active point.</p>
+</category>
+
+<category title="4.4.1.4. Ghost Carets">
+
+<p>The representation of the drop position - known as the ghost caret - has two typical forms. When the pointer is over a primarily textual region, and the task understands at least one of the available data types, the ghost caret can be displayed as a grey I-beam, "snapped" to the nearest character boundary. When the pointer is over a layout-based region, a grey bounding box, scaled according to the zoom setting of the window, can be displayed, snapped to any grid, guidelines, frame boundaries etc. as appropriate. The two are not necessarily mutually exclusive; a DTP package might, for example, want to display an I-beam when underneath a text drag, but a scaled bounding box when underneath a sprite drag. If neither form is appropriate, and the application knows of no other appropriate rendering either, the sending task must be informed (or be allowed to continue) to display the dragbox, sprite or whatever.</p>
+<image src="Pic12.gif" type="png" caption="" />
+<image src="Pic15.gif" type="png" caption="" />
+
+<p>While the task that technically owns the drag continues to be the sending task, the receiving task is responsible for drawing any ghost caret. Therefore the ghost caret position is only updated at each pass through the underlying message protocol, approximately four times a second. In order to prevent the sending task's dragbox or sprite from coexisting with the ghost caret, and thus cluttering the target area to an unnecessary extent, provision is made in the protocol for the receiving task to request that the drag be replaced with a "drag point" (type 7) drag for as long as the receiving task is displaying a ghost caret.</p>
+
+<p>In textual documents, if during the drag, the pointer is positioned over the original selection, the ghost caret must not be displayed - the dragbox must be displayed instead. This is because dragging text inside itself has no meaning.</p>
+</category>
+
+<category title="4.4.1.5. Scrolling">
+
+<p>During a drag, when the pointer is over a window that can scroll, autoscrolling must be turned on using the SWI Wimp_AutoScroll. For more details of the effect of this SWI, see [5], but note that unless the pointer is held still near the edge of the window for a period, no scrolling will occur. Since determination of the pause zone is dependent upon positioning of panes etc., the activation and deactivation of Wimp_AutoScroll is the responsibility of the receiving task.</p>
+</category>
+</subsubsection>
+
+<subsubsection title="4.4.2. Clipboard Module">
+<p>The use, or not, of the Clipboard module to handle drag operations will not affect the drag user interface.</p>
+</subsubsection>
+
+<subsubsection title="4.4.3. Writable Icons">
+
+<p>Drags from writable icons will use the ptr_drop pointer, and a rotating-dash dragbox matched in size to the selection. If the pointer has not moved since the click, the drag will initially look like this (with the dashes rotating):</p>
+<image src="Pic16.gif" type="png" caption="" />
+
+<p>Drags to writable icons (including drags within the same icon) will use an I-beam ghost caret. The ghost-caret drawing facility of the Wimp will also be made available to applications, in order to ensure that all I-beam ghost carets are drawn to the same colour and design. The colour used will be the ColourTransed version of palette entry &hex;80808000 (50.2% grey) in order to attain maximum contrast when EORed over every possible colour.</p>
+
+<p>If the pointer is dragged over the autoscrolling zone (as defined in §4.1.3.2), the icon will be scrolled in order to let the ghost caret be positioned in an out-of-sight part of the icon. This will happen even if the selection fills the icon (meaning that the ghost caret cannot be positioned anywhere in the icon) because there would be no visual clues as to why the autoscrolling was not occurring in this case.</p>
+
+<p>Window autoscrolling will not be initiated while the pointer is being dragged over a writable icon. However, if autoscrolling of the icon's window is already in progress and the pointer moves on to a writable icon, the ghost caret will not be placed in the writable icon.</p>
+</subsubsection>
+</subsection>
+
+<subsection title="4.5. Drop">
+<subsubsection title="4.5.1. Protocol">
+<category title="4.5.1.1. Sending">
+
+<p>When a drag-and-drop drag ends, the sending task attempts to transfer data to the task under the pointer, or if a drag-and-drop dialogue was in effect, to the receiving task (which can only be different from the task under the pointer if the receiving task is autoscrolling one of its windows). The data type actually transferred is negotiated between the sending and receiving tasks at the time of the drop; it may entail either or both tasks performing data translation.</p>
+
+<p>The decision whether to delete the original data when the drag ends (i.e. whether to copy or move the selection) is based upon the state of the Shift key when the drag began, and upon whether the pointer position at the end of the drag is in the same window as at the start, or not. Drags within a window move the data unless Shift is held down; drags between windows copy the data unless Shift is held down. Shift reverses the meaning of the drag, so within a region, the selection is copied, and between regions, the selection is moved.</p>
+
+<p>The destination task can also insist that the operation be a move irrespective of the above; this is to allow for trashcan applications. Drags to non-drag-and-drop applications (including the Filer) are treated the same as drags to a different window.</p>
+
+<p>In some circumstances, such as dropping data onto a directory viewer, the filename used in the data transfer protocols will become visible to the user. For these to be meaningful to the user, these filenames should follow the convention of concatenating the source of the data with the textual filetype, for example "IconText" or "PaintSprite".</p>
+
+<p>When generating data of type text that includes newline characters, you must use ASCII &hex;0A to terminate lines.</p>
+</category>
+
+<category title="4.5.1.2. Receiving">
+
+<p>To the destination task, a drop will appear the same as a non-drag-and-drop DataSave (inter-application data transfer) operation, except that the Wimp message is subtly marked (by virtue of having a non-zero your_ref field) as having resulted from previous messaging (i.e. the drag-and-drop dialogue). Assuming the task doesn't reject the data as being unsuitable, this is sufficient for the task to know what to do with the data:</p>
+
+<p>If a drag-and-drop drop,<list>
+
+    <item>If a ghost caret was being displayed, the insertion point is set to the last known ghost caret position.</item>
+    <item>Otherwise, the insertion point is set to the position specified in the message (i.e. the pointer position), snapped if necessary.</item></list>
+</p>
+
+<p>If a non-drag-and-drop drop,<list>
+
+    <item>If a caret (shadow or not) or selection (shaded or not) is being displayed, the insertion point is set there.</item>
+    <item>Otherwise, the insertion point is set to the position specified in the message, snapped if necessary.</item></list>
+</p>
+
+<p>If the insertion point thus determined lies on a selection (shaded or not), the said selection must be cut to the clipboard. (This is the only circumstance in which the clipboard is affected by a drag-and-drop operation.) The new data is inserted, and is then selected itself.</p>
+
+<p>If the insertion point lies on the source selection, no actions must be taken. The selection remains selected.</p>
+
+<p>Received text data must be correctly handled whether newlines (if any) are indicated using ASCII &hex;0A, &hex;0D, or both characters in either order.</p>
+</category>
+</subsubsection>
+
+<subsubsection title="4.5.2. Clipboard Module">
+<p>The use, or not, of the Clipboard module to handle drop operations will not affect the drop user interface.</p>
+</subsubsection>
+
+<subsubsection title="4.5.3. Writable Icons">
+<p>The requirements for acceptance of dropped data are the same as for pasted data (see §4.3.3).</p>
+
+<p>Text dragged from a writable icon is not terminated in any way - the "file" length determines the amount of text. The leafname used for icon-sourced text will be "IconText"; because the data transfer message handling will be delegated to the Clipboard, there will be no opportunity to change the leafname so as not to overwrite an existing file of the same name.</p>
+</subsubsection>
+</subsection>
+</section>
+
+<section title="5. Programming Interface and Data Interchange">
+
+<p>These two sections have been combined because any programming interfaces being specified are intimately connected to data interchange, and it makes no sense to discuss the programming interfaces before the data interchange they relate to.</p>
+
+<subsection title="5.1. Selection">
+<subsubsection title="5.1.1. Protocol">
+<p>Handling mouse and key events relating to and rendering of selections is the responsibility of the task. The task may use Wimp_SetCaretPosition to delegate drawing of the caret, but non-I-beam carets and selections need to be drawn during window update and redraw code. To give a window the input focus without displaying the Wimp caret (for example, when setting a selection), Wimp_SetCaretPosition must be called with R4 bit 25 set.</p>
+
+<p>Whenever a cut-and-paste / drag-and-drop task gains either the caret or the selection, it must broadcast the following event 17 Wimp message with both flag bits 0 and 1 set:</p>
+
+
+<message-definition name="ClaimEntity"
+                    number="0000F"
+                    description="This message is broadcast by a task claiming the cut-and-paste / drag-and-drop caret, selection or clipboard"
+                    source="Tasks"
+                    destination="Tasks">
+<message-table>
+  <message offset="12">your ref: 0</message>
+  <message offset="20">Flags:
+     <bitfield-table>
+    <bit number="0">Caret or selection being claimed</bit>
+    <bit number="1">Caret or selection being claimed</bit>
+    <bit number="2">Clipboard being claimed (see §5.2.1)</bit>
+    <bit number="3-31" state="reserved"></bit>
+   </bitfield-table></message>
+</message-table>
+
+<use>
+<fixme>confirm message definition attributes</fixme>
+<p>A task must determine if it is gaining, or merely repositioning the caret/selection by whether any other task has broadcast a Message_ClaimEntity with bits 0 or 1 set, since the last time the task in question broadcast such a message. Note in particular, this means that a task must not consider the caret to have been lost when the Wimp caret is grabbed by a non- cut-and-paste / drag-and-drop task.</p>
+
+<p>When a task receives Message_ClaimEntity with either one or both of bits 0 and 1 set, it must act as though both the caret and selection have been claimed - and therefore redraw any selection as a shaded selection, and either redraw the caret as a shadow caret, or remove the caret entirely (the latter will be done automatically if the task was using a Wimp-drawn user caret).</p>
+
+<p>Note that the Wimp does not issue this message when positioning either the caret or a selection within a menu structure.</p>
+</use>
+</message-definition>
+</subsubsection>
+
+<subsubsection title="5.1.2. Clipboard Module">
+
+<p>The Clipboard is not involved in the selection process. However, any programs planning to rely entirely on the Clipboard to manage its cut-and-paste / drag-and-drop data transfer must still claim the caret and selection as described in §5.1.1.</p>
+
+</subsubsection>
+
+<subsubsection title="5.1.3. Writable Icons">
+<category title="5.1.3.1. Wimp_SetCaretPosition API">
+
+<p>Wimp_SetCaretPosition will be extended to allow the following entities to be created:<list>
+
+    <item>Carets in writable icons that are not necessarily centred when the text is wider than the icon.</item>
+    <item>"User" ghost carets - i.e. ghost carets not in an icon. *</item>
+    <item>Ghost carets in writable icons (not necessarily centred). (See §5.4.3.)</item>
+    <item>Selections in writable icons, centred when the text is wider than the icon. *</item>
+    <item>Selections in writable icons, not necessarily centred when the text is wider than the icon.</item></list>
+</p>
+
+<p>Those entities above marked with an asterisk will also be made available to tasks. Any calls using the API for the others will be ignored, unless called using the internal Wimp routine. Below is the complete new Wimp_SetCaretPosition API, including the existing functionality, in a more digestible form than in the RISC OS 3 PRM. This includes the calls for internal use only; although these are internally distinguished by flags bit 28 being set, as far as the outside world is concerned, both bits 28 and 29 remain "reserved, must be zero".</p>
+
+<swi-definition name="Wimp_SetCaretPosition"
+                number="400D2"
+                description="Set up the data for a new caret, ghost caret or selection position, and redraw it there"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+<register-use number="0-6">contents varies by operation</register-use>
+</entry>
+
+<exit>
+<register-use number="0" state="preserved"></register-use>
+<register-use number="1" state="preserved"></register-use>
+<register-use number="2" state="preserved"></register-use>
+<register-use number="3" state="preserved"></register-use>
+<register-use number="4" state="preserved"></register-use>
+<register-use number="5" state="preserved"></register-use>
+<register-use number="6" state="undefined"></register-use>
+</exit>
+
+<use>
+<fixme>confirm irqs, fiqs, processor-mode, re-entrant</fixme>
+<p>This is SWI and has many use cases. The table below shows the complete list of operations.</p>
+<value-table head-number="Action" head-value="Description">
+<value number="0"><reference type="swi" name="Wimp_SetCaretPosition" reason="0" use-description="yes"/></value>
+<value number="1"><reference type="swi" name="Wimp_SetCaretPosition" reason="1" use-description="yes"/></value>
+<value number="2"><reference type="swi" name="Wimp_SetCaretPosition" reason="2" use-description="yes"/></value>
+<value number="3"><reference type="swi" name="Wimp_SetCaretPosition" reason="3" use-description="yes"/></value>
+<value number="4"><reference type="swi" name="Wimp_SetCaretPosition" reason="4" use-description="yes"/></value>
+<value number="5"><reference type="swi" name="Wimp_SetCaretPosition" reason="5" use-description="yes"/></value>
+<value number="6"><reference type="swi" name="Wimp_SetCaretPosition" reason="6" use-description="yes"/></value>
+<value number="7"><reference type="swi" name="Wimp_SetCaretPosition" reason="7" use-description="yes"/></value>
+</value-table>
+
+<p>The versions of the indexes into the string held internally, after an icon caret is positioned by index, will in future be restricted to the range <code type="c">{ 0 &le; index &le; length }</code> rather than just <code type="c">{ index &ge; 0 }</code>. This is essentially a bugfix, and will affect the values returned by Wimp_GetCaretPosition.</p>
+
+<p>The Caret Flag</p>
+<p> 
+Flag bits 30/31 determine which entity the call refers to, and also affect the other flag bit meanings:
+
+<value-table head-name="Entity">
+<value number="0" name="Caret">
+<bitfield-table>
+<bit number="0-15">height in OS units (0-65535)</bit>
+<bit number="16-23">colour (bits 20-23 ignored if a Wimp colour number)</bit>
+<bit number="24">use a Wimp-drawn caret rather than the Font Manager caret </bit>
+<bit number="25">do not draw the I-beam (caret is invisible)</bit>
+<bit number="26">use bits 16-23 for colour (else defaults to colour 11)</bit>
+<bit number="27">colour is a GCOL, otherwise a Wimp colour number</bit>
+<bit number="28">use both R2 and R5 to position the caret in an icon and override centring behaviour (internal use only, must be zero for external callers)</bit>
+<bit number="29" state="reserved"></bit>
+</bitfield-table></value>
+
+<value number="1" name="Ghost Caret">
+<bitfield-table>
+<bit number="0-15">height in OS units (0-65535)</bit>
+<bit number="16-23">not used; must be zero (palette entry &hex;80808000 always used)</bit>
+<bit number="24">use a Wimp-drawn caret rather than the Font Manager caret </bit>
+<bit number="25-27">not used; must be zero (cannot be invisible, colour is fixed)</bit>
+<bit number="28">use both R2 and R5 to position the ghost caret in an icon and override centring behaviour (internal use only, must be zero for external callers)</bit>
+<bit number="29" state="reserved"></bit>
+</bitfield-table></value>
+
+<value number="2" name="Selection">
+<bitfield-table>
+<bit number="0-25">not used; must be zero (height and colour determined by icon properties and bit 26)</bit>
+<bit number="26">use shaded selection colour scheme (also implies that the window containing the selection should not be awarded the input focus as the result of this call)</bit>
+<bit number="27">the window containing the selection should not be awarded the input focus, even if it is not shaded</bit>
+<bit number="28">use both R2 and R5/R6 to position the selection in an icon and override centring behaviour (internal use only, must be zero for external callers)</bit>
+<bit number="29" state="reserved"></bit>
+</bitfield-table></value>
+
+<value number="3" name="Reserved"></value>
+</value-table>
+</p>
+
+</use>
+
+<related>
+<reference type="swi" name="Wimp_GetCaretPosition"/>
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_SetCaretPosition"
+                number="400D2"
+                reason="0"
+                reasonname="Remove"
+                description="To remove the caret / ghost caret / selection"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+                <fixme>confirm irqs, fiqs, processor-mode, re-entrant</fixme>
+
+<entry>
+<register-use number="0">-1</register-use>
+<register-use number="2">"TASK"</register-use>
+<register-use number="3">caret flags (bits other than 30 and 31 reserved, must be zero)</register-use>
+<register-use number="4">use bits 30 and 31 of R4 to determine which entity to remove, otherwise remove the caret</register-use>
+</entry>
+
+<exit>
+<register-use number="0" state="preserved"></register-use>
+<register-use number="2">0</register-use>
+<register-use number="3" state="preserved"></register-use>
+<register-use number="3" state="preserved"></register-use>
+</exit>
+
+<use>
+<p>To remove the caret / ghost caret / selection.</p>
+</use>
+
+<related>
+<reference type="swi" name="Wimp_GetCaretPosition" />
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_SetCaretPosition"
+                number="400D2"
+                reason="1"
+                reasonname="SetUserCaretOrUserGhostCaret"
+                description="To set a user caret / user ghost caret:"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">window handle</register-use>
+<register-use number="1">x-offset of caret / ghost caret, relative to work area origin</register-use>
+<register-use number="2">y-offset of caret / ghost caret, relative to work area origin</register-use>
+<register-use number="3">caret flags (bits other than 30 and 31 reserved, must be zero)</register-use>
+<register-use number="4">height of caret, and flags</register-use>
+</entry>
+
+<exit>
+<register-use number="0" state="preserved"></register-use>
+<register-use number="1" state="preserved"></register-use>
+<register-use number="2" state="preserved"></register-use>
+<register-use number="3" state="preserved"></register-use>
+<register-use number="4" state="preserved"></register-use>
+</exit>
+
+<use>
+<fixme>confirm irqs, fiqs, processor-mode, re-entrant</fixme>
+<p>To remove the caret / ghost caret / selection.</p>
+</use>
+
+<related>
+<reference type="swi" name="Wimp_GetCaretPosition" />
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_SetCaretPosition"
+                number="400D2"
+                reason="2"
+                reasonname="SetIconCaretByIndex"
+                description="To set an icon caret, centred if possible, by known index into the string"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">window handle</register-use>
+<register-use number="1">icon handle</register-use>
+<register-use number="4">-1</register-use>
+<register-use number="5">index of caret into string (must be &ge; 0)</register-use>
+</entry>
+
+<exit>
+<register-use number="0" state="preserved"></register-use>
+<register-use number="1" state="preserved"></register-use>
+<register-use number="4" state="preserved"></register-use>
+<register-use number="5" state="preserved"></register-use>
+</exit>
+
+<use>
+<fixme>confirm irqs, fiqs, processor-mode, re-entrant.</fixme>
+<p>To set an icon caret, centred if possible, by known index into the string</p>
+</use>
+
+<related>
+<reference type="swi" name="Wimp_GetCaretPosition" />
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_SetCaretPosition"
+                number="400D2"
+                reason="3"
+                reasonname="SetIconCaretAndFlags"
+                description="To set an icon caret and override the default Y position, size or flags"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">window handle</register-use>
+<register-use number="1">icon handle</register-use>
+<register-use number="3">y-offset of caret, relative to work area origin</register-use>
+<register-use number="4">height of caret, and flags (bits 28-31 all clear)</register-use>
+<register-use number="5">index of caret into string (must be &ge; 0) </register-use>
+</entry>
+
+<exit>
+<register-use number="0" state="preserved"></register-use>
+<register-use number="1" state="preserved"></register-use>
+<register-use number="3" state="preserved"></register-use>
+<register-use number="4" state="preserved"></register-use>
+<register-use number="5" state="preserved"></register-use>
+</exit>
+
+<use>
+<fixme>confirm irqs, fiqs, processor-mode, re-entrant.</fixme>
+<p>To set an icon caret and override the default Y position, size or flags</p>
+</use>
+
+<related>
+<reference type="swi" name="Wimp_GetCaretPosition" />
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_SetCaretPosition"
+                number="400D2"
+                reason="4"
+                reasonname="SetIconCaretByScreenPosition"
+                description="To set an icon caret, centred if possible, by approximate current position on screen"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">window handle</register-use>
+<register-use number="1">icon handle</register-use>
+<register-use number="2">current x-offset of desired position, relative to work area origin</register-use>
+<register-use number="3">current y-offset of desired position, relative to work area origin</register-use>
+<register-use number="5">-1</register-use>
+</entry>
+
+<exit>
+<register-use number="0" state="preserved"></register-use>
+<register-use number="1" state="preserved"></register-use>
+<register-use number="2" state="preserved"></register-use>
+<register-use number="3" state="preserved"></register-use>
+<register-use number="5" state="preserved"></register-use>
+</exit>
+
+<use>
+<fixme>confirm irqs, fiqs, processor-mode, re-entrant</fixme>
+<p>To set an icon caret, centred if possible, by approximate current position on screen.</p>
+<p>Note that if positioning the caret there causes the icon to scroll, the final caret position may be very different to the specified position.</p>
+</use>
+
+<related>
+<reference type="swi" name="Wimp_GetCaretPosition" />
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_SetCaretPosition"
+                number="400D2"
+                reason="5"
+                reasonname="SetIconCaretOrGhostCaret"
+                description="To set an icon caret / icon ghost caret, not necessarily centred"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">window handle</register-use>
+<register-use number="1">icon handle</register-use>
+<register-use number="2">new value of caret scrollx</register-use>
+<register-use number="3">0 (reserved for future expansion)</register-use>
+<register-use number="4">height of caret, and flags (bit 28 set, bit 30 set for ghost caret or clear for caret, bit 31 clear)</register-use>
+<register-use number="5">index of caret into string (must be >= 0)</register-use>
+</entry>
+
+<exit>
+<register-use number="0" state="preserved"></register-use>
+<register-use number="1" state="preserved"></register-use>
+<register-use number="2" state="preserved"></register-use>
+<register-use number="3" state="preserved"></register-use>
+<register-use number="3" state="preserved"></register-use>
+<register-use number="5" state="preserved"></register-use>
+</exit>
+
+<use>
+<fixme>confirm irqs, fiqs, processor-mode, re-entrant</fixme>
+<p>To set an icon caret / icon ghost caret, not necessarily centred. *</p>
+</use>
+
+<related>
+<reference type="swi" name="Wimp_GetCaretPosition" />
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_SetCaretPosition"
+                number="400D2"
+                reason="6"
+                reasonname="SetIconSelectionCentred"
+                description="To set an icon selection, centred if possible"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">window handle</register-use>
+<register-use number="1">icon handle</register-use>
+<register-use number="4">flags (bit 28 clear, bit 30 clear, bit 31 set) </register-use>
+<register-use number="5">index of lower boundary into string</register-use>
+<register-use number="6">index of upper boundary into string</register-use>
+</entry>
+
+<exit>
+<register-use number="0" state="preserved"></register-use>
+<register-use number="1" state="preserved"></register-use>
+<register-use number="4" state="preserved"></register-use>
+<register-use number="5" state="preserved"></register-use>
+<register-use number="6" state="undefined"></register-use>
+</exit>
+
+<use>
+<fixme>confirm irqs, fiqs, processor-mode, re-entrant</fixme>
+<p>To set an icon selection, centred if possible (or if the selection is wider than the icon, right-aligned within the icon).</p>
+<p>Note: no action is taken if R5 &ge; R6.</p>
+</use>
+
+<related>
+<reference type="swi" name="Wimp_GetCaretPosition" />
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_SetCaretPosition"
+                number="400D2"
+                reason="7"
+                reasonname="SetIconSelection"
+                description="To set an icon selection, not necessarily centred"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">window handle</register-use>
+<register-use number="1">icon handle</register-use>
+<register-use number="2">new value of caret scrollx</register-use>
+<register-use number="3">0 (reserved for future expansion)</register-use>
+<register-use number="4">flags (bit 28 set, bit 30 clear, bit 31 set) </register-use>
+<register-use number="5">index of lower boundary into string</register-use>
+<register-use number="6">index of upper boundary into string</register-use>
+</entry>
+
+<exit>
+<register-use number="0" state="preserved"></register-use>
+<register-use number="1" state="preserved"></register-use>
+<register-use number="2" state="preserved"></register-use>
+<register-use number="3" state="preserved"></register-use>
+<register-use number="4" state="preserved"></register-use>
+<register-use number="5" state="preserved"></register-use>
+<register-use number="6" state="undefined"></register-use>
+</exit>
+
+<use>
+<fixme>confirm irqs, fiqs, processor-mode, re-entrant</fixme>
+<p>To set an icon selection, not necessarily centred.</p>
+<p>Note: no action is taken if R5 &ge; R6.</p>
+</use>
+
+<related>
+<reference type="swi" name="Wimp_GetCaretPosition" />
+</related>
+</swi-definition>
+
+</category>
+
+<category title="5.1.3.2. Wimp_GetCaretPosition API">
+
+<p>The complimentary SWI will be extended to allow for Wimp_SetCaretPosition's new functionality:</p>
+
+<swi-definition name="Wimp_GetCaretPosition"
+                number="400D3"
+                description="Returns details of the state of the caret, ghost caret or writable icon selection"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">if R2 = "TASK", this is the entity to inspect (0 => caret, 1 => ghost caret, 2 => selection)</register-use>
+<register-use number="1">block to fill with entity state</register-use>
+<register-use number="2">"TASK" =>  fill block with state of entity specified by R0 and R3, else fill block with caret state</register-use>
+<register-use number="3">if R0 = 2 and R2 = "TASK", this is either the handle of the window to inspect, or -1 to inspect the window which currently has the input focus and therefore also the only un-shaded selection</register-use>
+</entry>
+
+<exit>
+<register-use number="0" state="corrupted"></register-use>
+<register-use number="1" state="preserved"></register-use>
+<register-use number="2" >0 if it was "TASK" on entry</register-use>
+<register-use number="3" state="preserved"></register-use>
+</exit>
+
+<use>
+<fixme>confirm irqs, fiqs, processor-mode, re-entrant</fixme>
+<p>This call returns details of the state of the caret, ghost caret or writable icon selection.</p>
+
+
+<p>If the caret or ghost caret state is being returned, the block is filled as follows:
+<message-table>
+<message offset="0">window handle (or -1 if there is no [ghost] caret)</message>
+<message offset="4">icon handle (or -1 if a user [ghost] caret)</message>
+<message offset="8">x-offset of [ghost] caret, relative to work area origin</message>
+<message offset="12">y-offset of [ghost] caret, relative to work area origin</message>
+<message offset="16">height of [ghost] caret and flags (bit 28 clear)</message>
+<message offset="20">index of [ghost] caret into string (undefined if a user [ghost] caret)</message>
+</message-table>
+</p>
+
+<p>If the selection state is being returned, the block is filled as follows:
+<message-table>
+<message offset="0">window handle (or -1 if there is no writable icon selection)</message>
+<message offset="4">icon handle (>= 0)</message>
+<message offset="8">x-offset of lower boundary of selection, relative to work area origin</message>
+<message offset="12">width of selection</message>
+<message offset="16">y-offset of selection, relative to work area origin</message>
+<message offset="20">height of selection and flags (bit 28 clear)</message>
+<message offset="24">index of lower boundary into string</message>
+<message offset="28">index of upper boundary into string</message>
+</message-table>
+</p>
+</use>
+
+<related>
+<reference type="swi" name="Wimp_SetCaretPosition" />
+</related>
+</swi-definition>
+
+</category>
+</subsubsection>
+</subsection>
+
+<subsection title="5.2. Cut and Copy">
+<subsubsection title="5.2.1. Protocol">
+<p>When a cut or copy operation is requested of an application, it must copy the selected data to the clipboard. Under the raw protocol, each task is responsible for allocating (and deallocating) the memory necessary to store the clipboard. The clipboard must hold the data in a form from which it can be translated to the maximum number of other data types, which usually means it must be held in the application's internal format.</p>
+
+<p>In order to ensure that only one clipboard is active globally at a time, it is necessary that when a cut or copy operation is performed, the cutting/copying task broadcasts a Message_ClaimEntity (see §5.1.1) with bit 2 set. Accordingly, when a task receives such a message, it must deallocate the memory used to store its own clipboard (unless of course, its own clipboard was not in use). The message must not be sent if the same task already owned the clipboard.</p>
+</subsubsection>
+
+
+<subsubsection title="5.2.2. Clipboard Module">
+
+<p>One of the Clipboard's functions is to allocate and manage memory to store the clipboard data for any participating tasks, following a cut or copy operation.</p>
+
+<p>However, the Clipboard has no intrinsic knowledge of how to translate data between different formats, so it is essential that no task uses the Clipboard for this purpose if it is able to translate data on export. For example, none of Edit, Paint or Draw can exclusively use the Clipboard for clipboard storage - Edit could export Basic programs as a tokenised file, or as text; Paint can export both sprites and palettes; and Draw can export text, sprites, JPEGs and PostScript as well as DrawFiles.</p>
+
+<p>Despite this, the raw protocol messaging involved at the pasting stage is still not completely trivial, and so an alternative method will be provided, whereby the task is still responsible for storing the clipboard and translating the data when required, but the Clipboard handles all the associated Wimp messaging. This also allows some code sharing with the data-send end of the drop operation.</p>
+
+<swi-definition name="Clipboard_Put"
+                number="4E000"
+                description="Puts data on the clipboard, or initiates the data-send of a drop"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">flags:
+<bitfield-table>
+<bit number="0">Clear the clipboard (must be used when the application exits, unless another task has since claimed the clipboard using a Message_ClaimEntity 4)</bit>
+<bit number="1">Do not store the data, just the data length (and the task handle) - when the data is required, the Clipboard will send the clipboard-owning task a Message_PutRequest stating the required data type, see §5.3.2</bit>
+<bit number="2">R1 is a pointer to a data type list, otherwise R1 is the data type</bit>
+<bit number="3-30" state="reserved" />
+<bit number="31">Flag reply messages as for the attention of the Wimp</bit>
+</bitfield-table>
+</register-use>
+<register-use number="1">depending on flags bit 2, either the data type (in bits 0-11), or a pointer to non-null list of data types that the task can translate the data to (in no particular order), terminated by -1</register-use>
+<register-use number="2">pointer to data (if flags bit 1 is clear)</register-use>
+<register-use number="3">data length</register-use>
+<register-use number="4">pointer to proposed leafname of data, null-terminated</register-use>
+<register-use number="5">my_ref of Message_PutRequest which this is a reply to, or 0 if this isn't a reply</register-use>
+</entry>
+
+<exit>
+<register-use number="0-5" state="preserved"></register-use>
+</exit>
+
+<use>
+<fixme>confirm irqs, fiqs, processor-mode, re-entrant</fixme>
+<p>This SWI can be used for three main purposes:<list>
+<item>passing clipboard data to the Clipboard module to handle on the application's behalf</item>
+<item>passing enough information about the clipboard to the Clipboard so it can advertise on our behalf (or proxy) and get back to the application if and when a paste operation happens</item>
+<item>passing selection data to the Clipboard</item></list></p>
+
+<p>The first and second cases can be initiated by the application, often in response to a Ctrl-C or Ctrl-X keypress. In this case, R5 will be 0. The first and third cases should be called in response to a Message_PutRequest, which is sent to the application by the Clipboard module if it called SWI Clipboard_Put (second case) or SWI Clipboard_StartDrag respectively, and a paste or drop operation (respectively) has been performed by the user.</p>
+
+<p>Deleting the data in the main document following a cut operation remains the task's responsibility. If a task is maintaining its own clipboard storage area, it must release the memory when it receives a Message_ClaimEntity 4 broadcast. When a task exits, if it is maintaining the clipboard, or if Clipboard is maintaining the clipboard for it, the task must call Clipboard_Put with flags bit 0 set, for consistency with applications that do everything themselves.</p>
+
+<p>The Clipboard broadcasts a Message_ClaimEntity 4 (unless the Clipboard owns the clipboard already), and takes a copy of the data, the leafname and the data type list, as appropriate. An error is generated if any of the pointers are invalid.</p>
+</use>
+
+<related>
+<reference type="swi" name="Wimp_GetCaretPosition" />
+<reference type="swi" name="Wimp_SetCaretPosition" />
+</related>
+</swi-definition>
+
+</subsubsection>
+
+<subsubsection title="5.2.3. Writable Icons">
+<p>The Wimp itself is not a Wimp task. One of the consequences of this is that it has no task handle, and is as such not well suited to handling Wimp messages. Because of this, it will make heavy use of the Clipboard.</p>
+
+<p>When the user types Ctrl-C or Ctrl-X in a writable icon, the Wimp will call Clipboard_Put with all flags clear and a data type of &hex;FFF. The data will not be terminated; only the data length word will determine the extent of the data.</p>
+
+</subsubsection>
+</subsection>
+
+<subsection title="5.3. Paste">
+<subsubsection title="5.3.1. Protocol">
+
+<p>The application must first check to see if it owns the clipboard, and use the data directly if so. If it does not own it, it must broadcast a Message_DataRequest (message type 18):</p>
+
+<message-definition 
+    name="DataRequest"
+    number="00010"
+    description="Broadcast by a task when it wishes to paste data from a clipboard maintained by another task"
+    source="Task"
+    destination="Task">
+
+<message-table>
+<message offset="12">your_ref: 0</message>
+<message offset="20">destination window handle</message>
+<message offset="24">internal handle to indicate destination of data; may be icon handle (see below)</message>
+<message offset="28">destination x co-ordinate</message>
+<message offset="32">destination y co-ordinate</message>
+<message offset="36">flags:
+<bitfield-table>
+<bit number="2">Send data from clipboard</bit>
+<bit></bit>All other bits are reserved and must be clear</bitfield-table></message>
+<message offset="40">list of data types in receiver's order of preference, terminated by -1 (may be null)</message>
+</message-table>
+
+<use>
+<fixme>confirm message definition attributes</fixme>
+<p>Flags bit 2 must be set when the message is sent. If the message is received with flags bit 2 clear, the message must be ignored.</p>
+
+<p>If an application receiving the message owns the clipboard, it must choose the earliest data type in the list that it can provide, and if none are possible (or the list is null) it must provide the data in its original (native) format. It must reply using the normal Message_DataSave protocol. Bytes 20-35 of the DataSave block must be copied directly from the corresponding bytes of the Message_DataRequest block (despite the discrepancy between icon handle and internal handle), while the estimated size, data type and leafname must be filled appropriately. The your_ref of the Message_DataSave must be the my_ref of the Message_DataRequest.</p>
+
+<p>Be aware that if the Wimp sees an incoming DataSave with a valid icon handle at bytes 24-27 (i.e. less than the number of icons created in the windows), it will assume that it is a request to paste into that icon. Consequently, an application must be careful how it allocates its internal handles for use in this message. For example, it could use pointers into application space, which will be above &hex;8000 and therefore very unlikely to clash with an icon handle.</p>
+
+<p>When the task that initiated the paste receives the Message_DataSave, it must check the data type to ensure that it knows how to deal with it - it may be the clipboard owner's native format. If it cannot, it may back out of the transaction by ignoring the message. Otherwise, it must continue with the conventional DataSave protocol, preferably using memory data transfer.</p>
+
+<p>If an application needs to find out whether there is data available to paste, but does not actually want to receive the data (e.g. in order to determine whether a "Paste" menu option should be shaded), it must broadcast a Message_DataRequest as described above. If no task replies (i.e. the message bounces) then there is no clipboard data available. If a Message_DataSave is received, then the application must ignore it (i.e. fail to reply), which will cause the operation to be silently aborted by the other task. The data type field of the Message_DataSave can then be used to determine whether the data being offered by the other task is in a suitable format to be pasted.</p>
+</use>
+
+<related>
+<reference type="swi" name="Clipboard_GetDataType" />
+<reference type="swi" name="Clipboard_Put" />
+<reference type="message" name="Paste" />
+<reference type="message" name="PutRequest" />
+</related>
+
+</message-definition>
+
+</subsubsection>
+<subsubsection title="5.3.2. Clipboard Module">
+<category title="5.3.2.1. The Complete Paste Process">
+
+<p>During the paste process, the Clipboard behaves to conventional drag-and-drop tasks exactly like any other clipboard owner, and responds to Message_DataRequests as described above.</p>
+
+<p>It also provides an alternative interface to the pasting process, involving much less messaging. It involves SWI Clipboard_Get and the messages Message_PutRequest and Message_Paste. However, as before, if a task is managing its own clipboard, it must use the data directly in preference (although this will now only be in cases where the data can be translated on export).</p>
+
+
+<swi-definition name="Clipboard_Get"
+                number="4E001"
+                description="Requests data from the clipboard, using the Clipboard as a proxy"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">flags:
+<bitfield-table>
+<bit number="0-30" state="reserved" />
+<bit number="31">Flag reply messages as for the attention of the Wimp (this bit must only be set by the Wimp)</bit>
+</bitfield-table>
+</register-use>
+<register-use number="1">destination window handle</register-use>
+<register-use number="2">destination icon handle (-1 if none)</register-use>
+<register-use number="3">destination x co-ordinate</register-use>
+<register-use number="4">destination y co-ordinate</register-use>
+<register-use number="5">pointer to list of data types that the task is interested in receiving, in order of preference, terminated by -1 (may be a null list if the native format is required)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-5" state="preserved"></register-use>
+</exit>
+
+<use>
+<fixme>confirm irqs, fiqs, processor-mode, re-entrant</fixme>
+<p>The Clipboard takes an internal copy of the data type list. If it owns the clipboard itself, it replies immediately with a Message_Paste. If a task has registered itself with the Clipboard using a bit-1-set SWI Clipboard_Put, the Clipboard sends a Message_PutRequest to the clipboard owner, and uses the data copied from the details in the following SWI Clipboard_Put to construct a Message_Paste. Alternatively, if a conventional drag-and-drop task owns the clipboard, the Clipboard will send a Message_DataRequest and handle all the Message_DataSave etc. messaging, before sending a Message_Paste to the pasting task, thus creating a uniform interface.</p>
+
+</use>
+
+<related>
+<reference type="swi" name="Clipboard_GetDataType" />
+<reference type="swi" name="Clipboard_Put" />
+<reference type="message" name="DataRequest" />
+<reference type="message" name="PutRequest" />
+</related>
+</swi-definition>
+
+
+<message-definition 
+    name="PutRequest"
+    number="4E000"
+    description="Requests that clipboard or selection data be sent to the Clipboard"
+    source="Clipboard"
+    destination="Task">
+
+<message-table>
+<message offset="12">your_ref: 0</message>
+<message offset="20">flags:
+<bitfield-table>
+<bit number="0">Flags bit 0 to use in Clipboard_Put</bit>
+<bit number="1">Flags bit 1 to use in Clipboard_Put</bit>
+<bit number="2">Flags bit 2 to use in Clipboard_Put (note this also determines whether a single data type, or a data type list pointer is required in R3)</bit>
+<bit number="3">Send the clipboard (otherwise send the selection)</bit>
+<bit number="4">Delete the selection after sending the data</bit>
+<bit number="5-30" state="reserved"></bit>
+<bit number="31">Message is for the attention of the Wimp, other tasks must ignore it</bit>
+</bitfield-table></message>
+<message offset="24">destination window handle</message>
+<message offset="28">destination icon handle (-1 if none)</message>
+<message offset="32">destination x co-ordinate</message>
+<message offset="36">destination y co-ordinate</message>
+<message offset="40">pointer to list of data types that the destination task is interested in receiving, in order of preference, terminated by -1 (may be a null list if the native format is required) - now held in the Clipboard's workspace</message>
+</message-table>
+
+<use>
+<fixme>confirm message definition attributes</fixme>
+<p>This message requests that clipboard or selection data be sent to the Clipboard.</p>
+
+<p>Message_PutRequest is sent exclusively by the Clipboard. Any task receiving the message must reply before the next Wimp_Poll using SWI Clipboard_Put with, preserving flags bit 0-2 and 31.</p>
+
+<p>The message is used both for providing the data in a paste operation (when data translation has to be delayed until paste-time) and in a drop operation, so care must be taken to send the data from either the internal clipboard or the selection, respectively. Bit 4 caters for move-drags (see §5.4.2).</p>
+
+<p>The data type chosen must be the first one in the list that it can provide, or the native data type if none (or if the list is null). The data must be translated prior to calling Clipboard_Put (unless bit 2 is set), as it is at that stage that the Clipboard takes an internal copy of the data. The leafname must be built as described in §4.5.1.1.</p>
+</use>
+
+<related>
+<reference type="swi" name="Clipboard_Get" />
+<reference type="swi" name="Clipboard_Put" />
+<reference type="message" name="DataRequest" />
+<reference type="message" name="DataTypeIs" />
+</related>
+</message-definition>
+
+<message-definition 
+    name="Paste"
+    number="4E001"
+    description="Informs the task being pasted to or dropped upon that the data is ready to be received"
+    source="Clipboard"
+    destination="Task">
+
+<message-table>
+<message offset="12">your_ref: 0</message>
+<message offset="20">flags:
+<bitfield-table>
+<bit number="0">Clipboard couldn't find any clipboard after a Clipboard_Get call - take no further action</bit>
+<bit number="1-30" state="reserved"></bit>
+<bit number="31">Message is for the attention of the Wimp, other tasks must ignore it</bit>
+
+</bitfield-table>
+</message>
+<message offset="24">destination window handle</message>
+<message offset="28">destination icon handle (-1 if none) or internal handle if initiated by a Message_DataRequest</message>
+<message offset="32">destination x co-ordinate</message>
+<message offset="36">destination y co-ordinate</message>
+<message offset="40">data type</message>
+<message offset="44">pointer to data, or 0 if flag bit 0 set</message>
+<message offset="48">data length</message>
+<message offset="51">pointer to proposed leafname of data, null-terminated, or 0 if flag bit 0 set</message>
+</message-table>
+
+<use>
+<fixme>confirm message definition attributes</fixme>
+<p>This message informs the task being pasted to or dropped upon that the data is ready to be received.</p>
+
+<p>This message is also sent exclusively by the Clipboard. The data type must first be checked for suitability, then the data must be copied before the next Wimp_Poll, as the Clipboard will free up the memory unless it was itself the owner of the clipboard (the task must not attempt to determine whether this is the case).</p>
+
+<p>Note that the Clipboard stores data in its own application slot, and this is where the pointer at R1+44 lies, so in order to copy the data, you must use Wimp_TransferBlock. The Clipboard's task handle (required by Wimp_TransferBlock) may be obtained from R1+4.</p>
+</use>
+
+<related>
+<reference type="swi" name="Clipboard_Get" />
+<reference type="swi" name="Clipboard_GetDataType" />
+<reference type="swi" name="Clipboard_Put" />
+<reference type="message" name="DataTypeIs" />
+<reference type="message" name="PutRequest" />
+</related>
+</message-definition>
+</category>
+
+
+<category title="5.3.2.2. Interactions">
+
+<p>The five possible interactions during a paste operation are outlined below. The solid lines refer to the complete paste process, and the dotted lines refer to clipboard data type determination, as described in §5.3.2.3. Lines are diagonal where a task switch is performed (i.e. for the sending of messages rather than the use of SWIs). Note that the "clipboard-owning task" is the task that most recently performed a cut or copy operation - strictly speaking, if the task is cooperating with the Clipboard, the Clipboard is the clipboard owner.</p>
+<image src="Pic17.gif" type="png" caption="Interaction method 1" /><p><br /></p>
+<image src="Pic18.gif" type="png" caption="Interaction method 2" /><p><br /></p>
+<image src="Pic19.gif" type="png" caption="Interaction method 3" /><p><br /></p>
+<image src="Pic20.gif" type="png" caption="Interaction method 4" /><p><br /></p>
+<image src="Pic21.gif" type="png" caption="Interaction method 5" /><p><br /></p>
+
+<p>In the fifth case, it is necessary for the Clipboard to ack the Message_DataRequest so that it doesn't bounce while the Message_PutRequest is delivered to the clipboard-owning task.</p>
+</category>
+
+
+<category title="5.3.2.3. Clipboard Data Type Determination">
+
+<p>Since the Clipboard is responsible for performing the traditional data transfer protocol, tasks that use the Clipboard need another way in which to determine whether they can use the current clipboard data. This will be provided by the Clipboard using the SWI Clipboard_GetDataType and the message Message_DataTypeIs.</p>
+
+
+
+
+
+
+<swi-definition name="Clipboard_GetDataType"
+                number="4E002"
+                description="Requests data type of the clipboard, using the Clipboard as a proxy"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">flags:
+<bitfield-table>
+<bit number="0-30" state="reserved" />
+<bit number="31">Flag reply messages as for the attention of the Wimp (this bit must only be set by the Wimp, even though there are currently no plans for it to do so at present)</bit>
+</bitfield-table>
+</register-use>
+<register-use number="1">destination window handle</register-use>
+<register-use number="2">destination icon handle (-1 if none)</register-use>
+<register-use number="3">destination x co-ordinate</register-use>
+<register-use number="4">destination y co-ordinate</register-use>
+<register-use number="5">pointer to list of data types that the task is interested in receiving, in order of preference, terminated by -1 (may be a null list if the native format is required)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-5" state="preserved"></register-use>
+</exit>
+
+<use>
+<fixme>confirm irqs, fiqs, processor-mode, re-entrant</fixme>
+<p>Requests data type of the clipboard, using the Clipboard as a proxy.</p>
+
+<p>The Clipboard takes an internal copy of the data type list. If it owns the clipboard itself, it replies immediately with a Message_DataTypeIs. If a task has registered itself with the Clipboard using a bit-1-set SWI Clipboard_Put, the Clipboard sends a Message_PutRequest to the clipboard owner, and uses the (single) data type returned in the following SWI Clipboard_Put to construct a Message_DataTypeIs. Alternatively, if a conventional drag-and-drop task owns the clipboard, the Clipboard will send a Message_DataRequest, but fail to reply to the subsequent Message_DataSave; the data type from the Message_DataSave is used in the Message_DataTypeIs, thus creating a uniform interface.</p>
+</use>
+
+<related>
+<reference type="swi" name="Clipboard_Get" />
+<reference type="message" name="DataTypeIs" />
+</related>
+</swi-definition>
+
+<message-definition 
+    name="DataTypeIs"
+    number="4E002"
+    description="Informs a task of the data type of the clipboard"
+    source="Clipboard"
+    destination="Task">
+
+<message-table>
+<message offset="12">your_ref: 0</message>
+<message offset="20">flags:
+<bitfield-table>
+<bit number="0">Clipboard couldn't find any clipboard after a Clipboard_GetDataType call</bit>
+<bit number="1-30" state="reserved"></bit>
+<bit number="31">Message is for the attention of the Wimp, other tasks must ignore it</bit>
+</bitfield-table>
+</message>
+<message offset="24">destination window handle</message>
+<message offset="28">destination icon handle (-1 if none)</message>
+<message offset="32">destination x co-ordinate</message>
+<message offset="36">destination y co-ordinate</message>
+<message offset="40">data type</message>
+</message-table>
+
+<use>
+<fixme>confirm message definition attributes</fixme>
+<p>This message informs a task of the data type of the clipboard (subject to the data type list passed to the preceding SWI Clipboard_GetDataType).</p>
+</use>
+
+<related>
+<reference type="swi" name="Clipboard_GetDataType" />
+</related>
+</message-definition>
+</category>
+</subsubsection>
+
+<subsubsection title="5.3.3. Writable Icons">
+<p>The Wimp will use the Clipboard to obtain data when it needs to be pasted. It will (effectively) install a temporary post-poll filter on the task owning the icon, in order to detect the flags-bit-31-set Message_Paste that follows a Clipboard_Get SWI call. The message event will not be claimed, so that a task can be kept informed about what is being done to its icons - but the task must not change the contents of the icon, because the Wimp will already have done so.</p>
+
+<p>Since the Wimp will only export text from writable icons, and as such will have used the bit-1-clear version of Clipboard_Put, it will not have to respond to Message_PutRequests (except as a result of a drag-and-drop, see §5.4.2).</p>
+
+<p>The Wimp will not call Clipboard_GetDataType, so need not respond to Message_DataTypeIs.</p>
+</subsubsection>
+</subsection>
+
+<subsection title="5.4. Drag and Drop">
+<subsubsection title="5.4.1. Protocol">
+<p>During a traditional drag operation, no messaging takes place until the drop. However, during a drag-and-drop drag, a dialogue is set up between the dragging (sending) task and the potentially-receiving (claiming) task - which, in general, is the task owning the window under the pointer at any given time.</p>
+
+<category title="5.4.1.1. Responsibilities">
+<p>The sending task's responsibilities include:<list>
+
+<item>checking the status of the Shift key at the beginning of the drag</item>
+<item>setting the pointer shape to ptr_drop at the beginning of the drag, resetting the pointer shape to ptr_drop when the claiming task has finished with using an alternative pointer shape, and setting it back to ptr_default at the end of the drag</item>
+<item>calling Wimp_DragBox, DragASprite_Start/Stop or DragAnObject_Start/Stop, as appropriate, at the beginning and end (abortion or completion) of the drag, and whenever the claiming task starts or stops requiring that the dragged object be removed from view (during such a period, a type 7 Wimp_DragBox "dragpoint" must be used instead)</item>
+<item>contacting the claiming task every 0.25 seconds, stating the screen position and "real life" bounding box of the data and the data types in which it is available</item>
+<item>initiating the drop when the drag ends</item>
+<item>deleting the selected data after a successful drop if (drag was within the same window AND Shift was not held down) OR (drag was between windows or to a type-15 writable icon in any window AND Shift was held down) OR the destination is a trashcan application</item>
+<item>aborting the drag (and informing the claiming task as such) when the user presses Escape (which means the sending task must retain the input focus throughout the drag)</item></list></p>
+
+
+<p>The claiming task's responsibilities include:<list>
+
+<item>updating the ghost caret according to the data passed from the sending task, provided at least one available data type can be used (and telling the sending task to remove the dragged object if a ghost caret is being displayed)</item>
+<item>automatically scrolling the window if the pointer is paused near the edge of a document window (and changing the pointer to reflect as such at the beginning of the autoscroll - changing it back at the end is the sending task's responsibility)</item>
+<item>letting the sending task know its preferred ordering of data types, so that the sending task can work out which data type to send during the drop</item>
+<item>letting the sending task know if it the claiming task is a trashcan (i.e. that the source data must be deleted)</item></list></p>
+
+<p>A task must only claim the drag if it can do something useful with the handles and co-ordinates passed to it - typically a response would be made when the pointer is over a text area or in the autoscrolling pause zone, but not when over a "dead" area like a page border, and not when over a writable icon (except that being over an autoscrolling pause zone takes precedence over being over a dead zone or icon).</p>
+
+<p>In practice, the claiming task can choose to continue to be involved in the dialogue, even when the pointer is no longer over one of its windows. This is to allow autoscrolling to continue, even when the pointer is dragged outside the window being autoscrolled (although this must not occur if the pointer has been moved smoothly over the window boundary without pausing over the window's autoscrolling activation zone). In fact, the default behaviour is for the dialogue to continue between the same two tasks, until the claiming task bows out by letting the sending task's message bounce. The claiming task, being the one handling the autoscrolling, is of course the one that knows best when this is necessary.</p>
+
+</category>
+
+<category title="5.4.1.2. Messaging">
+
+<message-definition 
+    name="Dragging"
+    number="00011"
+    description="This message is sent by a sending task to a (prospective) claiming task at intervals of 0.25 second, carrying context-sensitive information about the drag"
+    source="Task"
+    destination="Task">
+
+<message-table>
+<message offset="12">your_ref: my_ref of last Message_DragClaim (or 0 if there was no claimant last time, or if this is the first Message_Dragging)</message>
+<message offset="20">destination window handle (constructed from Wimp_GetPointerInfo)</message>
+<message offset="24">destination icon handle (constructed from Wimp_GetPointerInfo)</message>
+<message offset="28">destination x co-ordinate (constructed from Wimp_GetPointerInfo)</message>
+<message offset="32">destination y co-ordinate (constructed from Wimp_GetPointerInfo)</message>
+<message offset="36">flags:
+<bitfield-table>
+<bit number="1">Sending data from selection (for information only, receiver must ignore)</bit>
+<bit number="2">Sending data from clipboard - i.e. from a clipboard-displaying window (for information only, receiver must ignore)</bit>
+<bit number="3">Source data will be deleted (for information only, and unfortunately is incorrect when generated by DataPower; receiver must ignore)</bit>
+<bit number="4">Drag is being aborted, do not respond to this message
+            All other bits are reserved and must be clear</bit>
+<bit number="31">All other bits are reserved and must be clear</bit>
+</bitfield-table>
+</message>
+<message offset="40">xmin, ymin, xmax, ymax (4 bytes each): bounding box of data, relative to pointer, measured in millipoints (1/72000th of an inch), not scaled according to the zoom factor(s) of the source window; xmin > xmax means data has no bounding box, or bounding box is unknown</message>
+<message offset="56">list of available data types in no particular order, terminated by -1 (must not be null)</message>
+</message-table>
+
+<use>
+<fixme>confirm message definition attributes</fixme>
+<p>This message is sent by a sending task to a (prospective) claiming task at intervals of 0.25 second, carrying context-sensitive information about the drag.</p>
+<p>The sending task sends a Message_Dragging, and the claiming task replies with a Message_DragClaim, as follow</p>
+</use>
+
+<related>
+<reference type="message" name="DragClaim" />
+</related>
+</message-definition>
+
+<message-definition 
+    name="DragClaim"
+    number="00012"
+    description="This message is sent by a claiming task to the sending task in response to a Message_Dragging, carrying context-sensitive information about the drag"
+    source="Task"
+    destination="Task">
+
+<message-table>
+<message offset="12">your_ref: my_ref of last Message_Dragging</message>
+<message offset="20">flags:
+<bitfield-table>
+<bit number="0">A pointer shape other than ptr_drop is in use</bit>
+<bit number="1">Claiming task requires the absence of the Wimp dragbox / DragASprite sprite / DragAnObject object</bit>
+<bit number="3">Claiming task is a trashcan application, so the source data must be deleted irrespective of Message_Dragging's flags bit 3 (else deletion of the source data is determined by sending task)</bit>
+<bit number="">All other bits are reserved and must be clear</bit>
+</bitfield-table>
+</message>
+<message offset="24">list of available data types in receiver's order of preference, terminated by -1 (may be null)</message>
+</message-table>
+
+<use>
+<fixme>confirm message definition attributes</fixme>
+<p>This message is sent by a claiming task to the sending task in response to a Message_Dragging, carrying context-sensitive information about the drag. It must only be issued if the claiming task is interested in at least one available data type.</p>
+</use>
+
+<related>
+<reference type="message" name="Dragging" />
+</related>
+</message-definition>
+
+<p>Tasks are free to use internal routines to keep track of drags within or between windows that it owns, avoiding the performance overhead of all the messaging, as long as the user interface is indistinguishable from that which would result otherwise. Note in particular, that if the pointer is found to be over a type-15 writable icon, messaging must be turned back on as though the pointer was over a window owned by another task; this is so that the Wimp can collaborate in the dragging dialogue. Fortunately, the only application which currently uses this optimisation is Easi/TechWriter, where all the writable icons are in transient (or pseudo-transient) dialogue boxes, so this problem will never be visible, provided new implementations of drag-and-drop in applications follow these revised guidelines.</p>
+</category>
+
+<category title="5.4.1.3. Use">
+<p>In event-driven terms, the sending and claiming tasks must follow the behaviour outlined below in order to implement every aspect of the protocol. Explanatory comments are italicised (and are all new in this specification).</p>
+
+<p>"Message type 17/18" means "use message type 17 unless drag_finished is 'true', when you must use message type 18". This is an optimisation, because we're not interested if Message_Dragging bounces from a non-drag-and-drop task, until the end of the drag, when we will want to send the data by simple data transfer.</p>
+
+<p>Sending task:
+    <list>
+    <item>At drag start,</item>
+        <list>
+        <item>enable null events every 0.25 seconds;</item>
+        <item>call Wimp_DragBox (with a drag type of 5), DragASprite_Start or DragAnObject_Start as appropriate (remember to use the dragbox if CMOS states that dragged sprites/objects must not be used);</item>
+        <item>program pointer shape to ptr_drop;</item>
+        <item>set shift_pressed to indicate current status of the Shift keys;</item>
+        <item>set claimant to 'none' (-1 is a suitable invalid task handle for this purpose);</item>
+        <item>set drag_finished to 'false';</item>
+        <item>set drag_aborted to 'false';</item>
+        <item>set lastref to 'none' (0 is suitable for this purpose).</item>
+        </list>
+    <item>At drag abort (when Escape pressed during a drag),</item>
+        <list>
+        <item>disable null events;</item>
+        <item>call Wimp_DragBox -1, DragASprite_Stop or DragAnObject_Stop as appropriate (or Wimp_DragBox -1 if old_dragclaim_flags has bit 1 set);</item>
+        <item>program pointer shape to ptr_default;</item>
+        <item>set drag_finished and drag_aborted to 'true';</item>
+        <item>proceed as for a null event...</item>
+    </list>
+    <item>At drag end (when User_Drag_Box event is received),</item>
+        <list>
+        <item>disable null events;</item>
+        <item>if necessary, call DragASprite_Stop or DragAnObject_Stop;</item>
+        <item>program pointer shape to ptr_default;</item>
+        <item>set drag_finished to 'true';</item>
+        <item>proceed as for a null event...</item>
+        </list>
+    <item>At null events,</item>
+        <list>
+        <item>construct Message_Dragging using data from Wimp_GetPointerInfo and the value of drag_aborted;</item>
+        <item>if claimant is 'none', send message type 17/18 to window owner with your_ref = 0;</item>
+        <item>else, send message type 18 to claimant with your_ref = lastref.</item>
+        </list>
+    <item>When Message_DragClaim is received,</item>
+        <list>
+        <item>if drag_finished is 'true',</item>
+            <list>
+            <item>drag has ended successfully while a claim is in force</item>
+            <item>if drag_aborted is 'false' (this comparison is not strictly necessary, since the claiming task is not supposed to reply when the drag is being aborted),</item>
+                <list>
+                <item>initiate enhanced drop operation (send Message_DataSave to claimant, using first possible data type in the list, or the native data type if none are possible, and using your_ref = my_ref of the Message_DragClaim, then delete the source data if shift_pressed and the new window/icon handles (or the trashcan flag bit in Message_DragClaim) indicate as such.</item>
+                </list>
+            </list>
+        <item>else,</item>
+            <list>
+            <item>drag is continuing AND (a claim is in force, or a claim is starting)</item>
+            <item>if lastref != 'none',</item>
+                <list>
+                <item>claim is continuing, not just starting</item>
+                <item>if old_dragclaim_flags bit 0 is set, but the new Message_DragClaim flags bit 0 is clear, program the pointer shape to ptr_drop;</item>
+                <item>if old_dragclaim_flags bit 1 is set, but the new Message_DragClaim flags bit 1 is clear, call Wimp_DragBox (with a drag type of 5), DragASprite_Start or DragAnObject_Start as appropriate.</item>
+                <item>if old_dragclaim_flags bit 1 is clear, but the new Message_DragClaim flags bit 1 is set, call DragASprite_Stop or DragAnObject_Stop if necessary, then call Wimp_DragBox with a drag type of 7.</item>
+                </list>
+            <item>else,</item>
+                <list>
+                <item>claim is just starting</item>
+                <item>if Message_DragClaim flags bit 1 is set, call DragASprite_Stop or DragAnObject_Stop if necessary, then call Wimp_DragBox with a drag type of 7.</item>
+                </list>
+            <item>set claimant to task handle in Message_DragClaim;</item>
+            <item>set lastref to my_ref of Message_DragClaim;</item>
+            <item>set old_dragclaim_flags to flags word from Message_DragClaim.</item>
+            </list>
+        </list>
+    <item>When Message_Dragging bounces,</item>
+        <list>
+        <item>if claimant is not 'none',</item>
+            <list>
+            <item>claimant is releasing claim (including when claimant doesn't reply because the drag is aborting)</item>
+            <item>if drag_finished is 'false',</item>
+                <list>
+                <item>if old_dragclaim_flags bit 0 is set, program the pointer shape to ptr_drop;</item>
+                <item>if old_dragclaim_flags bit 1 is set, call Wimp_DragBox (with a drag type of 5), DragASprite_Start or DragAnObject_Start as appropriate.</item>
+                </list>
+            <item>set claimant to 'none';</item>
+            <item>set lastref to 'none';</item>
+            <item>resend Message_Dragging as message type 17/18 to the window owner (preserving the flags, and with your_ref = 0).</item>
+            </list>
+        <item>else,</item>
+            <list>
+            <item>(no claimant is in effect AND drag has finished) OR the drag is aborting</item>
+            <item>if drag_finished is 'true' (this comparison is not strictly necessary, since drag_aborted also implies drag_finished),</item>
+                <list>
+                <item>if drag_aborted is 'false',</item>
+                    <list>
+                    <item>initiate simple drop operation (send Message_DataSave to window owner, using native data type and your_ref = 0).</item>
+                    </list>
+                </list>
+            </list>
+        </list>
+    </list>
+</p>
+
+<p>Claiming task:
+    <list>
+    <item>At initialisation,</item>
+        <list>
+        <item>set claiming to 'false'.</item>
+        </list>
+    <item>When Message_Dragging is received,</item>
+        <list>
+        <item>if claiming is 'false',</item>
+            <list>
+            <item>if flags bit 4 is clear,</item>
+                <list>
+                <item>start claim</item>
+                <item>set claiming to 'true' and autoscrolling to 'false';</item>
+                <item>if pointer is in the autoscroll pause zone,</item>
+                    <list>
+                    <item>set pausing to 'true';</item>
+                    <item>set old_pointer_x, old_pointer_y and old_pointer_time to the x and y from Message_Dragging and the current monotonic time;</item>
+                    <item>program pointer to autoscroll-pause shape, and set pointer_altered to 'true';</item>
+                </list>
+                <item>else,</item>
+                    <list>
+                    <item>set pausing to 'false' and pointer_altered to 'false';</item>
+                    </list>
+                <item>if the data type is suitable, draw the ghost caret (I-beam or bounding box) and set ghost_caret to 'true', else set ghost_caret to 'false';</item>
+                <item>reply with Message_DragClaim (message type 17), using pointer_altered and ghost_caret to determine the flags.</item>
+                </list>
+            </list>
+        <item>else,</item>
+            <list>
+            <item>if flags bit 4 is clear AND (claiming task owns the window/icon handle in Message_Dragging OR autoscrolling is 'true'),</item>
+                <list>
+                <item>update claim</item>
+                <item>if pausing is 'true',</item>
+                    <list>
+                    <item>if current pointer x or y differs from old_pointer_x or old_pointer_y, set old_pointer_x, old_pointer_y and old_pointer_time to the current pointer x and y and monotonic time;</item>
+                    <item>if pointer has left autoscroll pausing zone,</item>
+                        <list>
+                        <item>set pausing and pointer_altered to 'false';</item>
+                        </list>
+                    <item>else,</item>
+                        <list>
+                        <item>if (current monotonic time - old_pointer_time) >= pause_time (typically 0.5 seconds), set autoscrolling to 'true' and pausing to 'false', and program the pointer to its autoscroll-active shape;</item>
+                        </list>
+                    </list>
+                <item>else if autoscrolling is 'false',</item>
+                    <list>
+                    <item>if pointer is in the autoscroll pause zone,</item>
+                        <list>
+                        <item>set pausing to 'true';</item>
+                        <item>set old_pointer_x, old_pointer_y and old_pointer_time to the x and y from Message_Dragging and the current monotonic time;</item>
+                        <item>program pointer to autoscroll-pause shape, and set pointer_altered to 'true';</item>
+                        </list>
+                    <item>else,</item>
+                        <list>
+                        <item>set pausing to 'false' and pointer_altered to 'false';</item>
+                        </list>
+                    </list>
+                <item>else (i.e. autoscrolling is 'true'),</item>
+                    <list>
+                    <item>if pointer is over the window, but not in the autoscroll pause zone,</item>
+                        <list>
+                        <item>set autoscrolling and pointer_altered to 'false';</item>
+                        </list>
+                    <item>else,</item>
+                        <list>
+                        <item>scroll the window by an amount proportional to the distance from the pointer to the inside edge of the autoscroll pause zone;</item>
+                        <item>if the window cannot be scrolled any further in this direction (or can be scrolled in neither direction if a 2D scroll), set autoscrolling to 'false', set pausing to 'true' and program the pointer to its autoscroll-pausing shape;</item>
+                        </list>
+                    </list>
+                <item>if ghost_caret is 'true', update ghost caret - unless the work-area-relative position is unchanged, undraw the old ghost caret and draw the new ghost caret;</item>
+                <item>reply with Message_DragClaim (message type 17), using pointer_altered and ghost_caret to determine the flags.</item>
+                </list>
+            <item>else,</item>
+                <list>
+                <item>release claim</item>
+                <item>set claiming to 'false';</item>
+                <item>if ghost_caret is 'true', undraw the old ghost caret;</item>
+                <item>let Message_Dragging bounce (i.e. don't reply to it).</item>
+                </list>
+            </list>
+        </list>
+    <item>When Message_DataSave is received,</item>
+        <list>
+        <item>if you_ref != 0,</item>
+            <list>
+            <item>if claiming is 'true',</item>
+                <list>
+                <item>this was an enhanced (full drag-and-drop) drop - the claim was never released
+                set claiming to 'false';</item>
+                <item>if ghost_caret is 'true', undraw the old ghost caret;</item>
+                <item>import data to the last ghost caret position using conventional data transfer protocol (preferably using memory data transfer).</item>
+                </list>
+            <item>else,</item>
+                <list>
+                <item>this is part of the paste protocol</item>
+                <item>continue as for simple drop...</item>
+                </list>
+            </list>
+        <item>else,</item>
+            <list>
+            <item>this was a simple drop</item>
+            <item>import data to position from Message_DataSave using conventional data transfer protocol (preferably using memory data transfer).</item>
+            </list>
+        </list>
+    </list>
+</p>
+</category>
+</subsubsection>
+
+<subsubsection title="5.4.2. Clipboard Module">
+<category title="5.4.2.1. Use">
+<p>The Clipboard module, in conjunction with the SWI Wimp_AutoScroll, will reduce the coding required to implement drag-and-drop to the following, a great improvement on §5.4.1.3. Note that, unlike the clipboard maintenance and paste protocols, the drag and drop protocols use one-to-one messages rather than broadcast messages, so the Clipboard needs to make use of filters in order to translate between the protocols. (An assumption has been made that the receiving task wishes to use an I-beam ghost caret - this does not have to be the case, but Wimp_SetCaretPosition's new facility for drawing ghost carets requires simpler but different code from that in §5.4.1.3.)</p>
+
+
+<p>Sending task:
+    <list>
+    <item>At drag start,</item>
+        <list>
+        <item>ensure sending window has the input focus;</item>
+        <item>call SWI Clipboard_StartDrag.</item>
+        </list>
+    <item>When Message_PutRequest is received,</item>
+        <list>
+        <item>if flags bits 3 and 31 are clear,</item>
+            <list>
+            <item>this is a PutRequest for the selection, rather than the task-managed clipboard</item>
+            <item>translate selected data to the first possible data type in the list, or leave as the native data type if none are possible;</item>
+            <item>call Clipboard_Put to send the data;</item>
+            <item>if flags bit 4 of the Message_PutRequest was set, delete the selection.</item>
+            </list>
+        </list>
+    </list>
+</p>
+
+<p>Claiming task:
+    <list>
+    <item>At initialisation,</item>
+        <list>
+        <item>set claiming to 'false'.</item>
+        </list>
+    <item>When Message_Dragging is received,</item>
+        <list>
+        <item>if claiming is 'false',</item>
+            <list>
+            <item>if flags bit 4 is clear,</item>
+                <list>
+                <item>start claim</item>
+                <item>set claiming to 'true';</item>
+                <item>call Wimp_AutoScroll;</item>
+                <item>call Wimp_SetCaretPosition to position the ghost caret if at least one available data type is suitable;</item>
+                <item>reply with Message_DragClaim (message type 17), with flags bit 0 clear, and flags bit 1 set if a ghost caret is being displayed.</item>
+                </list>
+            </list>
+        <item>else,</item>
+            <list>
+            <item>if flags bit 4 is clear AND (claiming task owns the window handle in Message_Dragging OR Wimp_AutoScroll indicates scrolling is in progress),</item>
+                <list>
+                <item>update claim</item>
+                <item>call Wimp_SetCaretPosition to reposition the ghost caret if at least one available data type is suitable;</item>
+                <item>reply with Message_DragClaim (message type 17), with flags bit 0 clear, and flags bit 1 set if a ghost caret is being displayed.</item>
+                </list>
+            <item>else,</item>
+                <list>
+                <item>release claim</item>
+                <item>set claiming to 'false';</item>
+                <item>call Wimp_AutoScroll to deactivate autoscrolling;</item>
+                <item>call Wimp_SetCaretPosition -1 to remove the ghost caret;</item>
+                <item>let Message_Dragging bounce (i.e. don't reply to it).</item>
+                </list>
+            </list>
+        </list>
+    <item>When Message_DataSave is received,</item>
+        <list>
+        <item>if claiming is 'true',</item>
+            <list>
+            <item>this was an enhanced (full drag-and-drop) drop - the claim was never released</item>
+            <item>set claiming to 'false';</item>
+            <item>call Wimp_AutoScroll to deactivate autoscrolling;</item>
+            <item>call Wimp_SetCaretPosition -1 to remove the ghost caret;</item>
+            <item>copy window handle, icon handle, x and y offsets from last Message_Dragging over the Message_DataSave block equivalents, and call Clipboard_CatchDrop.</item>
+            </list>
+        <item>else,</item>
+            <list>
+            <item>this was a simple drop</item>
+            <item>call Clipboard_CatchDrop.</item>
+            </list>
+        </list>
+    </list>
+</p>
+
+</category>
+
+
+<category title="5.4.2.2. Messaging">
+<p>The details of the new SWIs introduced are:</p>
+
+<swi-definition name="Clipboard_StartDrag"
+                number="4E003"
+                description="Starts a drag-and-drop drag, using the Clipboard as a proxy"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">flags:
+<bitfield-table>
+<bit number="1">As Message_Dragging (= sending from selection)</bit>
+<bit number="2">As Message_Dragging (= sending from clipboard)</bit>
+<bit number="14-15">Proxy Drag Method:
+<value-table head-number="Value" head-value="Meaning">
+<value number="0">use rotating-dash fixed-size Wimp dragbox</value>
+<value number="1">use DragASprite</value>
+<value number="2">use DragAnObject</value>
+<value number="3">reserved</value>
+</value-table>
+</bit>
+<bit number="16">As DragAnObject_Start, if applicable (R1 is a pointer to a routine rather than a SWI number)</bit>
+<bit number="17">As DragAnObject_Start, if applicable (if bit 16 is set and bit 18 clear, enter routine with R10 below R13 - note this was previously misdocumented as the routine being entered in SVC mode rather than USR mode)</bit>
+<bit number="18">As DragAnObject_Start, if applicable (if bit 16 is set and DragAnObject is version 0.09 or later, enter routine in USR mode rather than SVC mode)</bit>
+<bit number="31">Flag reply messages as for the attention of the Wimp (this bit must only be set by the Wimp)</bit>
+<bit number="">All others are reserved and must be clear</bit>
+</bitfield-table>
+</register-use>
+<register-use number="1">sprite area or renderer (if DragASprite or DragAnObject, respectively)</register-use>
+<register-use number="2">pointer to sprite name or register/parameter block (if DragASprite or DragAnObject, respectively)</register-use>
+<register-use number="3">source window handle (used in combination with the Shift key state to determine when the source data needs deleting afterwards)</register-use>
+<register-use number="4">pointer to word-aligned block containing three bounding boxes, each made up of four 32-bit quantities held in the order xmin, ymin, xmax, ymax, where the minima are inclusive and the maxima are exclusive:
+<list>
+<item>bounding box to apply to the pointer, in OS units from the screen origin; if xmin > max then the pointer is constrained to the screen</item>
+<item>initial position of the dragbox/sprite/object being dragged, in OS units from the screen origin</item>
+<item>"real" position and size of the data to use to render the ghost caret, in millipoints (1/72000ths of an inch) relative to the pointer; if xmin > xmax then the size is unknown or undefined</item>
+</list>
+</register-use>
+<register-use number="5">data length, bytes</register-use>
+<register-use number="6">pointer to non-null list of data types that the task can translate the data to (in no particular order), terminated by -1</register-use>
+<register-use number="7">pointer to proposed leafname of data, null-terminated</register-use>
+</entry>
+
+<exit>
+<register-use number="0-7" state="preserved"></register-use>
+</exit>
+
+<use>
+<fixme>confirm irqs, fiqs, processor-mode, re-entrant</fixme>
+<p>Starts a drag-and-drop drag, using the Clipboard as a proxy.</p>
+
+<p>The Clipboard takes a copy of the data pointed to, and performs the actions described in §5.4.1.3 (sending) on behalf of the task. In order to achieve this, it forces the required Wimp events to be unmasked using a pre-poll filter, then performs its main actions using a post-poll filter; it also calls Wimp_AddMessages, so it not necessary for the task to register interest in Message_DragClaim etc. at initialisation. During the drag, the task will not see any user_drag_box events, key_pressed events (except for Escape), or any DragClaim, RAMFetch, DataSaveAck or DataLoadAck messages. If null events were enabled in the poll mask before it was massaged by the pre-poll filter (and, if it was a call to Wimp_PollIdle, the required time has passed) they will also pass through to the task once the post-poll filter has done its work.</p>
+
+<p>When the drag ends (successfully or not), the filters are removed. When the drag ends successfully, the task's cooperation is required in order to translate the data to the required data type; this is accomplished by the Clipboard sending it a Message_PutRequest with flags bit 3 clear, as described in §5.3.2.1.</p>
+</use>
+
+<related>
+<reference type="swi" name="Clipboard_CatchDrop" />
+</related>
+</swi-definition>
+
+
+
+
+<swi-definition name="Clipboard_CatchDrop"
+                number="4E004"
+                description="Request the Clipboard to act as a proxy for data transfer during a drop"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">flags:
+<bitfield-table>
+<bit number="31">Flag reply messages as for the attention of the Wimp (this bit must only be set by the Wimp)</bit>
+<bit number="">All others are reserved and must be clear</bit>
+</bitfield-table>
+</register-use>
+<register-use number="1">pointer to DataSave message block (or DataLoad message block if initiated by the Filer) that needs replying to</register-use>
+</entry>
+
+<exit>
+<register-use number="0-1" state="preserved"></register-use>
+</exit>
+
+<use>
+<fixme>confirm irqs, fiqs, processor-mode, re-entrant</fixme>
+<p>The Clipboard handles the data transfer for the task, trying memory data transfer first if possible. When the transfer is complete, the Clipboard sends a Message_Paste to the task that called this SWI, so as to appear identical to a paste operation.</p>
+
+<p>It will also detect if it sent the DataSave message itself - in other words, if the sending task was using the Clipboard as a proxy too - if so, no further messaging will occur, and the Clipboard will simply use the pointer to its copy of the data made during Clipboard_Put in the Message_Paste.</p>
+</use>
+
+<related>
+<reference type="swi" name="Clipboard_StartDrag" />
+</related>
+</swi-definition>
+</category>
+</subsubsection>
+
+<subsubsection title="5.4.3. Writable Icons">
+<p>The Wimp will handle drags to and from writable icons as in §5.4.2.</p>
+
+<p>The Wimp will install an internal message filter in order to listen for Clipboard messages (Message_PutRequest and Message_Paste) with flags bit 31 set; these are handled by the Wimp and not passed on to the task. Similarly, it will intercept and not pass on Message_Dragging throughout any period when it is claiming the drag. However, some tasks (such as FrontEnd) do perform useful functions when they receive a Message_DataSave, so Message_DataSave is always passed through to the task, and the Wimp will only call Clipboard_CatchDrop at the Wimp_Poll following the delivery of Message_DataSave if the task didn't call Wimp_SendMessage, Wimp_UpdateWindow or Wimp_ForceRedraw.</p>
+</subsubsection>
+</subsection>
+</section>
+
+<section title="6. Data Formats">
+<p>No new data formats are introduced.</p>
+</section>
+
+<section title="7. Dependencies">
+<p>The new Wimp provides facilities not available in earlier versions. Although the source release means that it is possible for applications that use them to require users of older Wimps to upgrade them, the authors may choose to implement them manually in cases where an older Wimp is detected. However, it is encouraged that the new Wimp facilities be utilised when possible, to accommodate future GUI changes, to allow system-wide configuration of autoscroll behaviour and so on.</p>
+
+<p>The Wimp will require the Clipboard to enable functioning of drag-and-drop to or from writable icons. Without it, selections will be able to be made, but no operations (other than deletion) can be performed on them, and no selections from other applications will be inserted when dropped on a writable icon.</p>
+</section>
+
+
+<section title="8. Acceptance Test">
+<subsection title="8.1. Clipboard Module">
+<subsubsection title="8.1.1. Compatibility">
+<p>The most advanced features of RISC OS that the Clipboard will make use of are Dynamic Areas and the DragAnObject module, both introduced at RISC OS 3.50. Provision may be made for further development work to be done to support versions back to RISC OS 3.10 (by using RMA rather than Dynamic Areas, and defaulting to rotating-dash boxes when a DragAnObject drag is requested), but for the purposes of the initial release, a modern OS may be assumed.</p>
+</subsubsection>
+
+<subsubsection title="8.1.2. Reliability/Robustness">
+<p>The module must be able to handle at least a thousand consecutive operations without crashing. Null-length data, extremely long data and data close in length to a multiple of the page size must not cause problems. Bad parameters (e.g. illegal sprite area pointers) must be handled as well as possible - in the example, a rotating-dash box must be used instead.</p>
+</subsubsection>
+
+<subsubsection title="8.1.3. Performance">
+<p>Performance will unfortunately continue to be slow in certain key situations - for example, when transferring data to a conventional task by memory data transfer, where the receiving task has specified too small a buffer. Memory transfer will be slower during drops, since the data is copied twice, once to the Clipboard's application slot, and once from it. The incidences of scrapfile transfer will however be reduced, resulting in speed gains.</p>
+</subsubsection>
+
+<subsubsection title="8.1.4. Memory Usage">
+<p>The module itself must not exceed 32kB in length. Stored global clipboard data and transient data (during a drop operation) are stored in the Clipboard's application slot so that the only size limits are those of the application slot size (not a big issue with modern memory maps) and the amount of physical RAM available. The application slot shall grow and shrink so that it is no larger than the combined size of the data stored, rounded up to the next page boundary. The RMA shall be used for general heap storage (linked lists etc.).</p>
+</subsubsection>
+</subsection>
+
+<subsection title="8.2. Wimp Writable Icon Code">
+<subsubsection title="8.2.1. Compatibility">
+<p>The writable icon code will function correctly for all tasks that follow the revised guidelines in §5 and all tasks that do not support the drag-and-drop protocol, but it may lack complete functionality (although not to the extent of rendering it useless) for up to 10% of the writable icons in existing applications written to the old application note guidelines.</p>
+</subsubsection>
+
+<subsubsection title="8.2.2. Reliability/Robustness">
+<p>The writable icon cut-and-paste / drag-and-drop code must be at least as reliable as the Clipboard module.</p>
+</subsubsection>
+
+<subsubsection title="8.2.3. Performance">
+<p>Redraw of writable icons, especially when delimiting a selection with autoscrolling active, must not cause flicker. Data transfer operations must not be appreciably slower than the Clipboard routines that are actually doing the work.</p>
+</subsubsection>
+
+<subsubsection title="8.2.4. Memory Usage">
+<p>Writable icon data is usually held in application workspace, and will not increase in size by virtue of these enhancements. A negligible amount of extra module workspace will be required to hold the details of the Wimp selection and ghost caret, this should typically be no more than 32K.</p>
+</subsubsection>
+</subsection>
+</section>
+
+<section title="9. Non Compliances">
+<p>No attempt will be made to develop an selection-drawing algorithm that can cope with overlapping icons. The appearance of such icons after scrolling and redrawing is not defined.</p>
+</section>
+
+<section title="10. Development Test Strategy">
+<p>Test applications will be written to exercise the Clipboard SWIs.</p>
+
+<p>Drags to and from the existing drag-and-drop applications (e.g. DataPower, EasiWriter and TechWriter) work seamlessly. These applications will therefore be important testing tools. Also for testing purposes, a drag-and-drop trashcan application and simple clipboard-display application will be written.</p>
+
+<p>(Conventional data transfer (as for example, when dropping a selection on to a Filer window) is not expected to cause significant problems, as the protocol has been clearly defined for a long time, unlike the protocol in the application notes.)</p>
+
+<p>A test suite will be written to exercise the functions of the Clipboard through exercise of writable icons' cut-and-paste / drag-and-drop facilities. For example: setting of writable icon selections will be tested repeatedly, involving operations that change one or both ends of a selection (or neither) at the same time, both with and without the presence of a ghost caret. This will be done by direct calling of Wimp_SetCaretPosition. And text files of differing length, of differing line terminator and files that have been accidentally mistyped as text will be saved on to writable icons of differing validation strings, using conventional data transfer, pasting and dropping.</p>
+</section>
+
+<section title="11. Product Organisation">
+
+<p>This document, and the code it describes, form part of the Shared Source RISC OS release.</p>
+
+<p>The APIs and messages should ideally be included in a new version of the Programmer's Reference Manual. Use of the raw protocol rather than the Clipboard module will be deprecated.</p>
+
+<p>The Clipboard module can be softloaded, but must also be capable of being built into ROM.</p>
+</section>
+
+<section title="12. Future Enhancements">
+
+<p>None planned.</p>
+</section>
+
+<section title="13. Glossary">
+
+<value-table head-number="" head-name="Term(s) used in Document" head-value="Meaning">
+<value name="AND conj.">Logical AND.</value>
+<value name="Caret n." >The position in a document where typed characters or pasted clipboard contents will be placed. Many pre-drag-and-drop applications also use this position as the insertion point for dropped data, but drag-and-drop applications must use the ghost caret for this purpose instead. In textual documents, the caret is often shown by a red I-beam, but other representations of the caret may be more appropriate for other kinds of data. Some editors, such as !Draw, do not have a visible insertion point, but still "grab the caret" and mark it as invisible, in order to gain the input focus so that they may receive keystroke events."</value>
+<value name="Clear v.">The operation by which a selection is undone."</value>
+<value name="Clipboard n.">A hidden, temporary storage area that holds any type of data while the user is copying or moving it using the cut-and-paste protocol, whether internal to one application, or between applications. Conceptually, there is only one clipboard, but the actual storage area may actually be managed by different applications or modules, depending upon the circumstances.<br />
+The term may also be used to refer to the Clipboard module, although in this eventuality, the initial letter will be in upper case.</value>
+<value name="Copy v.">The operation by which the current selection is replicated in the clipboard, overwriting any existing data in the clipboard.</value>
+<value name="Cut v.">As copy, but the selection is subsequently deleted from its original location.</value>
+<value name="Data type n.">A value equivalent to a filetype, but not necessarily referring to a file.</value>
+<value name="Drag v.">The operation by which the user indicates where they wish a selection to be copied or moved to by dragging a representation of the data from the selection to the destination.</value>
+<value name="Drop v.">At the end of a drag, the actual data transfer process. This combines the functionality of a paste operation with either a cut or copy operation, as appropriate.</value>
+<value name="Ghost caret n.">During a drag operation, the position in a document where the data would be inserted, were the user to release the mouse button. In textual documents, the ghost caret is often shown similarly to a normal caret, but coloured grey, and "snapped" to the nearest character boundary. Other documents might better display the ghost caret as the bounding box of the data, scaled according to the destination window's zoom factor(s).</value>
+<value name="OR conj.">Logical inclusive OR (i.e. not EOR) - used where the 'or' would have an ambiguous meaning, for example in English text.</value>
+<value name="Input focus n.">The defining attribute of the window where keystroke events will be delivered. The user may be able to see a caret or a selection, or possibly neither, in the window that has the input focus; the window border will be coloured in an alternative colour (conventionally cream). Any parent nested windows (recursively), and any non-pane window behind a pane window, will also have their title bars recoloured.</value>
+<value name="Paste v.">The operation that the user performs to copy the clipboard contents into a document, at the caret.</value>
+<value name="Selection n.">The portion of a document which the user has chosen as the target for subsequent operations. This may be a contiguous selection (as in the case of selected text) or a non-contiguous selection (as in the case of a number of selected files in the Filer). The rendering of the selection is media-dependent, but typically may be shown by inversion of the colours of the selected region, or alternatively by the drawing of a bounding box around the selection(s).<br />
+A shaded selection, which ought be rendered to match the Wimp's rendering of shaded selections in writable icons, indicates the location of a selection after another selection has been made in another window - but not when a caret or selection is made in a non-drag-and-drop application.</value>
+<value name="Shadow caret n.">The equivalent of a shaded selection, but for carets. A shadow caret must not be rendered in such a way that it can be mistaken for a ghost caret. It is optional, because applications are expected normally to use a Wimp-drawn caret, and the Wimp does not support shadow carets. However, shadow carets can be useful, especially if the application draws its own caret anyway (as, for example, if an I-beam is an unsuitable), because they fix an insertion point for a drop, whenever one or both of the sending and receiving tasks uses pre-drag-and-drop data transfer protocol. The shadow caret is also the position to which the caret will be returned if the user Adjust-clicks on the window, or clicks in a "dead" region of the window, such as a page border; this is particularly useful in cases where repositioning the caret would be time-consuming or fiddly, for example if the caret is in a deep "layer" of a document.</value>
+</value-table>
+</section>
+
+
+<section title="14. References">
+
+<p>[1]: Support Group Application Note 240: The RISC OS Selection Model and Clipboard</p>
+
+<p>[2]: Support Group Application Note 241: The RISC OS Drag-and-Drop System</p>
+
+<p>[3]: RISC OS 3 PRM 3 §53: The Window Manager, pp 3-249 - 3-256</p>
+
+<p>[4]: RISC OS Style Guide, issue 3, §11: Handling selection, pp 77-82</p>
+
+<p>[5]: Document Ref 1309,413/FS: Ursula Window Manager Changes Functional Specification</p>
+</section>
+
+
+<section title="15. History">
+</section>
+</chapter>
+
+<meta>
+<history>
+<revision number="0.00" author="BJGA" date="12 Sep 1997" title="Started" />
+<revision number="0.01" author="BJGA" date="13 Oct 1997" title="First release for comment" />
+<revision number="0.02" author="BJGA" date="14 Oct 1997" title="Released for review" />
+<revision number="D" author="BJGA" date="19 May 1998" title="Prepared for D.O" />
+<revision number="E" author="BJGA" date="26 Feb 1999" title="Started reworking document for Java 1.2 project, didn't get far before cancelled again" />
+<revision number="E" author="BJGA" date="16 Oct 2007" title="Finally finished integrating the Ursula review comments and 8 years' worth of mental notes, for initial release alongside shared source code" />
+<revision number="F" author="RPS" date="22 Feb 2015" title="Updated the page references in the Style Guide" />
+<revision number="G draft" author="Ben Avison" date="22 Feb 2015" title="Shared Source RISC OS release (formerly Ursula and Java 1.2) Ref: 1309,419/FS" />
+<revision number="0.08A" author="Alan Robertson" date="28 Aug 2021" title="Initial version in PRMinXML format">
+<change>Formatting of text removed from document (italic, underlined, bold)</change>
+<change>Added related links to swi and message definitions</change>
+</revision>
+</history>
+<related>
+<reference type="document" href="https://www.riscosopen.org/images/risc_os_open/specifications/clipboard/state_diagram.pdf" name="State diagram">(PDF format, 8K).</reference>
+</related>    
+</meta> 
+
+</riscos-prm>

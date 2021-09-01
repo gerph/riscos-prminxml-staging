@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="About these documents">
+<section title="Introduction">
+<p>
+The documentation in this collection is a staging area for documentation that does not yet have
+any home. It is intended to hold documents which are partially complete, or which are useful but
+yet ready for acceptance into general documentation.
+</p>
+</section>
+
+<section title="Collection areas">
+<p>
+    There are different areas in this collection, which are intended to arbitrarily divide
+    the content into their source or intended use. The structure here is not intended to
+    be indicative of the final structure of the documentation.
+</p>
+
+<subsection title="Functional specs ('acorn')">
+    <p>
+        This area is intended to contain functional specifications from the Acorn era which
+        have not yet made it to PRM documentation. Functional specifications contain references
+        to design and implementation decisions and discussion of problems with the system
+        which are not appropriate for the reference manuals. However they are important steps
+        along to way to creating documentation,
+    </p>
+</subsection>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2021.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Gerph" date="29 Aug 2021" title="Initial version">
+    <change>Created to hold cut and paste, and demonstrate indexing.</change>
+  </revision>
+ </history>
+</meta>
+</riscos-prm>

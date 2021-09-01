@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<index>
+<dirs output="output/html"
+      help="output/help"
+      header="output/header"
+      input="src"
+      temp="tmp" />
+<options
+    hide-empty="no"
+    include-source="no"
+    make-contents="no"
+    include-sections="yes"
+    include-sections-depth="1"
+    catalog-version="103"
+    page-format='html5'
+    page-css-variant='prm prm-ro2 body-fraunces heading-raleway webfont-fraunces webfont-raleway'
+    index-css-variant='prm prm-ro2 body-fraunces heading-raleway webfont-fraunces webfont-raleway no-thumb-bar'
+    />
+
+<make-index type="swi" />
+<make-index type="command" />
+<make-index type="message" />
+<make-index type="upcall" />
+<make-index type="service" />
+<make-index type="sysvar" />
+<make-index type="entry" />
+<make-index type="vector" />
+<make-index type="error" />
+<make-index type="vdu" />
+<make-index type="tboxmessage" />
+<make-index type="tboxmethod" />
+
+<make-filelist/>
+
+<footer>
+<p>These documents are not necessarily complete.</p>
+<p>Consult individual documents and authors for details of their completeness.</p>
+</footer>
+
+<section title="Introduction" dir="intro">
+    <page href="about">About this documentation</page>
+</section>
+<section title="Functional specs" dir="acorn">
+    <page href="cnp/cut_n_paste">Cut and paste specification</page>
+</section>
+
+</index>
+
