@@ -1,0 +1,1146 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="Acorn URL Fetcher API Specification">
+<section title="Overview">
+
+<p>The URL (Universal Resource Locator module is a general purpose module for fetching data from various Internet services. This specification reflects the behaviour of version 0.42 or later of the URL_Fetcher module. The purpose of the module is to provide a uniform entry point into a set of "fetcher" protocols (e.g. FTP, HTTP, Gopher, NNTP, etc.), without the need for a client application to understand how that protocol works. This is done using a number of generalised URL SWIs. The fetcher protocols modules (hereafter just "protocol modules") with which the URL module communicates, are called only by the URL module itself. The entry points into the protocol modules have similar names to the entry points into the URL module, but these are NOT the same, despite similarities. The system structure is shown in figure 1 below.</p>
+
+<p><image src="dia_url.png" type="png"
+          caption="Figure 1: URL Fetching system structure" /></p>
+
+<p>Each client fetch occurs with in the context of a 'session'. Each session is identified by a different session identifier. Client session identifiers are issued by the URL module upon request and remain valid until the client informs the URL module to discard the session. Subsequently, session identifiers may be re-issued by the URL module for new sessions. Only a single object fetch can be performed in any one given session. Sessions cannot be re-used by clients, even if a prior object fetch in that session has completed.</p>
+
+<p>The typical client usage of the system is:<list>
+
+    <item>Obtain a session identifier (SWI <reference type="swi" name="URL_Register" />)</item>
+    <item>Start fetching an object (SWI <reference type="swi" name="URL_GetURL" />)</item>
+    <item>Repeatedly, whilst multi-tasking if in the desktop environment:</item>
+        <list type="ordered">
+        <item>Read blocks of data (SWI <reference type="swi" name="URL_ReadData" />)</item>
+        <item>Process that data</item>
+        </list>
+    <item>Discard session (SWI <reference type="swi" name="URL_Deregister" />)</item>
+    </list>
+</p>
+
+
+<p>If an application decides it requires a premature termination (eg. the user asked the application to quit whilst an object was being downloaded), then the application calls SWI <reference type="swi" name="URL_Stop" /> immediately and then discards the session with SWI <reference type="swi" name="URL_Deregister" />. Typical clients, such as web browsers, will, most likely, have several sessions active concurrently.</p>
+
+<p>The URL module uses its own session identifiers that are passed in many of the SWI interfaces to the protocol modules which are not those known to the client application - the URL module maintains its own private sessions into the protocol modules. Service calls are also provided to ease interaction between the URL module and the fetchers, mainly to inform other modules of the arrival or departure of a particular module.</p>
+
+<p>Each protocol module accepts data and returns results as per the HTTP protocol. Thus any extra client data associated with a request (passed in R4 to SWI <reference type="swi" name="URL_GetURL" />) will take the format of a (possibly empty) set of HTTP headers,an empty line and then the data; and each response will start with an HTTP/1.0 or HTTP/1.1 Response-Line of the format: "HTTP/1.0 200 OK" followed by various headers identifying the content-type of the retrieved data, followed by an empty line, followed by the data itself.</p>
+</section>
+
+<section title="Outstanding issues">
+<p>There are no outstanding issues.</p>
+</section>
+
+
+<section title="Client to URL module interface">
+
+<p>A typical client would be an application, such as a Web Browser. The following SWI calls provide the interface for an application to control and transfer data via the URL module.</p>
+
+<swi-definition name="URL_Register"
+                number="83E00"
+                description="Initialise a client session with the URL module"
+                irqs="undefined"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">Flags: All bits are currently reserved (must be zero)</register-use>
+</entry>
+<exit>
+<register-use number="0">Reserved - currently zero</register-use>
+<register-use number="1">Session identifier</register-use>
+</exit>
+
+<use>
+<p>This SWI initialises a client session with the URL module and provides the client with a session identifier that can be used to monitor the status of the URL module within that client's context. The session identifier is unique for each client session that is registered with URL and is also used as an identifier in subsequent interactions with the URL module.</p>
+
+<p>Multiple registration by the same client application is permitted. This will provide the client with multiple identifiers to the URL module. Calling this SWI does not result in the calling of any protocol module SWIs.</p>
+
+<p>The URL module imposes no limit on the number of concurrently registered sessions, other than having the required memory available in which to store details of the session.</p>
+</use>
+
+<related>
+<reference type="swi" name="URL_Deregister" />
+</related>
+</swi-definition>
+
+<swi-definition name="URL_GetURL"
+                number="83E01"
+                description="Instigate data transfer from / to a resource server"
+                irqs="undefined"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">Flags:
+<bitfield-table>
+<bit number="0">If set, R6 is valid</bit>
+<bit number="1">If set, R5 holds length of data in R4 specified buffer, otherwise a single NULL terminated string in buffer</bit>
+<bit number="2-31" state="reserved"></bit>
+</bitfield-table>
+</register-use>
+<register-use number="1">Session identifier</register-use>
+<register-use number="2">Bitfield:
+<bitfield-table>
+<bit number="0-7"><reference type="subsubsection" name="Table of method numbers" >Method</reference> (8-bit value, held in bits 0-7). This is protocol dependent</bit>
+<bit number="8-15">Method dependent</bit>
+<bit number="16-31" state="reserved"></bit>
+</bitfield-table></register-use>
+<register-use number="3">URL - the document we are after, including the protocol. For example "http://www.acorn.co.uk/"</register-use>
+<register-use number="4">Data block - data to send in addition to the URL. Validity is protocol and method dependent</register-use>
+<register-use number="5">If R0:1 is set, length of data in R4 data block <br />
+If R0:1 is clear, must be 2</register-use>
+<register-use number="6">User Agent - Pointer to string to use as 'User Agent' identifier in request header if R0:0 is set. (NULL pointer or NULL string implies use default identifier - see below)<fixme>original links to middle of third paragraph below!</fixme></register-use>
+</entry>
+
+<exit>
+<register-use number="0">Protocol status (see SWI <reference type="swi" name="URL_Status" />, below)</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to instigate a transfer of data to or from (mainly from) a resource server. When this SWI has been called, the URL module checks the per-session and global proxy settings, looking for a match (see SWI <reference type="swi" name="URL_SetProxy" /> for details on setting proxies and proxy conflict resolution). If no proxy is to be used, then URL looks for a protocol module which is capable of handling the URL specified by R3. If a proxy setting was found, then a pointer to the proxy URL is placed in R7, R0:31 is forced to value 1, and URL looks for a protocol module which is capable of handling the specified proxy URL. In both cases, if a suitable module cannot be located, the URL module generates an error. If a protocol module capable of handling the URL was found, then all client registers are passed onto the protocol module via the <reference type="swi" name="Protocol_GetData" /> SWI call with the exceptions stated above for proxy handling. On exit, R0 will hold the status code returned by the protocol module.</p>
+
+<p>The extra data pointed to by R4 on entry is method and protocol specific. For example, in HTTP, the data comprises HTTP headers and, if appropriate, an entity body. Protocol modules should use this style wherever possible. Note that these headers do not include lines such as an HTTP Request-Line (ie. the "GET / HTTP/1.0" part. For example, when posting data to an HTTP URL as the result of a form submission on a web page, the web browser would supply a Content-Type header, Content-Length header, potentially some kind of encoding header, a blank line and then the entity body.</p>
+
+<p>The User Agent string pointed to by R6 if R0:0 is set, is in indication to the underlying protocol module of how the module should identify itself to remote systems. This controls the User-Agent header for the HTTP protocol module, for example. The protocol module is free to define its default identifier as it pleases, however, following the format of the HTTP User-Agent is recommended where possible and appropriate to the protocol. Modules may choose to ignore or amend any User-Agent string. For example, the AcornHTTP module will suffix the client's User-Agent with its own version number, resulting in complete identifiers such as:<br />
+<systemoutput>User-Agent: Acorn Browse/2.06 AcornHTTP/0.82</systemoutput></p>
+
+<p>where the client only specified <systemoutput>"Acorn Browse/2.06".</systemoutput></p>
+<subsubsection title="Table of method numbers">
+<p><image src="tbl_methods.png" type="png"/></p>
+</subsubsection>
+
+<p>Applications for new method codes should be made to Developer Support. The range 128-254 is reserved for private non-distributed modules. Method numbers 0 and 255 are reserved and must not be used.</p>
+
+<p>The list of methods specific to FTP quoted above are fully implemented in version 0.28 of the FTP Fetcher module. The list of methods specific to HTTP quoted above are fully implemented in version 0.82 of the AcornHTTP module.</p>
+</use>
+
+<related>
+<reference type="swi" name="URL_Register" />
+<reference type="swi" name="URL_SetProxy" />
+<reference type="swi" name="URL_Stop" />
+<reference type="swi" name="URL_Deregister" />
+<reference type="swi" name="Protocol_GetData" />
+</related>
+</swi-definition>
+
+<swi-definition name="URL_Status"
+                number="83E02"
+                description="Obtain information on a session"
+                irqs="undefined"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">Flags: All bits currently reserved (must be zero)</register-use>
+<register-use number="1">Session identifier</register-use>
+</entry>
+
+<exit>
+<register-use number="0">Status word:
+<bitfield-table>
+<bit number="0">Connected to server</bit>
+<bit number="1">Sent request</bit>
+<bit number="2">Sent data</bit>
+<bit number="3">Initial response received</bit>
+<bit number="4">Transfer in progress</bit>
+<bit number="5">All data received</bit>
+<bit number="6">All data received</bit>
+<bit number="7-31" state="reserved">Reserved (must be zero)</bit>
+</bitfield-table></register-use>
+<register-use number="1" state="preserved"></register-use>
+<register-use number="2">Server response, as an "HTTP" response code (200, 401 etc.)</register-use>
+<register-use number="3">Bytes read so far (total body data count)</register-use>
+<register-use number="4">Total bytes to be transferred in whole transaction if known (approximate value only), or -1 if unknown</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to monitor the transfer of data from a remote service. It is protocol independent - the exit status bits are common to all services. Clients must test this field bit-wise, since the value is cumulative.</p>
+
+<p>Clients may not assume that the states returned in R0 will progress in any particular combination or order. However, the likely progression during a fetch for a resource being retrieved over a network (when the bits are combined into a single decimal value) is: 0,1,3,7,15,31 and then R0:5 set upon completion, and R0:6 set at any stage when an error has occurred.</p>
+
+<p>Since each protocol module is returning its results according to the HTTP protocol, R2 can be treated as an HTTP response code whatever the URL being fetched. For example, the FileFetcher module will indicate file not found errors by setting the response code to 404 (HTTP's Not Found error code).</p>
+
+<p>Note that in the case of, for example, an HTTP 400 (Forbidden) return, some explanatory data may be received, too. If the amount of data to be received is unknown, R4 will contain -1, however R3 will contain the number of bytes received so far. The R4 value should be treated as approximate, since the exact interpretation varies between protocols.</p>
+
+<p>When this SWI is called, the URL module invokes SWI <reference type="swi" name="Protocol_Status" /> for the protocol module concerned with the request.</p>
+</use>
+
+<related>
+<reference type="swi" name="URL_Register" />
+<reference type="swi" name="URL_Deregister" />
+<reference type="swi" name="Protocol_Status" />
+</related>
+</swi-definition>
+
+<swi-definition name="URL_ReadData"
+                number="83E03"
+                description="Read data pending from a request"
+                irqs="undefined"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">Flags: All bits currently reserved (must be zero)</register-use>
+<register-use number="1">Session identifier</register-use>
+<register-use number="2">Client buffer for receiving data</register-use>
+<register-use number="3">Size of buffer pointed to by R2</register-use>
+</entry>
+
+<exit>
+<register-use number="0">Status word (see SWI <reference type="swi" name="URL_Status" />)</register-use>
+<register-use number="1" state="preserved"></register-use>
+<register-use number="2">Preserved. Contents of buffer modified</register-use>
+<register-use number="3" state="preserved"></register-use>
+<register-use number="4">Number of bytes transferred to R2 buffer</register-use>
+<register-use number="5">Number of bytes still to be read to complete object (if known) or -1 if unknown</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to read the data pending from a request, find out how much data has been read on this call and how much more there is remaining to be read for the request. R2 is a pointer to a buffer on entry (and R3 is the size of the buffer), on exit the buffer contains the new data, R4 contains the amount of data written to the buffer and R5 contains the amount of data left to be read. If the amount of data left is unknown R5 will contain -1. R1 always returns the protocol status code. In the event of all the data being read (R5 = 0 on exit), a call to <reference type="swi" name="URL_Stop" /> is not required as this is performed automatically when <reference type="swi" name="URL_Deregister" /> is called for the client session. Once all data has been read a call to <reference type="swi" name="URL_Status" /> can return no meaningful information, simply indicating that the transfer has completed.</p>
+
+<p>The data returned will take the form of a complete HTTP compatible response. Responses should use HTTP/1.0 if possible and avoid HTTP/1.1. For example, AcornHTTP will downgrade any higher version responses to HTTP/1.0, having taken care to remove any features applicable only to the higher version, such as chunked transfer encodings.</p>
+
+<p>When this SWI is called, the URL module invokes the <reference type="swi" name="Protocol_ReadData" /> SWI for the protocol module concerned with the request.</p>
+</use>
+
+<related>
+<reference type="swi" name="URL_Register" />
+<reference type="swi" name="URL_GetURL" />
+<reference type="swi" name="URL_SetProxy" />
+<reference type="swi" name="URL_Status" />
+<reference type="swi" name="URL_Deregister" />
+<reference type="swi" name="Protocol_GetData" />
+<reference type="swi" name="Protocol_ReadData" />
+</related>
+</swi-definition>
+
+<swi-definition name="URL_SetProxy"
+                number="83E04"
+                description="Set up a proxy server for a session with the URL module"
+                irqs="undefined"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">Flags: All bits currently reserved (must be zero)</register-use>
+<register-use number="1">Session identifier</register-use>
+<register-use number="2">Address of buffer containing a URL base</register-use>
+<register-use number="3">URL 'method' to proxy (address of URL fetch identifier to be proxied)</register-use>
+<register-use number="4">
+<value-table>
+<value number="0">Proxy request</value>
+<value number="1">Don't proxy request</value>
+<value number="">All other values are reserved</value>
+</value-table>
+</register-use>
+</entry>
+<exit>
+<register-use number="0">Status word (see SWI <reference type="swi" name="URL_Status" />)</register-use>
+</exit>
+
+<use>
+<p>This call is used to set up a proxy server to use for a session with the URL module. If R1 is zero then the proxy is considered global and is used for all sessions. If R1 is a valid session identifier then the proxy server for that session only is set. R2 is a pointer to a string containing the base URL to pass the request on to when a proxy request is made. This is of the form "http://www-cache.demon.co.uk:8080/" (note the trailing '/'). A common error is to omit the port number. If the port number is not specified, then the default port number is used. See discussion under <reference type="swi" name="URL_ProtocolRegister" /> regarding how the default port number is derived.</p>
+
+<p>R3 is a pointer to a buffer containing the initial part of the URL to proxy - the URL scheme (eg "http:", "ftp:"). This system has the advantage that requests to certain hosts can be proxied and not others (eg by giving "http://www.acorn.co.uk/" as the scheme). However, if R4 is 1, this indicates that no matter how the proxy settings have been defined, requests to the base URL should not be proxied in this case (R3 is undefined). When a <reference type="swi" name="URL_GetURL" /> request is received, the proxy settings are evaluated in the following order:</p>
+
+<p>
+<value-table head-number="Order" head-value="Description">
+<value number="1">Client no-proxy</value>
+<value number="2">Client proxy</value>
+<value number="3">Global no-proxy</value>
+<value number="4">Global proxy</value>
+</value-table>
+</p>
+ 
+
+<p>This is to ensure all client settings override global settings and thus remain safe for the given client - ie. a client which sets up a proxy server and then defaults all other URLs to no-proxy, can, no matter how the global settings are changed, be sure of where requests will end up. If R2=0 on entry, then all proxy settings for the specified session are cleared.</p>
+
+<p>Calling this SWI does not result in any calls being made to protocol modules.</p>
+</use>
+
+<related>
+<reference type="swi" name="URL_Register" />
+<reference type="swi" name="URL_GetURL" />
+<reference type="swi" name="URL_Deregister" />
+</related>
+</swi-definition>
+
+<swi-definition name="URL_Stop"
+                number="83E05"
+                description="Abort a request placed with the URL module"
+                irqs="undefined"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">Flags: All bits currently reserved (must be zero)</register-use>
+<register-use number="1">Session identifier</register-use>
+</entry>
+
+<exit>
+<register-use number="0">Status word (see SWI <reference type="swi" name="URL_Status" />)</register-use>
+<register-use number="1" state="preserved"></register-use>
+</exit>
+
+<use>
+<p>This call aborts a current request if there is one associated with the session identifier. In the event of no request being associated with the identifier, an error is generated. The purpose of this SWI call is to provide the client with a way of enforcing the termination of a request. It is not called by the client just because all the data associated with the request has finished being transferred, although it may do that if it so chooses. The URL_Stop call will be made automatically by the URL module when the session is deregistered by the client using SWI <reference type="swi" name="URL_Deregister" />.</p>
+
+<p>When this SWI is called, the URL module invokes the <reference type="swi" name="Protocol_Stop" /> SWI for the protocol module concerned with the request.</p>
+</use>
+
+<related>
+<reference type="swi" name="URL_Register" />
+<reference type="swi" name="URL_Deregister" />
+<reference type="swi" name="Protocol_Stop" />
+</related>
+</swi-definition>
+
+
+<swi-definition name="URL_Deregister"
+                number="83E06"
+                description="Deregister a client session with the URL module"
+                irqs="undefined"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">Flags: All bits currently reserved (must be zero)</register-use>
+<register-use number="1">Session identifier</register-use>
+</entry>
+
+<exit>
+<register-use number="0">Status word (see SWI <reference type="swi" name="URL_Status" />)</register-use>
+<register-use number="1" state="preserved"></register-use>
+</exit>
+
+<use>
+<p>This call deregisters the client session from the URL module, freeing up any information the URL module may have kept about the client session (eg proxy information). The session identifier ceases to be valid and becomes available for re-issue on a subsequent call to SWI <reference type="swi" name="URL_Register" />.</p>
+
+<p>When this SWI is called, the URL module invokes the <reference type="swi" name="Protocol_Stop" /> SWI for the protocol module concerned, if it has not already done so (e.g. during the processing of <reference type="swi" name="URL_Stop" />).</p>
+</use>
+
+<related>
+<reference type="swi" name="URL_Register" />
+<reference type="swi" name="URL_Stop" />
+<reference type="swi" name="Protocol_Stop" />
+</related>
+</swi-definition>
+
+
+<swi-definition name="URL_ParseURL"
+                number="83E07"
+                description="Parse URLs to / from their constituent parts"
+                irqs="undefined"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">Flags:
+<bitfield-table>
+<bit number="0">If set, R5 contains number of words in data block, else a default of 10 words is assumed.</bit>
+<bit number="1">If set, character codes 0 to 31 and 127 in the URL will be escaped (hex encoded, e.g. space becomes '%20') - only available in URL 0.42 or later. URL 0.38 through to 0.41 inclusive always escape these characters. Versions prior to 0.38 never do this.</bit>
+<bit number="2-31" state="reserved"></bit>
+</bitfield-table>
+</register-use>
+<register-use number="1">Reason code:
+<value-table>
+<value number="0"><reference type="swi" name="URL_ParseURL" reason="0" >Return component buffer requirements</reference></value>
+<value number="1"><reference type="swi" name="URL_ParseURL" reason="1" >Return component data in specified buffers</reference></value>
+<value number="2"><reference type="swi" name="URL_ParseURL" reason="2" >Construct full URL from component buffers</reference></value>
+<value number="3"><reference type="swi" name="URL_ParseURL" reason="3" >'Quick parse'</reference></value>
+</value-table>
+</register-use>
+<register-use number="2">Pointer to base URL</register-use>
+<register-use number="3">Pointer to URL relative to base URL (or NULL if none)</register-use>
+<register-use number="4">Pointer to data block of R5 words (unless R1 = 3, see below, or R0:0 is unset, in which case R4 points to a buffer of at least 10 words in length)</register-use>
+<register-use number="5">If R0:0 set, size of R4 block in words</register-use>
+</entry>
+
+<exit>
+<register-use number="0">Flags: All bits currently reserved (must be zero)</register-use>
+<register-use number="1" state="preserved"></register-use>
+<register-use number="2" state="preserved"></register-use>
+<register-use number="3" state="preserved"></register-use>
+<register-use number="4">preserved. Data block at R4 is updated in line with entry reason code</register-use>
+<register-use number="5" state="preserved"></register-use>
+</exit>
+
+<use>
+<p>This SWI is used to parse URLs into their constituent parts, enabling clients to extract the various fields from the URL in a reliable manner. The call is also capable of resolving a relative URL to produce a fully-qualified URL, and of reconstructing a full URL from a set of components.</p>
+
+<p>The data block referred to above is either a block of integers which will be updated to contain the size of the required buffer for each element, or a block containing pointers to buffers for the actual data.</p>
+
+<p>All strings are zero-terminated and all lengths include space for the zero terminator.</p>
+
+<p>The number of entries in the block is specified in R5 if R0:0 is set on entry. If R0:0 is clear, then the default value of 10 is assumed. The format of the data block is:
+<offset-table head-value="Usage">
+<offset number="0">Fully canonicalised URL</offset>
+<offset number="4">URL protocol (e.g. "http", "ftp") forced to lower-case</offset>
+<offset number="8">Hostname (e.g. "www.acorn.com") forced to lower-case</offset>
+<offset number="12">Port (e.g. "80")</offset>
+<offset number="16">Username - used for FTP authentication and mailto</offset>
+<offset number="20">Password - for FTP</offset>
+<offset number="24">Account - for FTP</offset>
+<offset number="28">Path (e.g. "pub/riscos/releases") (See note)</offset>
+<offset number="32">Query - for HTTP, things after a query character</offset>
+<offset number="36">Fragment - for HTTP, things after a hash character</offset>
+</offset-table>
+</p>
+
+<p>It is anticipated that this SWI will be called twice: the first time to find the lengths of the buffers, and the second to retrieve a copy of the data into the buffers. The URLs pointed to by R2 and R3 (if used) need not be fully-qualified, e.g. R2 may point to "www.acorn.com/browser/". The fully canonicalised version of the URL at block+0 refers to a fully-qualified, canonicalised version of it, which in this example would be "http://www.acorn.com/browser/".</p>
+
+<p>During canonicalisation, the port number will be elided if possible. See the discussion under SWI <reference type="swi" name="URL_ProtocolRegister" /> for details of how URL discovers whether this is possible or not.</p>
+
+<p>Note: The path will not start with a '/' unless the URL being parsed explicitly specified one - this is in keeping with the URL specification, so for example, given the URL "http://www.acorn.com/browser/", then the path component is "browser/", and not "/browser/"; the slash between the hostname and path is a separator only, not a part of either component.</p>
+
+<p>If R3 is non-NULL on entry, it is assumed to point to a partial URL which needs to be resolved with respect to the base URL pointed to by R2. If R3 is NULL, then R2 is assumed to point to a full URL.</p>
+
+<p>The entry reason codes are described below.</p>
+</use>
+
+<related>
+<reference type="swi" name="URL_ProtocolRegister" />
+</related>
+</swi-definition>
+
+
+<swi-definition name="URL_ParseURL"
+                number="83E07"
+                description="Work out space required for URL components"
+                reason="0"
+                reasonname="ReturnLengths"
+                irqs="undefined"
+                re-entrant="no">
+
+<entry><fixme>need someone to double-check entry and exits</fixme>
+<register-use number="0">Flags:
+<bitfield-table>
+<bit number="0">If set, R5 contains number of words in data block, else a default of 10 words is assumed</bit>
+<bit number="1">If set, character codes 0 to 31 and 127 in the URL will be escaped (hex encoded, e.g. space becomes '%20') - only available in URL 0.42 or later. URL 0.38 through to 0.41 inclusive always escape these characters. Versions prior to 0.38 never do this</bit>
+<bit number="2-31" state="reserved"></bit>
+</bitfield-table>
+</register-use>
+<register-use number="1">0 (reason code)</register-use>
+<register-use number="2">Pointer to base URL</register-use>
+<register-use number="3">Pointer to URL relative to base URL (or NULL if none)</register-use>
+<register-use number="4">Pointer to data block</register-use>
+<register-use number="5">If R0:0 set, size of R4 block in words</register-use>
+</entry>
+
+<exit>
+<register-use number="4">Data block updated with sizes of each component</register-use>
+</exit>
+<use>
+<p>When R1 is 0 on entry to the SWI, the data block is treated as a block of unsigned 32-bit integers. The contents of the block are ignored on entry, but on exit are filled in with the lengths of the individual components of the URL. A value of zero is stored for a field which does not exist; non-zero values include space for a zero-byte terminator.</p>
+</use>
+
+<related>
+<reference type="swi" name="URL_ParseURL" />
+<reference type="swi" name="URL_ParseURL" reason="1" />
+<reference type="swi" name="URL_ParseURL" reason="2" />
+</related>
+</swi-definition>
+
+
+<swi-definition name="URL_ParseURL"
+                number="83E07"
+                description="Split a URL into its component parts"
+                reason="1"
+                reasonname="ReturnData"
+                irqs="undefined"
+                re-entrant="no">
+
+<entry><fixme>need someone to double-check entry and exits</fixme>
+<register-use number="0">Flags:
+<bitfield-table>
+<bit number="0">If set, R5 contains number of words in data block, else a default of 10 words is assumed</bit>
+<bit number="1">If set, character codes 0 to 31 and 127 in the URL will be escaped (hex encoded, e.g. space becomes '%20') - only available in URL 0.42 or later. URL 0.38 through to 0.41 inclusive always escape these characters. Versions prior to 0.38 never do this</bit>
+<bit number="2-31" state="reserved"></bit>
+</bitfield-table>
+</register-use>
+<register-use number="1">1 (reason code)</register-use>
+<register-use number="2">Pointer to base URL</register-use>
+<register-use number="3">Pointer to URL relative to base URL (or NULL if none)</register-use>
+<register-use number="4">Pointer to data block</register-use>
+<register-use number="5">If R0:0 set, size of R4 block in words</register-use>
+</entry>
+
+<exit>
+<register-use number="4">Data block updated with pointers to each component requested</register-use>
+</exit>
+
+<use>
+<p>When R1 is 1 on entry to the SWI, the data block is treated as a block of pointers to buffers to receive the components of the URL. Each of the pointers in the data block must be either zero, indicating that the caller is not interested in that field, or point to a buffer which is sufficiently long to receive the field. The client can ensure this by having previously used reason code 0 to determine the length required.</p>
+</use>
+
+<related>
+<reference type="swi" name="URL_ParseURL" />
+<reference type="swi" name="URL_ParseURL" reason="0"/>
+<reference type="swi" name="URL_ParseURL" reason="2"/>
+</related>
+</swi-definition>
+
+
+<swi-definition name="URL_ParseURL"
+                number="83E07"
+                description="Combine the components of a URL"
+                reason="2"
+                reasonname="ComposeFromComponents"
+                irqs="undefined"
+                re-entrant="no">
+
+<entry><fixme>need someone to double-check entry and exits</fixme>
+<register-use number="0">Flags:
+<bitfield-table>
+<bit number="0">If set, R5 contains number of words in data block, else a default of 10 words is assumed.</bit>
+<bit number="1">If set, character codes 0 to 31 and 127 in the URL will be escaped (hex encoded, e.g. space becomes '%20') - only available in URL 0.42 or later. URL 0.38 through to 0.41 inclusive always escape these characters. Versions prior to 0.38 never do this.</bit>
+<bit number="2-31" state="reserved"></bit>
+</bitfield-table>
+</register-use>
+<register-use number="1">2 (reason code)</register-use>
+<register-use number="2">Pointer to base URL</register-use>
+<register-use number="3">Pointer to URL relative to base URL (or NULL if none)</register-use>
+<register-use number="4">Pointer to data block</register-use>
+<register-use number="5">If R0:0 set, size of R4 block in words</register-use>
+</entry>
+
+<exit>
+<register-use number="4">Data block updated with full URL</register-use>
+</exit>
+
+<use>
+<p>When R1 is 2 on entry to the SWI, the data block is treated as containing the broken down fields of a URL. Each of the pointers in the data block must be either zero or point to a buffer containing the value of the component, with the exception of the full URL field, which is a pointer to a buffer to receive the fully canonicalised URL. This buffer is filled in on exit.</p>
+</use>
+
+<related>
+<reference type="swi" name="URL_ParseURL" />
+<reference type="swi" name="URL_ParseURL" reason="0" />
+<reference type="swi" name="URL_ParseURL" reason="1" />
+</related>
+</swi-definition>
+
+
+<swi-definition name="URL_ParseURL"
+                number="83E07"
+                description="Quickly obtain a fully resolved URL"
+                reason="3"
+                reasonname="QuickResolve"
+                irqs="undefined"
+                re-entrant="no">
+
+<entry><fixme>need someone to double-check entry and exits</fixme>
+<register-use number="0">Flags:
+<bitfield-table>
+<bit number="0" state="reserved" />
+<bit number="1">If set, character codes 0 to 31 and 127 in the URL will be escaped (hex encoded, e.g. space becomes '%20') - only available in URL 0.42 or later. URL 0.38 through to 0.41 inclusive always escape these characters. Versions prior to 0.38 never do this.</bit>
+<bit number="2-31" state="reserved"></bit>
+</bitfield-table>
+</register-use>
+<register-use number="1">3 (reason code)</register-use>
+<register-use number="2">Pointer to base URL</register-use>
+<register-use number="3">Pointer to URL relative to base URL (or NULL if none)</register-use>
+<register-use number="4">Pointer to buffer</register-use>
+<register-use number="5">Size of buffer in R4</register-use>
+</entry>
+
+<exit>
+<register-use number="4">Data block updated with fully resolved URL</register-use>
+<register-use number="5">Size of buffer remaining (negative if it was too small)</register-use>
+</exit>
+
+<use>
+<p>When R1 is 3 on entry to the SWI, R4 points to a buffer for receiving the fully resolved URL. R5 is the length of the buffer. On exit, the buffer is filled in with the fully resolved URL obtained, and R5 is decreased by the length of the URL (including terminating zero byte). Hence R5 will be negative on exit if the buffer wasn't large enough. There is no fixed rule for calculating the minimum buffer length required for the answer. To guarantee that the buffer is large enough, it should be calculated as:</p>
+
+<code type="pseudo" >length(base URL) + length(relative URL) + 4</code>
+
+<p>If R0:1 is set on entry, there is the potential for up to the entire URL to be hex encoded. In this case, you would need to multiply the above by three. URL 0.37 and earler never hex encodes URLs. Note that URL 0.38, 0.39, 0.40 and 0.41 will always do this; the control through R0:1 was introduced in v0.42. Clients not knowing about this bit (therefore leaving R0:1 unset) will find that 0.42 or later do not automatically escape URLs, this being more sensible default behaviour on the whole.</p>
+
+<p>Characters which are already hex encoded in URLs are left alone in all versions of the URL module.</p>
+
+<p>Clients are strongly recommended to use this reason code if they wish to resolve a relative URL or canonicalise a URL and are only interested in the fully resolved and canonicalised form of the URL, since it is significantly faster than using reason code 0 and then reason code 1. To help reduce the chances of wildly over-allocating buffer space, setting of R0:1 is not recommended unless full hex escaping is definitely required.</p>
+</use>
+
+<related>
+<reference type="swi" name="URL_ParseURL" />
+</related>
+</swi-definition>
+
+<swi-definition name="URL_EnumerateSchemes"
+                number="83E08"
+                description=""
+                irqs="undefined"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">Flags: All bits currently reserved (must be zero)</register-use>
+<register-use number="1">Context (0 for first call)</register-use>
+</entry>
+
+<exit>
+<register-use number="0">Status flags (currently unused)</register-use>
+<register-use number="1">Context for next call (-1 if finished)</register-use>
+<register-use number="2">Pointer to read-only URL fetch scheme (if R1 is not -1)</register-use>
+<register-use number="3">Pointer to read-only help string (if R1 is not -1)</register-use>
+<register-use number="4">Protocol module SWI base (if R1 is not -1)</register-use>
+<register-use number="5">Protocol module version (&times;100, if R1 is not -1)</register-use>
+</exit>
+
+<use>
+<p>This call is used to discover which schemes are currently available to the URL module. It may be used, for example, to determine whether or not a client of the URL module may deal with a given URL (in combination with SWI <reference type="swi" name="URL_ParseURL" /> to extract the scheme) and if not, pass it to the Acorn URI handler to see if anything else in the system can deal with it [9].<fixme>Add link to Acorn URI Handler Functional Specification</fixme></p>
+
+<p>URL will not cope gracefully if the protocol module list is updated between calls to this SWI (you may get duplicate modules or miss some out).</p>
+</use>
+
+<related>
+</related>
+</swi-definition>
+
+
+<swi-definition name="URL_EnumerateProxies"
+                number="83E09"
+                description="Enumerate proxies or no-proxy URLs"
+                irqs="undefined"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">Flags:
+<bitfield-table>
+<bit number="0">If set, enumerate the no-proxy list</bit>
+<bit number="1-31" state="reserved"></bit>
+</bitfield-table></register-use>
+<register-use number="1">Session identifier, or zero for global proxies / no-proxies)</register-use>
+<register-use number="2">Context (0 for first call)</register-use>
+</entry>
+
+<exit>
+<register-use number="0">Status flags (currently unused)</register-use>
+<register-use number="1" state="preserved"></register-use>
+<register-use number="2">Context for next call (-1 if finished)</register-use>
+<register-use number="3" >  If R0:0 clear: Pointer to read-only URL to proxy (if R2 is not -1)<br />If R0:0 set: Pointer to a read-only URL to not proxy (if R2 is not -1)</register-use>
+<register-use number="4">   If R0:0 clear: Pointer to read-only proxy URL information (if R2 ia not -1) <br />
+If R0:0 set: Corrupted, contains no useful information</register-use>
+</exit>
+
+<use>
+<p>This call is used to discover which URLs proxies are set for on a per session or global basis, or which URLs are not to be proxied. The information pointed to by R3 and R4 where applicable is a copy of that which was passed to SWI <reference type="swi" name="URL_SetProxy" /> when the setting was made.</p>
+
+<p>If R0:0 is set on entry, then R4 will be corrupted on exit and may not contain a meaningful value.</p>
+
+<p>URL will not cope gracefully if the proxy list is updated between calls to this SWI (you may get duplicate entries or miss some out).</p>
+
+</use>
+
+<related>
+<reference type="swi" name="URL_SetProxy" />
+</related>
+</swi-definition>
+</section>
+
+<section title="Protocol module to URL module interface">
+<p>This section defines the calls provided by the URL module to enable a fetcher protocol module to interact with it.</p>
+
+<swi-definition name="URL_ProtocolRegister"
+                number="83E20"
+                description="Register a protocol module with the URL module"
+                irqs="undefined"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">Flags:
+<bitfield-table>
+<bit number="0">If set, R5 contains protocol flags word</bit>
+<bit number="1">If set, R6 contains the default port number</bit>
+<bit number="2-31" state="reserved"></bit>
+</bitfield-table>
+</register-use>
+<register-use number="1">Protocol module's SWI base</register-use>
+<register-use number="2">URL fetch scheme supported e.g. "http:" etc</register-use>
+<register-use number="3">Version number &times; 100 e.g. 116 => version 1.16</register-use>
+<register-use number="4">Informational string. Up to 50 characters of descriptive text, e.g. "Acorn HTTP fetcher"</register-use>
+<register-use number="5">Protocol flags word, if R0:0 set. See below<fixme>Add link</fixme></register-use>
+<register-use number="6">Default port number, if R0:1 set. See below<fixme>Add link</fixme></register-use>
+</entry>
+
+<exit>
+<register-use number="0">Flags: All bits currently reserved (must be zero)</register-use>
+<register-use number="1-6" state="preserved"></register-use>
+</exit>
+
+<use>
+<p>This call is used by a protocol fetcher module to register its SWI base and the type of URL that it accepts with the URL module. The SWIs that are accessible from this SWI base are defined in the following section. If the module cannot be registered (e.g. another module is already claiming that URL base), then an error will be returned. R3 is an integer version number and R4 is a pointer to a string containing more information which will be displayed by the <reference type="command" name="URLProtoShow" /> command(or 0 if no descriptive text is provided).</p>
+
+<p>Typically, it will be called during a protocol module's initialisation code or on a callback set from the module's initialisation code. If the protocol module is registered successfully, then URL will issue a service call <reference type="service" name="URLProtocolModule_ProtocolModule" /> to inform any interested modules.</p>
+
+<p>If R0:0 is set, then R5 contains a protocol flags word. This is used to describe to URL how the resolver should treat URLs from this scheme. The current bits defined are:</p>
+<bitfield-table>
+<bit number="0">Path is not UNIX-like</bit>
+<bit number="1">No parsing should be performed on this scheme</bit>
+<bit number="2">Scheme allows "user@" to precede the hostname component</bit>
+<bit number="3">Hash (ASCII 35) allowed in hostname (e.g. for file: URLs)</bit>
+<bit number="4">No hostname component (e.g. mailto: URLs)</bit>
+<bit number="5">Remove leading ".." components in pathname</bit>
+</bitfield-table>
+
+<p>Note that the meanings of set bits are such that zero is a reasonable value to pass for unknown schemes. Note that if URL is requested to resolve URLs using schemes unknown to it, it will assume a protocol flags word value of zero. This may lead to inconsistent behaviour depending on whether the protocol module is loaded or not.</p>
+
+<p>If R0:1 is set, then R6 contains the default port number for this scheme. This is used by the URL resolving code to determine if explicitly specified port numbers can be elided from the URL. For example, when constructing the canonicalised form of "http://www.acorn.com:80/", the port bit is dropped as it serves no useful purpose, leaving "http://www.acorn.com/".</p>
+
+<p>The URL module is primed with knowledge of the following protocols:<list type="ordered">
+
+<item>mailto:</item>
+<item>telnet:</item>
+<item>finger:</item>
+<item>file:</item>
+<item>filer_opendir:</item>
+<item>filer_run:</item>
+<item>local:</item>
+<item>gopher:</item>
+<item>ftp:</item>
+<item>http:</item>
+<item>https:</item>
+<item>whois:</item>
+</list>
+</p>
+<p>It is not necessary for modules implementing those protocols to set either flag bit and hence no need for them to set R5 or R6.</p>
+</use>
+
+<related>
+<reference type="swi" name="URL_ProtocolDeregister" />
+<reference type="service" name="URLProtocolModule_ProtocolModule" />
+</related>
+</swi-definition>
+
+
+<swi-definition name="URL_ProtocolDeregister"
+                number="83E21"
+                description="Deregister a protocol module from the URL module."
+                irqs="undefined"
+                re-entrant="no">
+
+<entry>
+<register-use number="0">Flags: All bits currently reserved (must be zero)</register-use>
+<register-use number="1">Protocol module's SWI base</register-use>
+</entry>
+
+<exit>
+<register-use number="0">Flags: All bits currently reserved (must be zero)</register-use>
+<register-use number="1">Number of client sessions that were using this module</register-use>
+</exit>
+
+<use>
+<p>This call should be used by the protocol module to tell the URL module that it is no longer available. The URL module will raise the appropriate disconnect messages with its clients, and tell the protocol module the number of clients that were affected.</p>
+
+<p>Typically, it will be called during a protocol module's finalisation code. If the protocol module is deregistered successfully, then URL will issue a service call <reference type="service" name="URLProtocolModule_ProtocolModule" /> to inform any interested modules.</p>
+</use>
+
+<related>
+<reference type="swi" name="URL_ProtocolRegister" />
+<reference type="service" name="URLProtocolModule_ProtocolModule" /> 
+</related>
+</swi-definition>
+</section>
+
+<section title="URL module to protocol module interface">
+<p>The protocol module SWI interface is only called by the URL module. URL module clients should never call the ReadData/Status/GetData/Stop SWIs directly. The protocol modules are required to supply a SWI interface. There are currently 4 SWIs that need to be supported which run from SWI_base to SWI_base+3. New SWIs common to all protocol modules will only be added at the low-end of the SWI range. Protocol modules must generate standard SWI not known error (error number &hex;1E6) if they receive a call which they do not understand, so that the URL module can determine that they do not support the SWI. Note that there is no general requirement to use SWIs from offset 0 into a SWI chunk, although it makes sense to do this. Protocol modules which support multiple protocols should ensure that they do not place their internal "SWI bases" less than 16 SWIs apart to allow space to future expansion. e.g. AcornHTTP registers http: as &hex;83F80 and https: as &hex;83F90.</p>
+
+<p>Protocol specific SWIs should be added at the top-end of the SWI chunk (ie start at SWI_base+63 and work down) - the AcornHTTP module uses that range to provide clients with access to its HTTP cookie management code, for example.</p>
+
+<p>Note: the Session identifiers used by the URL module to talk to the protocol modules are not the same identifiers used by clients to talk to the URL module. They are not interchangeable.</p>
+
+<swi-definition name="Protocol_GetData"
+                number="SWI base+0"
+                description="Start retrieving data"
+                irqs="protocol module dependent"
+                fiqs="protocol module dependent"
+                re-entrant="protocol module dependent">
+
+<entry>
+<register-use number="0">Flags:
+<bitfield-table>
+<bit number="0-30">As specified by client in <reference type="swi" name="URL_GetURL" /></bit>
+<bit number="31">R7 is valid</bit>
+</bitfield-table></register-use>
+<register-use number="1">Session identifier</register-use>
+<register-use number="2"><reference type="subsubsection" name="Table of method numbers" >Method</reference></register-use>
+<register-use number="3">URL (including fetch scheme)</register-use>
+<register-use number="4">Pointer to block of data in addition to URL</register-use>
+<register-use number="5">Protocol dependent</register-use>
+<register-use number="6">Protocol dependent</register-use>
+<register-use number="7">If R0:31 is set, proxy URL information. See below</register-use>
+</entry>
+
+<exit>
+<register-use number="0">Protocol status word (see SWI <reference type="swi" name="URL_Status" /> for details)</register-use>
+</exit>
+
+<use>
+<p>This call is used to start retrieving data. The protocol module should raise any events for the client via the session identifier provided in R1. The URL module calls this SWI in response to one of its clients calling SWI <reference type="swi" name="URL_GetURL" />.</p>
+
+<p>The proxy URL information specified in R7 (if R0:31 is set) gives the location of the proxy to be used in the format of a URL. For example, "http://www-cache.demon.co.uk:8080/". This information is supplied by the URL module and not the client. The protocol module must note that on a proxied request, the target URL indicated by R3 may not have the same fetch scheme. For example, it might be an ftp: URL being proxied through an HTTP proxy service.</p>
+
+<p>All other registers are protocol dependent.<fixme>This text was originally in 'On Exit'</fixme></p>
+</use>
+
+<related>
+<reference type="swi" name="URL_GetURL" />
+<reference type="swi" name="URL_ProtocolRegister" />
+<reference type="swi" name="URL_ProtocolDeregister" />
+<reference type="swi" name="Protocol_Stop" />
+</related>
+</swi-definition>
+
+
+<swi-definition name="Protocol_Status"
+                number="SWI_base+1"
+                description="Monitor data transfer"
+                irqs="protocol module dependent"
+                fiqs="protocol module dependent"
+                re-entrant="protocol module dependent">
+
+<entry>
+<register-use number="0">Flags: All bits currently reserved (must be zero)</register-use>
+<register-use number="1">Session identifier</register-use>
+</entry>
+
+<exit>
+<register-use number="0">Protocol status word (see SWI <reference type="swi" name="URL_Status" /> for details)</register-use>
+<register-use number="1" >preserved<fixme>I added this</fixme></register-use>
+<register-use number="2">As <reference type="swi" name="URL_Status" /></register-use>
+<register-use number="3">As <reference type="swi" name="URL_Status" /></register-use>
+<register-use number="4">As <reference type="swi" name="URL_Status" /></register-use>
+</exit>
+
+<use>
+<p>This SWI is used to monitor the transfer of data from the remote service. It is protocol independent, with the exit status bits of R0 being common to all fetcher services. R2 should contain the remote server's most recent response code where possible; note that even in the case of, for example, an HTTP 400 (Forbidden) response, some explanatory data may be received, and thus R3 may be non-zero. If the client is unknown to the protocol module then an error should be returned. If the client's last request has finished, but the client session has not yet been deregistered, then the protocol module should return the status code as of the time that the request finished (ie bit 6 or 5 will be set along with another combination if relevant).</p>
+
+<p>The URL module calls this SWI in response to one of its clients calling SWI <reference type="swi" name="URL_Status" />.</p>
+</use>
+
+<related>
+<reference type="swi" name="URL_Status" />
+<reference type="swi" name="URL_ProtocolRegister" />
+<reference type="swi" name="URL_ProtocolDeregister" />
+</related>
+</swi-definition>
+
+
+<swi-definition name="Protocol_ReadData"
+                number="SWI base+2"
+                description="Read data pending from a request"
+                irqs="protocol module dependent"
+                fiqs="protocol module dependent"
+                re-entrant="protocol module dependent">
+
+<entry>
+<register-use number="0">Flags: All bits currently reserved (must be zero)</register-use>
+<register-use number="1">Session identifier</register-use>
+<register-use number="2">Address of client's data buffer</register-use>
+<register-use number="3">Size of client's data buffer</register-use>
+</entry>
+
+<exit>
+<register-use number="0">Protocol status word (see SWI <reference type="swi" name="URL_Status" /> for details)</register-use>
+<register-use number="1" >preserved<fixme>I added this</fixme></register-use>
+<register-use number="2">As <reference type="swi" name="URL_ReadData" /></register-use>
+<register-use number="3">As <reference type="swi" name="URL_ReadData" /></register-use>
+<register-use number="4">As <reference type="swi" name="URL_ReadData" /></register-use>
+<register-use number="5">As <reference type="swi" name="URL_ReadData" /></register-use>
+</exit>
+
+<use>
+<p>This SWI is used to read the data pending from a request, find out how much data has been read on this call and how much more there is remaining to be read for the request. The register usage and description is the same as for SWI <reference type="swi" name="URL_ReadData" />. The URL module calls this SWI in response to one of its clients calling SWI <reference type="swi" name="URL_ReadData" />.</p>
+
+</use>
+
+<related>
+<reference type="swi" name="URL_ReadData" />
+<reference type="swi" name="URL_ProtocolRegister" />
+<reference type="swi" name="URL_ProtocolDeregister" />
+<reference type="swi" name="Protocol_GetData" />
+<reference type="swi" name="Protocol_Stop" />
+</related>
+</swi-definition>
+
+
+<swi-definition name="Protocol_Stop"
+                number="SWI_base+3"
+                description="Abort a current request"
+                irqs="protocol module dependent"
+                fiqs="protocol module dependent"
+                re-entrant="protocol module dependent">
+
+<entry>
+<register-use number="0">Flags: All bits currently reserved (must be zero)</register-use>
+<register-use number="1">Session identifier</register-use>
+</entry>
+
+<exit>
+<register-use number="0">Protocol status word (see SWI <reference type="swi" name="URL_Status" /> for details)</register-use>
+</exit>
+
+<use>
+<p>This call aborts a current request if there is one associated with the session identifier. The URL module calls this SWI in response to one of its clients calling SWI <reference type="swi" name="URL_Deregister" /> or SWI <reference type="swi" name="URL_Stop" />.</p>
+</use>
+
+<related>
+<reference type="swi" name="URL_Stop" />
+<reference type="swi" name="URL_Deregister" />
+<reference type="swi" name="URL_ProtocolRegister" />
+<reference type="swi" name="URL_ProtocolDeregister" />
+</related>
+</swi-definition>
+</section>
+
+
+<section title="URL module service calls">
+<p>The URL fetcher system has been allocated a block of 256 service calls (&hex;83E00-&hex;83EFF). Two are currently defined. The other 254 are reserved by Acorn for future use.</p>
+
+<service-definition name="URLProtocolModule"
+                    number="83E00"
+                    description="Communicate important events to protocol modules">
+<entry>
+<register-use number="0">Reason code indicating type of event:
+<value-table head-value="Name of event">
+<value number="0"><reference type="service" name="URLProtocolModule" reason="0" >URLModuleStarted</reference></value>
+<value number="1"><reference type="service" name="URLProtocolModule" reason="1" >URLModuleDying</reference></value>
+<value>All other reason codes are reserved to Acorn and must not be used</value>
+</value-table>
+</register-use>
+<register-use number="1">&hex;83E00 (Service_URLProtocolModule)</register-use>
+</entry>
+
+<exit>
+<p>All registers must be preserved, unless claiming the service call. In all the currently defined cases, the service call must not be claimed. Protocol modules must ignore reason codes which they do not understand.</p>
+</exit>
+
+<use>
+<P>The various reason codes are described below.</P>
+</use>
+
+<related>
+</related>
+</service-definition>
+
+
+<service-definition name="URLProtocolModule"
+                    number="83E00"
+                    description="URL module has initialised"
+                    reason="0"
+                    reasonname="UrlModuleStarted">
+<entry>
+<register-use number="0">0 (URLModuleStarted)</register-use>
+<register-use number="1">&hex;83E00 (Service_URLProtocolModule)</register-use>
+<register-use number="2">Version number of URL module &times; 100</register-use> 
+</entry>
+
+<exit>
+</exit>
+
+<use>
+<p>Upon receiving this service call, protocol modules should re-register with the new URL module by issuing SWI <reference type="swi" name="URL_ProtocolRegister" /> as usual. It must assume that any previous registration is no longer valid.</p>
+
+<p>This service call must not be claimed.</p>
+</use>
+
+<related>
+</related>
+</service-definition>
+
+<service-definition name="URLProtocolModule"
+                    number="83E00"
+                    description="URL module is dying"
+                    reason="1"
+                    reasonname="UrlModuleDying">
+<entry>
+<register-use number="0">1 (URLModuleDying)</register-use>
+<register-use number="1">&hex;83E00 (Service_URLProtocolModule)</register-use>
+<register-use number="2">Version number of URL module &times; 100</register-use> 
+</entry>
+
+<exit>
+</exit>
+
+<use>
+<p>Upon receiving this service call, protocol modules should note that the URL module has gone away and not attempt to talk to it any more until a future <reference type="service" name="URLProtocolModule" reason="0" >URLProtocolModule/URLModuleStarted</reference> service call arrives.</p>
+
+<p>This service call must not be claimed.</p>
+</use>
+
+<related>
+</related>
+</service-definition>
+
+
+<service-definition name="URLProtocolModule_ProtocolModule"
+                    number="83E01"
+                    description="A protocol module has registered or deregistered"
+                    reasonname="UrlModuleDying">
+<entry>
+<register-use number="0">Reason code:
+<value-table>
+<value number="0">URLProtocolModuleStarted (A protocol module has just registered) </value>
+<value number="1">URLProtocolModuleDying (A protocol module has just deregistered) </value>
+<value>All other reason codes are reserved</value>
+</value-table></register-use>
+<register-use number="1">&hex;83E01 (Service_URLProtocolModule_ProtocolModule)</register-use>
+<register-use number="2">URL fetch scheme (e.g. "http:", "ftp:")</register-use>
+<register-use number="3">SWI base chunk of protocol module</register-use>
+<register-use number="4">Description of module as shown by <reference type="command" name="URLProtoShow" /></register-use>
+</entry>
+
+<exit>
+<p>All registers must be preserved, unless claiming the service call. In all the currently defined cases, the service call must not be claimed. Protocol modules must ignore reason codes which they do not understand.</p>
+
+</exit>
+
+<use>
+<p>Upon receiving this service call, protocol modules should note that the URL module has gone away and not attempt to talk to it any more until a future <reference type="service" name="URLProtocolModule" reason="0" >URLProtocolModule/URLModuleStarted</reference> service call arrives.</p>
+
+<p>This service call must not be claimed.</p>
+</use>
+
+<related>
+</related>
+</service-definition>
+</section>
+
+
+<section title="URL module *-commands">
+<p>The URL module provides a single *-command.</p>
+
+<command-definition name="URLProtoShow"
+                    description="Shows all the current protocols known and their SWI bases">
+
+<syntax>
+
+</syntax>
+
+
+
+<use>
+<p>Display information on currently registered protocol modules.</p>
+
+<p>Help Text: <systemoutput>"*URLProtoShow shows all the current protocols known and their SWI bases."</systemoutput></p>
+</use>
+
+<example>
+<command>*URLProtoShow</command>
+
+<systemoutput>
+Base URL SwiBase  Version  Comment<br />
+=============================================================================<br />
+ ---     0x83e00    038    URL © Acorn 1997-8 (Built: 07 May 1998)<br />
+gopher:  0x508c0    010    Gopher Fetcher © Acorn 1997-8 (Built: 17 Feb 1998)<br />
+ftp:     0x4bd00    028    FTP Fetcher © Acorn 1997-8 (Built: 19 Mar 1998)<br />
+file:    0x83f40    038    File Fetcher © Acorn 1997-8 (Built: 04 Jun 1998)<br />
+http:    0x83f80    082    Acorn HTTP © Acorn 1997-8 (Built: 07 May 1998)</systemoutput>
+
+</example>
+
+<related>
+<reference type="swi" name="URL_EnumerateSchemes" />
+</related>
+</command-definition>
+
+</section>
+
+
+<section title="URL errors">
+<p>The URL module is allocated two ranges of error numbers, each range being 256 long. The first 32 errors are reserved to the URL module and the rest are reserved to Acorn protocol modules.</p>
+
+
+<value-table head-number="" head-name="Module" head-value="Error range" >
+<value name="URL" >&hex;80DE00 - &hex;80DE1F</value>
+<value name="HTTP">&hex;80DE20 - &hex;80DE3F</value>
+<value name="MAILTO">&hex;80DE40 - &hex;80DE5F</value>
+<value name="File">&hex;80DE60 - &hex;80DE7F</value>
+<value name="FTP">&hex;80DE80 - &hex;80DE9F</value>
+<value name="Gopher">&hex;80DEA0 - &hex;80DEBF</value>
+<value name="WhoIs">&hex;80DEC0 - &hex;80DEDF</value>
+<value name="Finger">&hex;80DEE0 - &hex;80DEFF</value>
+<value name="WAIS">&hex;81EF00 - &hex;81EF1F</value>
+<value name="HTTPS">&hex;81EF20 - &hex;81EF3F</value>
+<value name="News">&hex;81EF40 - &hex;81EF5F</value>
+</value-table>
+
+<p>Error numbers &hex;81EF60-&hex;81EFFF are reserved for Acorn use only. The URL module errors are:</p>
+
+<value-table head-number="Error no." head-value="Meaning" >
+<value number="&hex;80DE00">Session ID not found. A client passed an unknown session ID in R1 to one of the URL module's SWIs</value>
+<value number="&hex;80DE01">URL ran out of memory</value>
+<value number="&hex;80DE02">No matching fetcher for the URL could be found</value>
+<value number="&hex;80DE03">SWI not found (URL Module). URL attempted to call a fetcher's SWI and received a SWI not known error</value>
+<value number="&hex;80DE04">Session already has had an object fetch performed in it. You cannot re-use this session</value>
+<value number="&hex;80DE05">No fetch in progress for this session ID. You have called URL_ReadData or URL_Status having already terminated the fetch</value>
+<value number="&hex;80DE06">SWI Method already exists. URL already knows of a module which provides this method for fetching - another cannot register</value>
+<value number="&hex;80DE07">No fetch in progress for this session ID. You have not called URL_GetURL before URL_Stop,URL_ReadData or URL_Status</value>
+<value number="&hex;80DE08">Message not found in Messages file</value>
+<value number="&hex;80DE09">(No longer used)</value>
+<value number="&hex;80DE0A">Unable to parse URL</value>
+</value-table>
+
+<p>Error numbers for protocol modules are not within the scope of this specification.</p>
+
+</section>
+
+<section title="Performance targets">
+<p>Final code size of the version described by this document should be about 25K. When fetches are active, more memory will be claimed from the RMA to record details of the session. The amount claimed depends on the URL being fetched plus the small overhead for the session information.</p>
+
+<p>Temporary workspace is claimed from the RMA as required for URL resolution equivalent to three times the total combined length of the base and relative URLs involved.</p>
+
+<p>Workspace is claimed from the RMA to store details of registered proxies.</p>
+
+<p>All session-specific memory, including proxy information, is freed when the session is terminated.</p>
+</section>
+
+<section title="Glossary">
+
+<value-table head-number="" head-name="Term" head-value="Description" >
+<value name="FTP">File Transfer Protocol - an application level protocol for the transfer of files between a remote host computer and a local client, as defined by RFC 959 [6]</value>
+<value name="HTTP">HyperText Transfer Protocol - a protocol designed to transfer resources ("documents") from a remote server machine to a local client, as defined by RFC 1945 (version 1.0 [4]) and RFC 2068 (version 1.1 [5])</value>
+<value name="HTTPS">Secure HyperText Transfer Protocol - HTTP protocol over a communication channel encrypted using SSL</value>
+<value name="URL">Uniform Resource Locator, as defined by RFC 1738 [2], [3] - a subclass of URIs (Uniform Resource Identifiers, defined in RFC 1630 [1]) which map onto network access protocols. More commonly, the addresses of objects on the World Wide Web</value>
+<value name="NNTP">Network News Transfer Protocol, as defined by RFC 977 [7]</value>
+<value name="Gopher">The Internet Gopher Protocol - a distributed document search and retrieval protocol</value>
+<value name="SSL">Secure Sockets Layer. A specification for encryption of communications on networks</value>
+<value name="WAIS">Wide Area Information Servers, as defined by RFC 1625 [8]</value>
+</value-table>
+
+</section>
+
+<section title="References">
+<p>The following references may be of interest:</p>
+<reference type="document" href="http://www.faqs.org/rfcs/rfc1630" name="RFC 1630 - Uniform Resource Identifiers" />
+<reference type="document" href="http://www.faqs.org/rfcs/rfc1738.html" name="RFC 1738 - Uniform Resource Locators" />
+<reference type="document" href="http://www.faqs.org/rfcs/rfc1808.html" name="RFC 1808 - Relative Uniform Resource Locators" />
+<reference type="document" href="http://www.faqs.org/rfcs/rfc1945.html" name="RFC 1945 - HyperText Transfer Protocol (HTTP) version 1.0" />
+<reference type="document" href="http://www.faqs.org/rfcs/rfc2068.html" name="RFC 2068 - HyperText Transfer Protocol (HTTP) version 1.1" />
+<reference type="document" href="http://www.faqs.org/rfcs/rfc959.html" name="RFC 959 - File Transfer Protocol (FTP)" />
+<reference type="document" href="http://www.faqs.org/rfcs/rfc977.html" name="RFC 977 - Network News Transfer Protocol (NNTP)" />
+<reference type="document" href="http://www.faqs.org/rfcs/rfc1625.html" name="RFC 1625 - Wide Area Information Servers (WAIS) over Z39.50-1988" />
+<reference type="document" href="http://www.vigay.com/inet/acorn/uri.html" name="1215,215/FS Acorn URI Handler Functional Specification" /><fixme>version I found on Internet</fixme>
+</section>
+</chapter>
+
+<meta>
+<history>
+<revision number="1215,2201" author="" title="(Developers only)" />
+<revision number="0.16" date="19 Oct 1997" author="RCE" title="First formal version of specification based on uncontrolled textual programmer's notes (RCE)" />
+<revision number="0.16a" date="20 Oct 1997" author="RCE" title="Incorporated notes from ADH and SB" />
+<revision number="0.19" date="17 Nov 1997" author="SNB" title="Incorporated details of service calls " />
+<revision number="0.20" date="20 Nov 1997" author="SNB" title="Incporated details of URL parsing SWI" />
+<revision number="0.21" date="11 Jun 1998" author="SNB" title="All other updates incorporated" />
+<revision number="0.22" date="22 Jun 1998" author="SNB" title="Comments after first review incorporated. Added details of proxy enumeration SWI" />
+<revision number="0.24" date="04 Aug 1998" author="SNB" title="No longer live. ECO 4082." />
+<revision number="0.25" date="12 Nov 1998" author="ADH" title="Multiple changes" >
+<change>Four digit years on all dates.</change>
+<change>Tidied up white space.</change>
+<change>Removed smart quotes and n-dashes.</change>
+<change>Added author details to history.</change>
+<change>Corrected references on R0 exit words from URL_ParseURL to URL_Status.</change>
+<change>Added details of bit 1 of flags word in R0 to URL_ParseURL.</change>
+<change>Clarified a few sentences here and there. ECO 4131.</change>
+</revision>
+</history>
+</meta>
+</riscos-prm>
