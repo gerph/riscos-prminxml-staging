@@ -44,6 +44,9 @@
     <page href="cnp/cut_n_paste">Cut and paste specification</page>
     <page href="url_fetcher/url_fetcher">URL Fetcher specification</page>
 </section>
+<section title="3rd Party" dir="3rdparty">
+    <page href="lineeditor">LineEditor module</page>
+</section>
 
 </index>
 

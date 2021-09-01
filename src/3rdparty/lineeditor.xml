@@ -1,0 +1,722 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="Chapter Title">
+<section title="Introduction and Overview">
+<p>
+<fixme>Provide something from the documentation</fixme>
+</p>
+
+</section>
+
+<section title="Terminology">
+<p>
+<fixme> Some non-RISC OS terms are used, so we can document them </fixme>
+</p>
+</section>
+
+
+<section title="Technical details">
+<p>
+<fixme> Describe what it does and the key bindings. Explain the actions. </fixme>
+</p>
+
+<subsection title="Bindable actions">
+<p>
+    <fixme> Fill this in better</fixme>
+</p>
+
+<p>
+<value-table head-number='Action'>
+    <value number="IGNORE">Totally ignore keypress</value>
+    <value number="BEEP">Beep and ignore keypress</value>
+    <value number="LEFT">Move cursor left</value>
+    <value number="RIGHT">Move cursor right</value>
+    <value number="DELWORD">Delete right to next word end</value>
+    <value number="CRIGHT">Goto end of line</value>
+    <value number="CLEFT">Goto start of line</value>
+    <value number="SRIGHT">Goto start of next word</value>
+    <value number="SLEFT">Goto end of previous word</value>
+    <value number="TOGGLEINSERT">Toggle insert/overtype mode</value>
+    <value number="DELLINE">Ctrl-U default action</value>
+    <value number="REMOVELINE">Remove line from history</value>
+    <value number="COMPLETE">tcsh style filename completion</value>
+    <value number="COMPLETESHOW">tcsh style filename complete-and-show-matches</value>
+    <value number="SHOWCOMP">tcsh style show completions</value>
+    <value number="COMPLETENEXT">4DOS TAB</value>
+    <value number="COMPLETEPREV">4DOS Shift-TAB</value>
+    <value number="SETMARK">Set mark</value>
+    <value number="COPY">Enable copy mode (toggles if not on COPY or arrow keys</value>
+    <value number="UNCOPY">Disable copy mode</value>
+    <value number="SWAPMARK">Swap mark and cursor</value>
+    <value number="CUT">Emacs Ctrl-W</value>
+    <value number="DELETENEXT">Delete character to cursor right</value>
+    <value number="DELETE">Delete character to cursor left</value>
+    <value number="WIPEHISTORY">Delete history buffer(s</value>
+    <value number="DELTOEND">Emacs Ctrl-K</value>
+    <value number="PASTE">Emacs Ctrl-Y</value>
+    <value number="SWAPCHARS">Swap character with char to cursor left</value>
+    <value number="QUOTE">Handle next keypress as OS_ReadLine would</value>
+    <value number="VANILLA">Process this key as OS_ReadLine would</value>
+    <value number="CUP">Recall oldest line in history</value>
+    <value number="CDOWN">Recall most recent line in history</value>
+    <value number="UP">Recall next oldest line</value>
+    <value number="DOWN">Recall next most recent line</value>
+    <value number="SUP">Recall next oldest line matching start</value>
+    <value number="SDOWN">Recall next most recent line matching start</value>
+    <value number="ESCAPE">ESCAPE key pressed</value>
+    <value number="FNKEY">Function key F(keycode AND &hex;0F) (F0 = PRINT)</value>
+    <value number="RETURN">Finish editing line - don't record in history</value>
+    <value number="ENTER">Finish editing line - ENTER into history</value>
+    <value number="FILEROPEN">Open a filer window on a directory</value>
+</value-table>
+</p>
+</subsection>
+</section>
+
+
+<section title="System variables">
+<sysvar-definition name="LineEditor$Edit"
+                   description="LineEditor prompt issued whilst editing">
+<use>
+<p>This variable provides the control string which is output when editing under LineEditor.</p>
+<fixme>Check that this is what it actually does</fixme>
+</use>
+
+<related>
+    <reference type="sysvar" name="CLI$Prompt" href='?'/>
+    <reference type="sysvar" name="LineEditor$List" />
+    <reference type="sysvar" name="LineEditor$Type" />
+    <reference type="sysvar" name="LineEditor$Output" />
+</related>
+</sysvar-definition>
+
+
+<sysvar-definition name="LineEditor$List"
+                   description="LineEditor prompt issued when listing completions">
+<use>
+<p>This variable provides the control string which is output when the LineEditor is showing the completions which are possible for the current command string.</p>
+<fixme>Check that this is what it actually does</fixme>
+</use>
+
+<related>
+    <reference type="sysvar" name="CLI$Prompt" href='?'/>
+    <reference type="sysvar" name="LineEditor$Edit" />
+    <reference type="sysvar" name="LineEditor$Type" />
+    <reference type="sysvar" name="LineEditor$Output" />
+</related>
+</sysvar-definition>
+
+
+<sysvar-definition name="LineEditor$Type"
+                   description="LineEditor prompt issued when listing completions types">
+<use>
+<p>This variable provides the control string which is output when the LineEditor is showing the types of completions which are possible for the current command string.</p>
+<fixme>Check that this is what it actually does</fixme>
+</use>
+
+<related>
+    <reference type="sysvar" name="CLI$Prompt" href='?'/>
+    <reference type="sysvar" name="LineEditor$Edit" />
+    <reference type="sysvar" name="LineEditor$List" />
+    <reference type="sysvar" name="LineEditor$Output" />
+</related>
+</sysvar-definition>
+
+
+<sysvar-definition name="LineEditor$Output"
+                   description="LineEditor prompt issued when editing completes">
+<use>
+<p>This variable provides the control string which is output when the LineEditor completes editing.</p>
+<fixme>Check that this is what it actually does</fixme>
+</use>
+
+<related>
+    <reference type="sysvar" name="CLI$Prompt" href='?'/>
+    <reference type="sysvar" name="LineEditor$Edit" />
+    <reference type="sysvar" name="LineEditor$List" />
+    <reference type="sysvar" name="LineEditor$Type" />
+</related>
+</sysvar-definition>
+
+
+</section>
+
+
+<section title="Service calls">
+<p>
+Lists the service calls, using service-definition, which are defined
+or used by this component.
+</p>
+
+<service-definition name="MyServiceName"
+                    number="90210"
+                    description="What the service is for">
+<entry>
+ <register-use number="0">Register purpose</register-use>
+ <register-use number="1">&hex;90210 (reason code)</register-use>
+</entry>
+
+<exit>
+ <register-use number="0">What is returned</register-use>
+ <register-use number="1" state="preserved" />
+</exit>
+
+<use>
+<p>What the service is for and how it is used.</p>
+<p>This service call is issued by A Component when Something Happens.</p>
+
+</use>
+
+<related>
+<!-- <reference type="sysvar" name="Sys$Variable" /> -->
+</related>
+
+</service-definition>
+</section>
+
+
+<section title="SWI calls">
+
+<swi-definition name="LineEditor_SetOptions"
+                number="83380"
+                description="Sets global LineEditor options"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">Buffer size, or 0 for the default buffer size</register-use>
+ <register-use number="1"><p>Feature flags:</p>
+    <p>
+        <bitfield-table>
+            <bit number='0'>TaskWindows have local buffers</bit>
+            <bit number='1'>Trailing dots will be appended to directory completions</bit>
+            <bit number='2'>Default to overtype mode</bit>
+            <bit number='3'>Keep duplicate lines in history</bit>
+            <bit number='4'>Don't do <userinput>~</userinput> expansion</bit>
+            <bit number='5'>Don't de <userinput>!</userinput>-type events (eg <userinput>!!</userinput>)</bit>
+            <bit number='6'>Don't do <userinput>^two^three</userinput> type replacements</bit>
+        </bitfield-table>
+    </p>
+ </register-use>
+ <register-use number="2">Minimum length to record</register-use>
+ <register-use number="3">Maximum length to record, or 0 for no maximum</register-use>
+ <register-use number="4"><p>Cursor shape usage:</p>
+    <bitfield-table>
+        <bit number='0' state='clear'>Normal cursor is underline</bit>
+        <bit number='0' state='set'>Normal cursor is block</bit>
+        <bit number='1' state='clear'>Normal cursor flashes</bit>
+        <bit number='1' state='set'>Normal cursor is steady</bit>
+        <bit number='2-7' state='reserved'/>
+        <bit number='8' state='clear'>Overtype cursor is underline</bit>
+        <bit number='8' state='set'>Overtype cursor is block</bit>
+        <bit number='9' state='clear'>Overtype cursor flashes</bit>
+        <bit number='9' state='set'>Overtype cursor is steady</bit>
+        <bit number='10-31' state='reserved'/>
+    </bitfield-table>
+ </register-use>
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>This SWI is used to update the global options used by the LineEditor module..</p>
+</use>
+
+<related>
+    <reference type="swi" name="LineEditor_GetOptions" />
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="LineEditor_GetOptions"
+                number="83381"
+                description="Reads global LineEditor options"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+</entry>
+<exit>
+ <register-use number="0">Buffer size in kilobytes, or 0 for the default buffer size</register-use>
+ <register-use number="1"><p>Feature flags (as for <reference type='swi' name="LineEditor_SetOptions" />):</p>
+    <p>
+        <bitfield-table>
+            <bit number='0'>TaskWindows have local buffers</bit>
+            <bit number='1'>Trailing dots will be appended to directory completions</bit>
+            <bit number='2'>Default to overtype mode</bit>
+            <bit number='3'>Keep duplicate lines in history</bit>
+            <bit number='4'>Don't do <userinput>~</userinput> expansion</bit>
+            <bit number='5'>Don't de <userinput>!</userinput>-type events (eg <userinput>!!</userinput>)</bit>
+            <bit number='6'>Don't do <userinput>^two^three</userinput> type replacements</bit>
+        </bitfield-table>
+    </p>
+ </register-use>
+ <register-use number="2">Minimum length to record</register-use>
+ <register-use number="3">Maximum length to record, or 0 for no maximum</register-use>
+ <register-use number="4"><p>Cursor shape usage (as for <reference type='swi' name="LineEditor_SetOptions" />):</p>
+    <bitfield-table>
+        <bit number='0' state='clear'>Normal cursor is underline</bit>
+        <bit number='0' state='set'>Normal cursor is block</bit>
+        <bit number='1' state='clear'>Normal cursor flashes</bit>
+        <bit number='1' state='set'>Normal cursor is steady</bit>
+        <bit number='2-7' state='reserved'/>
+        <bit number='8' state='clear'>Overtype cursor is underline</bit>
+        <bit number='8' state='set'>Overtype cursor is block</bit>
+        <bit number='9' state='clear'>Overtype cursor flashes</bit>
+        <bit number='9' state='set'>Overtype cursor is steady</bit>
+        <bit number='10-31' state='reserved'/>
+    </bitfield-table>
+ </register-use>
+</exit>
+
+<use>
+<p>This SWI is used to read the global options used by the LineEditor module.</p>
+<fixme> Make the bitfield tables into tables in the Technical Details? </fixme>
+</use>
+
+<related>
+    <reference type="swi" name="LineEditor_SetOptions" />
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="LineEditor_CreateBuffer"
+                number="83382"
+                description="Create a private LineEditor buffer"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">Buffer size in kilobytes, or 0 for the default buffer size</register-use>
+ <register-use number="1">Expansion word (0), task handle or -1</register-use>
+ <register-use number="2">Expansion word if R1 is a task handle, or unused if not</register-use>
+</entry>
+<exit>
+ <register-use number="0">LineEditor history buffer id, or 0 if a buffer could not be created</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to create a private use LineEditor buffer. If the value in R1 is
+    a task handle, the buffer will be deleted automatically when the task exits.</p>
+<fixme>A better explanation of the expansion word is required</fixme>
+
+</use>
+
+<related>
+    <reference type="swi" name="LineEditor_DeleteBuffer" />
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="LineEditor_DeleteBuffer"
+                number="83383"
+                description="Deletes a private LineEditor buffer"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">LineEditor history buffer id</register-use>
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>This SWI is used to delete a private use LineEditor buffer created with <reference type="swi" name="LineEditor_CreateBuffer" />.
+</p>
+</use>
+
+<related>
+    <reference type="swi" name="LineEditor_CreateBuffer" />
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="LineEditor_SetPos"
+                number="83384"
+                description="Sets the position in the LineEditor history"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">LineEditor history buffer id</register-use>
+ <register-use number="1"><p>line number to select, based at 0, or special code:</p>
+    <value-table>
+        <value number="&hex;7FFFFFFF">Last line (end of buffer)</value>
+        <value number="&hex;80000000">Previous line, wrapping to end</value>
+        <value number="&hex;80000001">Previous line, stopping at start</value>
+        <value number="&hex;80000002">Next line, stopping at end</value>
+        <value number="&hex;80000003">Next line, wrapping to start</value>
+    </value-table>
+ </register-use>
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>This SWI is used to set the position in the history for a private use LineEditor buffer.
+</p>
+</use>
+
+<related>
+    <reference type="swi" name="LineEditor_GetPos" />
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="LineEditor_GetPos"
+                number="83385"
+                description="Reads the position in the LineEditor history"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">LineEditor history buffer id</register-use>
+</entry>
+<exit>
+ <register-use number="1">line number in the buffer, based at 0</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to read the position in the history of a private use LineEditor buffer.
+</p>
+</use>
+
+<related>
+    <reference type="swi" name="LineEditor_SetPos" />
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="LineEditor_GetLine"
+                number="83386"
+                description="Read the text within a line in the LineEditor history"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">LineEditor history buffer id</register-use>
+ <register-use number="1">Pointer to a buffer to fill</register-use>
+ <register-use number="2">Size of the buffer</register-use>
+</entry>
+<exit>
+ <register-use number="2">Number of characters written to the buffer, excluding the terminator</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to read the text line from the current position in the LineEditor buffer.
+    The line read will be zero terminated.
+</p>
+<fixme>When the data doesn't fit, do we get an error?</fixme>
+</use>
+
+<related>
+    <!--<reference type="swi" name="LineEditor_SetPos" />-->
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="LineEditor_AppendLine"
+                number="83387"
+                description="Append a line to the LineEditor history"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">LineEditor history buffer id</register-use>
+ <register-use number="1">Pointer to a line to add, control terminated</register-use>
+</entry>
+<exit>
+ <register-use number="2">Number of characters written to the buffer, excluding the terminator</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to append a line to the history of the LineEditor buffer.
+</p>
+<fixme> Is there an error if it cannot be added? </fixme>
+</use>
+
+<related>
+    <reference type="swi" name="LineEditor_DeleteLine" />
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="LineEditor_DeleteLine"
+                number="83388"
+                description="Append the last line from the LineEditor history"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">LineEditor history buffer id</register-use>
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>This SWI is used to delete the last line from the history of the LineEditor buffer.
+</p>
+<fixme> Is there an error if there is no last line? </fixme>
+</use>
+
+<related>
+    <reference type="swi" name="LineEditor_DeleteLine" />
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="LineEditor_ReadInfo"
+                number="83389"
+                description="Read information about the current LineEditor buffer"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">Task handle to read</register-use>
+</entry>
+<exit>
+ <register-use number="0">Length of the line currently being edited in the task, or -2 if task is not known, or -1 if there is no edit in progress</register-use>
+ <register-use number="1">cursor position</register-use>
+</exit>
+
+<use>
+<p>This SWI is used read information about the line editing in a given task.
+    Editors may use this to ensure that the cursor position is properly reflected.
+</p>
+
+<p>
+    This SWI is only available from LineEditor 2.73 onwards.
+    <fixme> This should be a tag </fixme>
+</p>
+</use>
+
+<related>
+    <!--<reference type="swi" name="LineEditor_DeleteLine" />-->
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="LineEditor_ReadLine"
+                number="8338A"
+                description="Read a line of input from the user"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">Pointer to buffer to fill</register-use>
+ <register-use number="1">Size of the buffer</register-use>
+ <register-use number="2">Lowest character allowed</register-use>
+ <register-use number="3">Highest character allowed</register-use>
+ <register-use number="4">Password character (if password bit set)</register-use>
+ <register-use number="5"><p>Flags:</p>
+    <bitfield-table>
+        <bit number='0'>Password style display (uses R4 in place of all character output)</bit>
+        <bit number='1'>Do not echo control characters</bit>
+        <bit number='2-31' state='reserved'/>
+    </bitfield-table>
+ </register-use>
+ <register-use number="6">LineEditor history buffer id</register-use>
+</entry>
+<exit>
+ <register-use number="0" state='corrupted'/>
+ <register-use number="1">Characters read into buffer, excluding terminator</register-use>
+ <processor-flag name='C'>Set if Escape was pressed</processor-flag>
+</exit>
+
+<use>
+<p>This SWI is used a line of input from the user, using a specific LineEditor history buffer.
+</p>
+
+<p>
+    This SWI is only available from LineEditor 2.74 onwards.
+    <fixme> This should be a tag </fixme>
+</p>
+</use>
+
+<related>
+    <reference type="swi" name="OS_ReadLine" href='?' />
+    <reference type="vector" name="ReadLineV" href='?' />
+</related>
+
+</swi-definition>
+
+
+<p>
+
+<extended-example>
+
+</extended-example>
+
+</p>
+
+</section>
+
+
+<section title="Error messages">
+<p>
+Lists the errors, using error-definition, which are reported by this
+component.
+</p>
+
+<error-definition name="MyErrorMessage"
+                  number="90210"
+                  description="Meaning of the error message"
+                  >
+
+<use>
+<p>Why the error is reported.</p>
+</use>
+
+<related>
+<reference type="swi" name="Module_Register" />
+</related>
+
+</error-definition>
+
+</section>
+
+
+<section title="*Commands">
+
+<command-definition name="SaveHistory"
+                    description="Saves the LineEditor history to a file">
+
+<syntax>
+  <userreplace>filename</userreplace>
+</syntax>
+
+<parameter name="filename">
+ Filename to save the history as.
+</parameter>
+
+<use>
+<p>This command saves the history buffer, or most recently used buffer if you use local buffers, as a
+text file.</p>
+</use>
+
+<example>
+<command>*SaveHistory LineHistory</command>
+</example>
+
+
+<related>
+<reference type="command" name="LoadHistory" />
+</related>
+
+</command-definition>
+
+<command-definition name="ListHistory"
+                    description="Loads the LineEditor history from a file">
+
+<syntax>
+  <userreplace>filename</userreplace>
+</syntax>
+
+<parameter name="filename">
+ Filename to load the history from
+</parameter>
+
+<use>
+<p>This command loads the history buffer, or most recently used buffer if you use local buffers, from a
+text file. Loading each line is processed through the usual min/max length checks, although currently
+lines over 255 characters are ignored regardless.</p>
+</use>
+
+<example>
+<command>*LoadHistory LineHistory</command>
+</example>
+
+
+<related>
+<reference type="command" name="LoadHistory" />
+</related>
+
+</command-definition>
+
+<command-definition name="Recall"
+                    description="Show the current history">
+
+
+<use>
+<p>This command shows the current history.</p>
+<fixme> Is that right? </fixme>
+</use>
+
+<example>
+<command>*Recall</command>
+</example>
+
+
+<related>
+<!--<reference type="command" name="LoadHistory" />-->
+</related>
+
+</command-definition>
+
+</section>
+
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Person's name" address="email@nowhere.com" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Your name, the year. Whatever you need to say.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Who changed it" date="dd mmm yyyy" title="Initial version">
+    <change>What you did</change>
+  </revision>
+ </history>
+
+ <related>
+    <reference type='link' href="http://some.site/moredocs.html" />
+ </related>
+</meta>
+</riscos-prm>
