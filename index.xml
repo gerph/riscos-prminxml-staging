@@ -13,8 +13,8 @@
     include-sections-depth="1"
     catalog-version="103"
     page-format='html5'
-    page-css-variant='prm prm-ro2 body-fraunces heading-raleway webfont-fraunces webfont-raleway'
-    index-css-variant='prm prm-ro2 body-fraunces heading-raleway webfont-fraunces webfont-raleway no-thumb-bar'
+    page-css-variant='prm body-fraunces heading-raleway webfont-fraunces webfont-raleway large-bullets'
+    index-css-variant='prm body-fraunces heading-raleway webfont-fraunces webfont-raleway large-bullets no-thumb-bar'
     />
 
 <make-index type="swi" />
