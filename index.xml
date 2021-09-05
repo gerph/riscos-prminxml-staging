@@ -43,6 +43,7 @@
 <section title="Functional specs" dir="acorn">
     <page href="cnp/cut_n_paste">Cut and paste specification</page>
     <page href="url_fetcher/url_fetcher">URL Fetcher specification</page>
+    <page href="plugin_protocol/plug-in_protocol">Browser Plug-in Protocol specification</page>
 </section>
 
 </index>
