@@ -344,6 +344,10 @@ td > p:first-of-type {
     margin-top: 0em;
 }
 
+article li > p:first-of-type {
+    margin-top: 0em;
+}
+
 figure {
     margin-left: 2rem;
     margin-right: 2rem;
@@ -842,10 +846,13 @@ footer section.meta table th {
 
 <!-- This variant is closer to the PRM than the standard style -->
     <css variant="prm"><![CDATA[
-/* Specify the text size */
-:root {
-  font-size: 10pt;
+/* Specify the text size (but only when printed; when on screen we use natural size) */
+@media print {
+    :root {
+      font-size: 10pt;
+    }
 }
+
 /* Grey divider lines */
 header h1 {
   border-top: 0.375rem solid lightgray;
@@ -1059,11 +1066,14 @@ pre {
 
 <!-- A style like PRMs for RISC OS 2, which is intended to be layered AFTER the prm style -->
 <css variant='prm-ro2'><![CDATA[
-/* Specify the text size */
-:root {
-  /* The font seems to be smaller for the RO 2 PRMs */
-  font-size: 9pt;
+/* Specify the text size (but only when printed; when on screen we use natural size) */
+@media print {
+    :root {
+      /* The font seems to be smaller for the RO 2 PRMs */
+      font-size: 9pt;
+    }
 }
+
 /* No divider lines */
 header h1 {
   border-top: none;
@@ -1248,13 +1258,13 @@ div.meta table > tbody > tr > th + td {
 
 /* Contents on the page */
 header nav > ul {
-    margin-bottom: 0em;
-    padding-bottom: 1em;
-    padding-left: 0em;
+    margin-bottom: 0rem;
+    padding-bottom: 1rem;
+    padding-left: 1rem;
 }
 header nav > ul li {
     list-style-type: none;
-    margin-left: 0em;
+    margin-left: 0rem;
 }
 header nav h2 {
     margin-top: 0em;
@@ -1576,14 +1586,12 @@ section.definition::before {
 ul > li::marker {
     content: '\25CF';
 }
-ul > li {
-    padding-left: 0.375em;
+header nav li,
+footer section.meta li {
+    padding-left: 0.5rem;
 }
-article ul {
-    padding-left: 0.25em;
-}
-nav ul ul {
-    padding-left: 0.75em;
+article ul > li {
+    padding-left: 1.5rem;
 }
 ]]></css>
 
@@ -1606,6 +1614,20 @@ section.section:first-of-type p:first-of-type::first-letter {
     @right-top {
         background-color: #ffffff;
     }
+}
+]]></css>
+
+
+
+<!-- Force the page size -->
+    <css variant='page-a4'><![CDATA[
+@page {
+    size: a4 portrait;
+}
+]]></css>
+    <css variant='page-a5'><![CDATA[
+@page {
+    size: a5 portrait;
 }
 ]]></css>
 
