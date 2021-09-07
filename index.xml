@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <index>
 <dirs output="output/html"
+      index="output/index"
       help="output/help"
       header="output/header"
       input="src"
@@ -31,6 +32,7 @@
 <make-index type="tboxmethod" />
 
 <make-filelist/>
+<make-indexdata/>
 
 <footer>
 <p>These documents are not necessarily complete.</p>
