@@ -1,0 +1,734 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="URI Handler Functional Specification">
+
+<section title="Overview">
+
+<p>This document addresses the recognised lack of existing RISC OS specifications that describe a standard method for different applications to communicate URIs (of which URLs are an example) between themselves; for example, to provide for an address book requesting that a Web browser display someone's home page.</p>
+
+<p>The first part of this requirement addressed is the provision of a mechanism for applications to pass URIs between themselves in a uniform manner. To date, several third party developers have independently solved this problem in a variety of different ways, as there was no centrally published, universally available standard for developers to work to. This is such a standard.</p>
+
+<p>This 'central resource broker' will be extended in the future to provide mechanisms to enable more efficient handling of URIs. For example, data may be passed to an appropriate application based on the type of data as opposed to simply the method specified for retrieval of the data, as is often the case with URLs. This too will be via a service interface to the central broker.</p>
+
+</section>
+
+
+<section title="Deliverable 'product'">
+
+<p>This document describes the API created to fulfil the above stated requirement, and relates to existing software providing the underlying functionality.</p>
+
+<p>The software takes the form of a RISC OS relocatable module, entitled 'AcornURI'. This is a generic, OS-level software component that could as equally sit beneath a text editor which was aware of the form of URIs as sit beneath a Web browser or mail / news reader. Distributed alongside the module are four sprite definitions for URI files.</p>
+
+<p>The module is suitable for RISC OS 3.10 upwards, and should be stored in <filename>!System.310.Modules.Network</filename> as '<filename>URI</filename>'.</p>
+
+<p>An archive containing the module, sprites, a text version of this specification and a brief ReadMe describing the component versions can be downloaded here (ZIP format).</p>
+
+</section>
+
+
+<section title="Programmer's interface">
+
+<p>The application programmer's interface to the services provided by the Acorn URI handler is detailed in the following sections. This interface will be enhanced in the future, as outlined in the overview, to provide a more comprehensive set of services; so it's worth emphasising that only those details and features of the interface specified in the following sections should be considered to be supported. Any behaviour which is not specified below should be considered to be an implementation feature of a particular version of the software, and as such liable to change, alteration or omission without notice.</p>
+
+<p>The following have been allocated for the use of the Acorn URI handler:</p>
+
+<value-table head-number="" head-name="Type" head-value="Allocated" >
+<value name="Module name">AcornURI</value>
+<value name="SWI prefix">URI</value>
+<value name="SWI chunk">&hex;4E380</value>
+<value name="WIMP message chunk">&hex;4E380</value>
+<value name="Error code chunk ">&hex;810A00</value>
+<value name="Service Call">&hex;A7</value>
+<value name="FileType">&hex;F91</value>
+</value-table>
+
+<p>All environment variables containing the string <sysvar>_URI_</sysvar> (i.e. matching <sysvar>*_URI_*</sysvar>)</p>
+
+<p>URI 'handles' are utilised to identify a specific URI request when communicating with the URI handler; tasks may assume nothing about these handle values, other than that they identify a particular URI to the handler for the period of their validity.</p>
+
+
+
+
+<subsection title="URI SWIs">
+
+<swi-definition name="URI_Version"
+number="4E380"
+description="return the URI handler module's version number"
+irqs="undefined"
+re-entrant="undefined">
+
+<entry>
+<register-use number="0">flags:
+<bitfield-table>
+<bit number="0-31" state="reserved"></bit>
+</bitfield-table></register-use>
+</entry>
+
+<exit>
+<register-use number="0">current version &times; 100</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to inquire of the URI handler module's version number, and should be used to check for a suitable version being present before using the facilities provided.</p>
+
+<p>The number returned is of the form (major version &times; 100) + minor version.</p>
+</use>
+
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="URI_Dispatch"
+number="4E381"
+description="pass a URI string to the handler for dispatch, or checking for the presence of a potential servicer"
+irqs="undefined"
+re-entrant="no">
+
+<entry>
+<register-use number="0">flags:
+<bitfield-table>
+<bit number="0">inform caller of result (=>R2 valid)</bit>
+<bit number="1">check only, don't process (R0:0 must be set)</bit>
+<bit number="2">don't attempt external process startup</bit>
+<bit number="3-31" state="reserved"></bit>
+</bitfield-table></register-use>
+<register-use number="1">pointer to 0 terminated URI string</register-use>
+<register-use number="2">0, or source task handle if bit R0:0 is set and the caller is a WIMP task</register-use>
+</entry>
+
+<exit>
+<register-use number="0">flags:
+<bitfield-table>
+<bit number="0">request rejected, URI won't be dispatched</bit>
+<bit number="1-31" state="reserved"></bit>
+</bitfield-table></register-use>
+<register-use number="1" state="preserved"></register-use>
+<register-use number="2">task handle of URI handler</register-use>
+<register-use number="3">handle of this URI (request identifier)</register-use>
+</exit>
+
+<use>
+<p>This SWI is used by an application to pass a URI string to the handler for dispatch, or checking for the presence of a potential servicer. Dispatch provides for optional requesting of a success/failure indication (R0:0 set) via a WIMP message (<reference type="message" name="URI_MReturnResult" />) or service call reason code (<reference type="service" name="URI" reason="3" />) <fixme>change this to use-reasonname, when available</fixme>- necessary since the dispatch of the URI occurs asynchronously.</p>
+
+<p>If R0:0 is set, module clients must signal that a URI_MReturnResult message is not necessary by setting R2 to 0. In this case, only the service call will be sent out. Conversely, WIMP task clients must specify a valid task handle in R2 - in this case, only the WIMP message will be sent out.</p>
+
+<p>When requesting a check only (R0:1 set), it is an error not to set R0:0 and fill in R2 as described above.</p>
+
+<p>The URI will be copied to the URI handler's workspace, optionally transformed (future enhancement, such as canonicalisation), then relocatable modules will be offered the chance to handle the URI via service call &hex;A7 with an appropriate reason code (<reference type="service" name="URI" reason="2" />)<fixme>change this to use-reasonname, when available</fixme>; if the service call is unclaimed, then a User_Message_Recorded WIMP message will be broadcasted (<reference type="message" name="URI_MProcess" />), offering other tasks the chance of handling the URI; if neither of these mechanisms elicits a response, then the request will be deemed to have failed (in so far as active tasks are concerned).</p>
+
+<p>If R0:2 is clear, then the 'fallback' position of checking a subset of the environment variables will be used to attempt to start a suitable task to handle the URI. The handle ceases to be valid at this point if notification has not been requested, irrespective of whether or not the URI has processed.</p>
+
+<p>If R0:0 is set, the originating task will be informed of the results of the dispatch process (via a User_Message_Recorded WIMP message URI_MReturnResult if R2 contains a valid task handle, or service call Service_URI_ReturnResult if R2 is zero). If the message is not acknowledged or service call claimed, the handle will cease to be valid; otherwise, the originating task becomes responsible for indicating that it no longer needs the URI by calling SWI <reference type="swi" name="URI_InvalidateURI" />.</p> 
+</use>
+
+<related>
+<reference type="swi" name="URI_InvalidateURI" />
+<reference type="message" name="URI_MProcess" />
+<reference type="message" name="URI_MReturnResult" />
+<reference type="service" name="URI" reason="2" />
+<reference type="service" name="URI" reason="3" />
+</related>
+</swi-definition>
+
+<swi-definition name="URI_RequestURI"
+number="4E382"
+description="return size of buffer required to hold specified URI, or to return the URI via the buffer"
+irqs="undefined"
+re-entrant="no">
+
+<entry>
+<register-use number="0">flags:
+<bitfield-table>
+<bit number="0-31" state="reserved"></bit>
+</bitfield-table></register-use>
+<register-use number="1">pointer to buffer to hold URI or 0 to read required size</register-use>
+<register-use number="2">length of buffer or unused (if R1 = 0)</register-use>
+<register-use number="3">URI handle</register-use>
+</entry>
+
+<exit>
+<register-use number="0" state="preserved"></register-use>
+<register-use number="1" state="preserved"></register-use>
+<register-use number="2">offset into buffer of terminating null, or size of buffer required (if R1 = 0 on entry)</register-use>
+<register-use number="3" state="preserved"></register-use>
+</exit>
+
+<use>
+<p>This SWI is used to inquire what size of buffer is required to hold the specified URI (if R1 is zero on entry), or to pass details of a buffer into which your task desires the URI to be copied.</p>
+
+<p>If this is successful, then R2 should be equal to the size of the buffer: if the buffer specified on entry is not large enough, then R2 will be returned negative (indicating the number of unreturned characters), and the string returned in the buffer will still be zero-terminated i.e. buffersize-1 characters of the string are returned.</p>
+</use>
+
+<related>
+
+</related>
+</swi-definition>
+
+<swi-definition name="URI_InvalidateURI"
+number="4E383"
+description="mark the specified URI as being invalid"
+irqs="undefined"
+re-entrant="no">
+
+<entry>
+<register-use number="0">flags:
+<bitfield-table>
+<bit number="0-31" state="reserved"></bit>
+</bitfield-table></register-use>
+<register-use number="3">URI handle</register-use>
+</entry>
+
+<exit>
+<register-use number="0" state="preserved"></register-use>
+<register-use number="3" state="preserved"></register-use>
+</exit>
+
+<use>
+<p>This SWI is used to mark the specified URI as being invalid.</p>
+</use>
+
+<related>
+
+</related>
+</swi-definition>
+
+</subsection>
+
+
+<subsection title="URI service calls">
+
+<p>Service call &hex;A7 has been allocated for the use of the URI handler; the following sub-reason codes are defined for the use of external applications. All other service call reason codes are reserved: a module may assume nothing about these, and should always ignore unrecognised reason codes - never claim such service calls.</p>
+
+<p>A deliberate degree of similarly exists between the WIMP messages and the service calls, since both provide essentially the same functionality; clearly, messages will be convenient in environments where service calls are not and vice versa, hence the duplication of functionality between the two.</p>
+
+<service-definition name="URI"
+    number="A7"
+    description="events issued by URI handler">
+<entry>
+<register-use number="0">reason code:
+<value-table>
+<value number="0"><reference type="service" name="URI" reason="0" use-description="yes" /></value>
+<value number="1"><reference type="service" name="URI" reason="1" use-description="yes" /></value>
+<value number="2"><reference type="service" name="URI" reason="2" use-description="yes" /></value>
+<value number="3"><reference type="service" name="URI" reason="3" use-description="yes" /></value>
+<value number="">All other values are reserved, and must not be used</value>
+<value number=""></value>
+</value-table></register-use>
+<register-use number="1">service call number</register-use>
+<register-use number="2">flags</register-use>
+<register-use number="3-4">dependant on reason code</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3">dependant on reason code</register-use>
+</exit>
+
+<use>
+
+</use>
+
+<related>
+
+</related>
+</service-definition>
+
+<service-definition name="URI"
+    number="A7"
+    description="URI handler started"
+    reason="0"
+    reasonname="Started">
+<entry>
+<register-use number="0">0 (reason code)</register-use>
+<register-use number="1">&hex;A7 (service call)</register-use>
+<register-use number="2">flags:
+<bitfield-table>
+<bit number="0-31" state="reserved"></bit>
+</bitfield-table></register-use>
+</entry>
+
+<exit>
+<register-use number="0-2" state="preserved" />
+</exit>
+
+<use>
+<p>This service call indicates that the URI handler has started. It is intended for more specific use defined in future versions of this specification.</p>
+
+<p>This service call must be passed on.</p>
+</use>
+
+<related>
+
+</related>
+</service-definition>
+
+<service-definition name="URI"
+    number="A7"
+    description="URI handler dying"
+    reason="1"
+    reasonname="Dying">
+<entry>
+<register-use number="0">1 (reason code)</register-use>
+<register-use number="1">&hex;A7 (service call)</register-use>
+<register-use number="2">flags:
+<bitfield-table>
+<bit number="0-31" state="reserved"></bit>
+</bitfield-table></register-use>
+</entry>
+
+<exit>
+<register-use number="0-2" state="preserved" />
+</exit>
+
+<use>
+<p>This service call indicates that the URI handler is dying. It is intended for more specific use defined in future versions of this specification.</p>
+
+<p>This service call must be passed on.</p>
+</use>
+
+<related>
+
+</related>
+</service-definition>
+
+<service-definition name="URI"
+    number="A7"
+    description="process or check URI"
+    reason="2"
+    reasonname="Process">
+<entry>
+<register-use number="0">2 (reason code)</register-use>
+<register-use number="1">&hex;A7 (service call)</register-use>
+<register-use number="2">flags:
+<bitfield-table>
+<bit number="0">check URI only, do not process</bit>
+<bit number="1-31" state="reserved"></bit>
+</bitfield-table></register-use>
+<register-use number="3">pointer to URI string (readonly access)</register-use>
+<register-use number="4">handle of this URI</register-use>
+</entry>
+
+<exit>
+<register-use number="0" state="preserved" />
+<register-use number="1" >preserved, or 0 to claim</register-use>
+<register-use number="2-4" state="preserved" />
+</exit>
+
+<use>
+<p>This service call indicates that the URI handler has been requested to dispatch the given URI for either processing (R2:0 clear), or just checking (R2:0 set). The URI string is held in the URI handler's workspace; this buffer must not be written to - if it is, behaviour is undefined. It is intended that modules should inspect the string at the given address, and if they decide they can process the given URI, claim the service call. If R2:0 is set, this is all that is required.</p>
+
+<p>However, if R2:0 is clear, i.e. process URI, then a call to SWI <reference type="swi" name="URI_RequestURI" /> to obtain a local copy to work with must be made; this step may NOT be omitted, since the internal buffer is not guaranteed to remain valid after return from the service handler.</p>
+
+<p>If a module cannot process the given URI, it must pass the call on with all registers preserved to allow the remainder of the dispatch mechanism to function. </p>
+</use>
+
+<related>
+<reference type="swi" name="URI_RequestURI" />
+</related>
+
+</service-definition>
+
+<service-definition name="URI"
+    number="A7"
+    description="return result of a dispatch"
+    reason="3"
+    reasonname="ReturnResult">
+<entry>
+<register-use number="0">3 (reason code)</register-use>
+<register-use number="1">&hex;A7 (service call)</register-use>
+<register-use number="2">flags:
+<bitfield-table>
+<bit number="0" state="clear">URI was claimed for processing</bit>
+<bit number="0" state="set">URI was not claimed for processing</bit>
+<bit number="1-31" state="reserved"></bit>
+</bitfield-table></register-use>
+<register-use number="3" state="undefined"></register-use>
+<register-use number="4">handle of this URI</register-use>
+</entry>
+
+<exit>
+</exit>
+
+<use>
+<p>This service call is used by the URI handler to return result status information to a requesting module. The module requests the service call when it calls the <reference type="swi" name="URI_Dispatch" /> SWI; it must set R0:0 and R2=0 on entry. Such modules must remember the URI handle returned in R3 by this SWI or they cannot later determine if the service call was meant for them or another client; any client setting R0:0 on entry to URI_Dispatch must see if it recognises the URI handle in R4, and if so, claim the service call. If it does not recognise the handle, it must not claim the service call. Any clients which never set R0:0 on entry to URI_Dispatch can ignore the service call.</p>
+
+<p>Only success or failure is indicated, though this is likely to be enhanced in future.</p>
+</use>
+
+<related>
+<reference type="swi" name="URI_Dispatch" />
+</related>
+</service-definition>
+
+</subsection>
+
+
+<subsection title="WIMP messages">
+
+<message-definition name="URI_MStarted"
+    number="4E380"
+    description="URI handler started">
+
+<message-table>
+<message offset="20">flags:
+<bitfield-table>
+<bit number="0-31" state="reserved" />
+</bitfield-table></message>
+<message offset="24">undefined (reserved)</message>
+</message-table>
+
+
+<use>
+<p>This message is broadcast (User_Message) to indicate that the URI handler has started up. It must not be acknowledged - information only.</p>
+</use>
+
+<related>
+
+</related>
+</message-definition>
+
+<message-definition name="URI_MDying"
+    number="4E381"
+    description="URI handler dying">
+
+<message-table>
+<message offset="20">flags:
+<bitfield-table>
+<bit number="0-31" state="reserved" />
+</bitfield-table></message>
+<message offset="24">undefined (reserved)</message>
+</message-table>
+
+
+<use>
+<p>This message is broadcast (User_Message) to indicate that the URI handler is shutting down. It must not be acknowledged - information only.</p>
+</use>
+
+<related>
+
+</related>
+</message-definition>
+
+<message-definition name="URI_MProcess"
+    number="4E382"
+    description="process or check URI"
+    broadcast="must"
+    recorded="must">
+
+<message-table>
+<message offset="20">flags:
+<bitfield-table>
+<bit number="0" >check URI only, do not process</bit>
+<bit number="1-31" state="reserved" />
+</bitfield-table></message>
+<message offset="24">pointer to URI string (URI internal buffer)</message>
+<message offset="28">URI handle</message>
+<message offset="32">undefined (reserved)</message>
+</message-table>
+
+
+<use>
+<p>This message is broadcast (User_Message_Recorded) to indicate that the URI handler has been requested to dispatch the given URI for processing, or check if any task can process the URI.</p>
+
+<p>The URI string is held in the URI module's workspace; this buffer must not be written to - if it is, behaviour is undefined.</p>
+
+<p>It is intended that applications which can process URIs should inspect the string at the given address to determine if they can process the URI. If R0 bit 0 is clear, you must then call SWI <reference type="swi" name="URI_RequestURI" /> to obtain a copy to work with - this step may not be omitted, since the buffer given is not guaranteed to remain unaltered.</p>
+
+<p>If an application is able to check or process the given URI, then it should acknowledge the broadcast by sending a <reference type="message" name="URI_MProcessAck" /> message to the URI handler, thus preventing it being passed on to other applications, otherwise it must not acknowledge the message. </p>
+</use>
+
+<related>
+<reference type="swi" name="URI_RequestURI" />
+<reference type="message" name="URI_MProcessAck" />
+</related>
+</message-definition>
+
+<message-definition name="URI_MReturnResult"
+    number="4E383"
+    description="return result of a dispatch">
+
+<message-table>
+<message offset="20">flags:
+<bitfield-table>
+<bit number="0" state="clear">URI was claimed for processing</bit>
+<bit number="0" state="set">URI was not claimed for processing</bit>
+<bit number="1-31" state="reserved" />
+</bitfield-table></message>
+<message offset="24">URI handle</message>
+<message offset="28">undefined (reserved)</message>
+</message-table>
+
+
+<use>
+<p>This message is used by the URI handler to return result status information to a requesting task. Only success or failure is indicated, though this is likely to be enhanced in future.</p>
+</use>
+
+<related>
+
+</related>
+</message-definition>
+
+<message-definition name="URI_MProcessAck"
+    number="4E384"
+    description="acknowledge URI_MProcess">
+
+<message-table>
+<message offset="20">flags:
+<bitfield-table>
+<bit number="0">Check URI only, do not process</bit>
+<bit number="1-31" state="reserved" />
+</bitfield-table></message>
+<message offset="24">pointer to URI string (URI internal buffer)</message>
+<message offset="28">URI handle</message>
+<message offset="32">undefined (reserved)</message>
+</message-table>
+
+
+<use>
+<p>This message is used by clients of the URI handler to indicate to the URI handler that they can claim or process a given URI, thus preventing it being passed on to other applications. Claimants just change the message type to &hex;4E384 (URI_MProcessAck) and copy the supplied my_ref field into your_ref, then send the message back to its originator (ie. the URI handler).</p>
+</use>
+
+<related>
+
+</related>
+</message-definition>
+
+</subsection>
+
+
+<subsection title="* Commands">
+
+<command-definition name="Desktop_AcornURI"
+    description="starts the URI handler ">
+
+<syntax>
+
+</syntax>
+
+
+
+<use>
+<p><command>Desktop_AcornURI</command> starts the Acorn URI handler. Do not use <command>*Desktop_AcornURI</command>, use <command>*Desktop</command> instead.</p>
+
+<p>Help Text:<systemoutput>*Do not use *Desktop_AcornURI, use *Desktop instead.<br />
+Syntax: *Desktop_AcornURI</systemoutput></p>
+<p></p>
+
+</use>
+
+<example>
+<command>*Desktop_AcornURI</command>
+<systemoutput>Use *Desktop to start AcornURI</systemoutput>
+</example>
+
+<related>
+</related>
+</command-definition>
+
+<command-definition name="URIinfo"
+    description="display information about the URI handler">
+
+<syntax>
+
+</syntax>
+
+
+<use>
+<p><command>*URIinfo</command> produces status information from the Acorn URI handler.</p>
+<p>HelpText:
+<extended-example type="pseudo">
+URIinfo produces status information from the Acorn URI handler.
+Syntax: *URIinfo</extended-example></p>
+</use>
+
+<example>
+<command>*URIinfo</command>
+<extended-example type="pseudo">
+URI_taskhandle: 4b4016d8
+URI chain start: 021cc844
+URI handle: 022b60d4 (action:00020000) 'http://www.acorn.com/'
+</extended-example>
+</example>
+
+<related>
+</related>
+</command-definition>
+
+<command-definition name="URIdispatch"
+    description="try to launch a URI ">
+
+<syntax>
+<userreplace>uri</userreplace>
+</syntax>
+
+<parameter name="uri">the uri to be launched</parameter>
+
+<use>
+<p><command>*URIdispatch</command> tries to lauch a given URI. No indication is given of whether or not the launch succeeded.</p>
+<p>Help Text:
+<extended-example type="pseudo">
+URIdispatch tries to launch a URI.
+Syntax: *URIdispatch &lt;uri&gt; 
+</extended-example>
+</p>
+</use>
+
+<example>
+<command>*URIdispatch http://www.acorn.com/</command>
+</example>
+
+<related>
+<reference type="swi" name="URI_Dispatch" />
+</related>
+</command-definition>
+
+</subsection>
+
+
+<subsection title="URI handler errors">
+
+<subsubsection title="Defined errors">
+<p>The URI handler has a error chunk base of &hex;810A00. Currently defined errors are:</p>
+<p><image type="png" src="tbl_uri_handler_errors.png" /></p>
+
+</subsubsection>>
+
+<subsubsection title="Error generators">
+
+<p>Generators of the errors are as follows:</p>
+<p><image type="png" src="tbl_generators_errors.png" /></p>
+
+<p>Finally, the WIMP task may generate (through a standard WIMP error box) <variable>Error_URI_NoMemory</variable> and <variable>Error_URI_BadFile</variable>.</p>
+
+</subsubsection>>
+
+</subsection>
+
+
+<subsection title="Use of the URI filetype">
+
+<p>URI files have the filetype &hex;F91, with the text equivalent 'URI'. The URI handler will deal with such files appropriately when the file is double-clicked upon (currenly, it dispatches the URI inside the file - see the file format description below). Applications must not set an <variable>Alias$@RunType</variable> variable for the URI filetype, nor must they deal with DataOpen messages for this filetype. Applications may respond to DataLoad messages for the filetype as they see fit.</p>
+
+<p>Suitable sprites exist (four; medium and high resolution file sprites, small and large variants). These are the only sprite definitions acceptable for use in this context. The sprites should always be distributed alongside the module.</p>
+
+<p>URI files consist of a series of lines of characters. Lines are ended by any number of control code characters (ASCII code less than 32) or the end of the file. All lines in a file do not have to end in the same way provided each individual line ends in a valid manner. Other white space is not ignored, hence a single space character (ASCII code 32) followed by ASCII code 9 does count as a line containing a single space followed by a line end marker.</p>
+
+<p>URI files support comments. Comment lines start with a '#' (ASCII 35) and end in the same way as all other lines. Comment lines are not counted; any file reader that happened to keep track of the line number it was on should not increment the counter for a comment line. A URI file may contain any number of comment lines, but automatic file generators are encouraged to keep comments to a bare minimum to keep file sizes down. Generator code must never create special comment lines which mean something to accompanying reader code - comment lines are always skipped by the reader code and never parsed, beyond identifying them as comments.</p>
+
+<p>The line ending type of a URI file is not fixed as a specific control code or sequence of control codes (e.g. CR+LF) to allow simple generation from a variety of sources, including manual authoring. Given this latter possibility, it is important to stress that unlike, say, HTML, the URI file format is rigorously defined and must be adhered to. Incorrectly formed files are not guaranteed to work correctly with either the Acorn URI handler or applications which support it.</p>
+
+<p>That said, the use of ASCII code 13 followed by ASCII code 10 (CR+LF) to end lines is strongly encouraged as this is a common line ending type supported by many different editors on many platforms. ASCII code 9 (tab) could also be used to give the file a better visual appearence in the editor - it is still an end of line as far as the file reader is concerned. This convention provides the potential for greater convenience for the end-user, but must NOT be assumed in file reading code!</p>
+
+<p>Currently defined formats:</p>
+
+<p><image type="png" src="tbl_data_format.png" /></p>
+
+<p>You can find some examples of URI files in a SparkFS format archive here.</p>
+
+<p>Future file formats will be backwards compatible with this one, so clients should only check the version number of the file to know what sort of contents to expect. So for example, if a version 100 aware application encounters a later version file, it can assume that the first 4 lines of the file are as described for the version 100 file; though there may be other lines which clearly it cannot understand, and must ignore.</p>
+
+<p>For example, the file format rationale may be easier to understand given the possibility of a future format - version 101, say - which allowed non-fully specified URIs in line 5 which can be canonicalised, and a preferred external process to start in line 6. The file could look like this:</p>
+
+<extended-example type="pseudo">
+-Start of file-
+URI
+6
+
+*
+Acorn Group PLC
+www.acorn.com
+
+&lt;Browse$Dir&gt;.!Run
+-End of file-
+</extended-example>
+</subsection>
+
+
+<subsection title="Use of URI environment variables">
+
+<p>Currently defined variables are of the form:</p>
+<variable>Alias$Open_URI_<userreplace>scheme</userreplace> <userreplace>file_to_run</userreplace></variable>
+
+<p>for example,</p>
+<extended-example type="pseudo">
+Alias$Open_URI_http &lt;Browse$Dir&gt;.!Run
+Alias$Open_URI_ftp &lt;FTPClient$Dir&gt;.!Run
+</extended-example>
+
+<p>If a variable such as the above is defined, then the task it names will be run. If this is successful, the URI will be redispatched in the normal way, so the task has the opportunity of dealing with it.</p>
+
+<p>A comma separated list of handlers may be specified, so applications must always add to the contents of the variables. At present, only the first item in the list is used, though this may change in future versions.</p>
+
+<p>For compatability with existing applications, the URI handler will support a similar scheme of system variables defined by ANT Ltd. Details of these are at the time of writing freely available on the ANT Support web site.</p>
+
+</subsection>
+</section>
+
+<section title="Performance targets">
+
+<p>Final code size of version 1.00 should be about 26K. Quiescent memory usage should be no more than 512 bytes. When active, the main storage requirement for each URI being processed is storage of the URI itself. This is, then, indeterminate, but unlikely to be more than 2K (not that the URI handler will have any such hard coded limits). An additional overhead of no more than 128 bytes per URI is also required.</p>
+
+
+</section>
+
+</chapter>
+
+<meta>
+
+<disclaimer>
+<p>This document first appeared as 1307,260/FS and went through issues 1 to 8, with 8 being published outside of Acorn. The document number was later changed to 1215,215/FS.</p>
+</disclaimer>
+
+<history>
+<revision number="1307,260/FS_1" date="13 Dec 1996" author="Carl Elkins, Stewart Brodie, Kevin Bracey, Simon Middleton, Ben Laughton, Andrew Hodgkinson" title="(Developers only) Original Version" />
+<revision number="1307,260/FS_2" date="21 Dec 1996" author="" title="" >
+<change>Added 'handles' concept after discussions with S.Brodie</change></revision>
+<revision number="1307,260/FS_3" date="22 Feb 1997" author="" title="" >
+<change>Corrected omission of URI handle from Message_ReturnResult, clarified responsibility for invalidation of URIs</change></revision>
+<revision number="1307,260/FS_4" date="21 Apr 1997" author="" title="" >
+<change>Added URI_MProcessAck message and *command documentation and updated URI filetype section</change></revision>
+<revision number="1307,260/FS_5" date="13 Jun 1997" author="" title="" >
+<change>Service calls given flags, so 'Check' service call removed</change>
+<change>R0 return of URI_Dispatch now a bitfield, not a return value</change>
+<change>Added Service_MReturnResult. Desktop_URI renamed to Desktop_AcornURIto match the actual module task name</change>
+<change>URI file contents specified; includes a version number linked to the module version, so this specifies a version 5 file</change></revision>
+<revision number="1307,260/FS_6" date="20 Jun 2997" author="" title="" >
+<change>Following review of draft 5, some minor wording changes here and there; performance targets and development test strategy sections added</change></revision>
+<revision number="1307,260/FS_7" date="21 Jun 1997" author="" title="" >
+<change>Reworded away from future tense to form an externally releasable specification</change></revision>
+<revision number="1307,260/FS_8" date="10 Dec 1997" author="" title="" >
+<change>A couple of implied future tense references missed in Draft 7, Following review of draft 5</change>
+<change>some minor wording changes here and there</change>
+<change>performance targets and development test strategy sections addednow corrected</change>
+<change>some minor rewording associated with this</change></revision>
+<revision number="-" date="11 Dec 1997" author="" title="(General release of 1307,260/FS)" >
+<change>No longer draft</change>
+<change>settled on WIMP rather than Wimp; couple of minor typos corrected</change></revision>
+<revision number="-" date="05 Jan 1998" author="" title="" >
+<change>Few more typos fixed ('21', '23', 'URI_ProcessAck' and 'URIProcessAck' instead of 'R2', '32', 'URI_MProcessAck' and again 'URI_MProcessAck' respectively)</change></revision>
+<revision number="-" date="05 Feb 1998" author="" title="" >
+<change>Minor tweaks to fit in with the rest of the Acorn Internet site (now uses a small style sheet like everything else, site map link added, and so-on). No changes to the content of the specification</change></revision>
+<revision number="-" date="19 Feb 1998" author="" title="" >
+<change>A few HTML style changes to make some of the section headings a bit clearer; no content change</change></revision>
+<revision number="-" date="23 Feb 1998" author="" title="" >
+<change>Colours changed to blue; now back to green again</change></revision>
+
+<revision number="1215,215/FS_1" date="02 Mar 1998" author="" title="(General release of 1215,215/FS)" >
+<change>Document number now 1215,215/FS</change>
+<change>Updated history, and navigation links in the page footer now include the specifications section; no other content changes</change></revision>
+<revision number="1215,215/FS_2" date="01 Sep 1998" author="" title="" >
+<change>Corrected table listing allocated items in the Programmer's Interface section - module name is 'AcornURI', not 'URI'</change>
+<change>Issue numbers for 1215,215/FS in this table are now in &lt;strong&gt; to match the 1307,260/FS numbers. ECO 4102 allocated for these changes</change></revision>
+<revision number="1215,215/FS_3" date="08 Sep 2021" author="Alan Robertson" title="Initial version in PRMinXML format">
+<change>No major changes to text. Removed the 'Document Status' section as information captured in 'Document Information' section</change>
+<change>Added related links to definitions and various parts throughout document</change>
+<change>Prefixed the Acorn Functional Specification Document Number to each Issue revision in original</change>
+<change>Removed links to zip files</change>
+</revision>
+</history>
+
+</meta>
+
+</riscos-prm>
