@@ -623,7 +623,12 @@ Syntax: *URIdispatch &lt;uri&gt;
 
 <p>Currently defined formats:</p>
 
-<p><image type="png" src="tbl_data_format.png" /></p>
+<value-table head-number="Line number" head-value="Contents">
+<value number="1">'URI' - this must be present before any comments or other information</value>
+<value number="2">  Text equivalent of the earliest module version number (as returned by URI_Version) that would fully understand the file contents; e.g. '5' for v0.05 (any number of preceeding '0's are also valid). So if lines were added to this file format to produce a version 6 file, this implies that URI v0.06 is required to understand those extra lines, even though v0.05 would still understand lines 1 to 4<br />The first general release version of the URI handler will adopt a version number of 1.00, so the first URI files will start with '100' in this line</value>
+<value number="3">A fully specified URI; v0.05 of the URI handler does not attempt to canonicalise URIs, though future versions may. If this line contains only one character with ASCII code 42 ('*'), the file does not contain a URI and should be ignored (this is to allow future file formats to hold non-fully specified URIs on later lines that could be canonicalised by the URI module, without breaking legacy file reading code) <br />Lines 1 to 3 are required in a minimal URI file. Any other lines may or may not appear</value>
+<value number="4">A title string to associate with the URI. Again, if this line contains only one character with ASCII code 42 ('*'), the file does not contain a title string. Processors wishing to display title information alongside a URI may well use the URI itself instead, in this case</value>
+</value-table>
 
 <p>You can find some examples of URI files in a SparkFS format archive here.</p>
 
