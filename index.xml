@@ -15,7 +15,7 @@
     catalog-version="103"
     page-format='html5'
     page-css-variant='prm body-fraunces heading-raleway webfont-fraunces webfont-raleway large-bullets'
-    index-css-variant='prm body-fraunces heading-raleway webfont-fraunces webfont-raleway large-bullets no-thumb-bar'
+    index-css-variant='prm body-fraunces heading-raleway webfont-fraunces webfont-raleway large-bullets no-edge-index'
     />
 
 <make-index type="swi" />
