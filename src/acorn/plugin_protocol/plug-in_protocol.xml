@@ -1,0 +1,1165 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="Acorn Plug-In Protocol Functional Specification">
+
+<section title="Overview">
+
+<p>The World Wide Web is gradually being extended to offer better support for embedding multimedia data inside Web pages. A well-established mechanism known as "helpers" allows a browser to delegate the display of unsupported data types to other applications. However, the helper application displays this data independently, usually in its own window.</p>
+
+<p>The idea of a "plug-in" is to integrate the display of such data into the WWW browser's own window. A number of proposed HTML extensions are being promoted, such as <variable>&lt;APPLET&gt;</variable> (by Sun for Java), <variable>&lt;EMBED&gt;</variable> (by <reference type="document" href="https://www.netscape.com" name="Netscape" />) and <variable>&lt;OBJECT&gt;</variable> (by <reference type="document" href="https://www.w3.org/" name="W3C" />).</p>
+
+This protocol is described from the point of view of a web browser and plug-in however it is applicable to any application that needs to embed another application's windows within its own.
+
+</section>
+
+
+<section title="Outstanding issues">
+
+<p>There are no outstanding issues.</p>
+
+</section>
+
+
+<section title="Technical background">
+
+<p>Navigator™ for the Mac and Windows™ supports plug-ins in the form of dynamically loaded code resources (DLLs). On finding data of a type it cannot display itself, the browser seeks a DLL which is capable of handling it. If it finds one, it calls standard entry points in the DLL to get it to display the data in the browser's window.</p>
+
+<p>This model does not fit well with RISC OS practices. It does not have a standard scheme for DLLs, and the alternative - using relocatable modules - is not practical for very large playback engines for systems like Java and Director. Therefore plug-ins are implemented as separate tasks, with a special message protocol between the browser and the plug-in to permit communication and control.</p>
+
+<p>In order to display the data inside the browser's own window, the plug-in needs to be made responsible for updating a certain portion of the browser's work area. This could be done by the browser instructing the plug-in to redraw parts of the window. However, this approach is rejected because it introduces significant differences between a plug-in and a normal application. Instead, we utilise a new facility <fixme>Original document had link to Nested Window Manager</fixme> added to the Window Manager, whereby windows can be created "inside" a parent window. The Window Manager takes care of event distribution to the plug-in, and also ensures that the "child" window is in a fixed position relative to the work-area of the parent - so the plug-in's display area will be scrolled within the browser window if the user manipulates the browser window's scrollbars.</p>
+
+</section>
+
+
+
+<section title="User interface">
+
+<p>There is no user interface component to this specification.</p>
+
+</section>
+
+
+<section title="Programmer interface">
+
+<p>A plug-in accepts one or more types of data, specified using normal RISC OS filetypes. It is the responsibility of the browser to map MIME types to RISC OS filetypes.</p>
+
+<p>Just as other RISC OS applications may be "single document" or "multiple document", a plug-in implementor may choose whether to handle multiple items at once or not. Ideally, plug-ins should be able to cope with multiple pieces of data, potentially owned by multiple client applications. However, for ease of implementation it may sometimes be preferred to restrict each instance of a plug-in to displaying one piece of data. In this case, were two such pieces of data to be displayed at once, it would be necessary to invoke the plug-in twice.</p>
+
+<subsection title="Invocation">
+
+<p>Having determined the best RISC OS filetype for the data, the browser performs the following sequence of actions:<list type="ordered">
+
+    <item>Broadcast <reference type="message" name="PlugIn_Open" />, passing the filename and filetype of the data, and the parent window information. This message also contains an opaque 32 bit value known as the "browser instance handle". This is a word of significance to the browser, and might be different for each instance of a plug-in. The plug-in must always quote the correct browser instance handle to the browser in subsequent messages.</item>
+
+    <item>If a <reference type="message" name="PlugIn_Opening" /> is received in reply, an existing invocation of a suitable plug-in has agreed to handle the data. The Message_PlugIn_Opening contains an opaque word value, known as the "plug-in instance handle", which together with the task handle of the plug-in task uniquely identifies the piece of data. The browser remembers both of these values for use in future messages.</item>
+
+    <item>If no task responds to Message_PlugIn_Opening, the browser attempts to launch the appropriate plug-in. This is done by looking for an environment variable called <sysvar>Alias$@PlugInType_<userreplace>xxx</userreplace></sysvar> where <userreplace>xxx</userreplace> is the hexadecimal type value. If this variable is not found, no suitable plug-in is available, and the browser regards the attempt to display the data as unsuccessful. If the variable is found, then the browser launches it by calling Wimp_StartTask.</item>
+
+    <item>The result of Wimp_StartTask is the task handle of the new invocation of the plug-in. As soon as Wimp_StartTask returns, the browser re-broadcasts the Message_PlugIn_Open message.</item>
+
+    <item>Normally, the plug-in accepts this message and replies with Message_PlugIn_Opening, containing a plug-in instance handle as described above.</item>
+
+    <item>If no reply was forthcoming, the browser assumes that for some reason the plug-in was unable to load the data, and it regards the attempt to display this data as unsuccessful. This might be because the data is malformed, erroneous or of an incompatible version to that expected by the plug-in, or it might be because of some unexpected eventuality (out of memory, etc). If a detailed failure message is to be issued to the user, it is the responsibility of the plug-in to do this.<br /><br />
+
+    If further data of the same type needs to be displayed, either simultaneously or sequentially, then the browser should repeat the whole process starting with the broadcast.</item>
+
+    <item>If the plug-in replies and so requests then the browser opens a data stream for the initial object being embedded and sends this data to the plug-in according to the <reference type="subsection" name="Stream protocol" >plug-in stream</reference> protocol.</item>
+
+    <item>The plug-in examines the contents of the file that was named in the Message_PlugIn_Open message. This file contains all of the information from the OBJECT, EMBED or APPLET tag, and is used by the plug-in to initialise itself. The plug-in may have to fetch the contents of more URLs in order to do this; it may get the browser to do this on its behalf by using <reference type="message" name="PlugIn_URL_Access" />.</item>
+
+    <item>If during startup the plug-in encounters an unrecoverable error it tidies up after itself and sends a <reference type="message" name="PlugIn_Closed" /> to the browser, setting a flag in the message to indicate that this is due to an error. The message may optionally include an error message for the browser to display.</item>
+</list>
+</p>
+
+</subsection>
+
+
+<subsection title="Shutdown">
+
+<p>When the browser wishes the data to be forgotten, for example when the user quits the browser or leaves the current page, the following actions are taken. If multiple pieces of data have been farmed out (to the same or multiple plug-ins) the sequence below is performed for each such piece of data.<list type="ordered">
+
+    <item>Browser sends <reference type="message" name="PlugIn_Close" /> directly to the plug-in task, passing the plug-in instance handle associated with the data.</item>
+
+    <item>Plug-in closes and deletes its window, cleans up state and data, etc.</item>
+
+    <item>Plug-in replies with <reference type="message" name="PlugIn_Closed" />.</item>
+
+    <item>Plug-in decrements its count of active objects. If the count is zero, it is free to exit if it wishes. A flag in the Message_PlugIn_Close acts as a hint to the plug-in as to whether the browser would like the plug-in to remain running or not, but the plug-in does not have to honour this if it does not want to.</item>
+</list>
+</p>
+
+</subsection>
+
+
+<subsection title="Plug-in death">
+
+<p>If the browser receives a Message_Task_CloseDown, it checks to see whether the exiting task was a plug-in that was currently displaying data on behalf of the browser. If so, all data being displayed by that plug-in is marked as undisplayable. The Window Manager has already deleted the child window(s) associated with the task. The browser might not issue any error in this case (for example, the NCBrowser does not); other possibilities are relaunching the plug-in or reporting the exit to the user.</p>
+
+</subsection>
+
+
+<subsection title="Browser death">
+
+<p>If the plug-in receives a Message_Task_CloseDown, it checks to see whether it is displaying data on behalf of the exiting task. If so, it deallocates any state or data associated with that task, and reduces its reference count by the correct amount. If the reference count reaches zero (i.e. the dead task was the only task using the plug-in), then the plug-in may exit if it wants to.</p>
+
+</subsection>
+
+
+<subsection title="Window events">
+
+<p>The Window Manager's nested window mechanism handles all subwindow positioning issues automatically. If a browser window is closed, then the subwindow is removed from view, and is reinstated when the parent window is reopened. If the browser window is scrolled, the Window Manager ensures that the plug-in window stays at the same position relative to the browser's work area, if necessary it repositions the subwindow and clips it if it has scrolled partiallly or entirely out of view. Repositioning is done by the Window Manager without sending Open_Window_Request events to the plug-in.</p>
+
+<p>If the plug-in receives a keypress or mouse button click that it does not want to handle, it must pass it on to the browser by means of Wimp_SendMessage. It must set the window handle field of the message to the handle of its parent window. Note that this should be used instead of Wimp_ProcessKey.</p>
+
+<p>If the browser wishes to forcibly resize or reposition the subwindow, it sends a <reference type="message" name="PlugIn_Reshape" /> to the plug-in, quoting the plug-in instance handle. The plug-in must honour this request by re-opening itself at the new position. The coordinates in this request are work-area coordinates of the parent window. The parent window handle in this message may be different to the original one. The plug-in should be prepared to check for this, and re-create its window as a child of the new parent if necessary.</p>
+
+<p>If the plug-in wishes to alter its size, it cannot simply resize its window. Instead it must send a <reference type="message" name="PlugIn_Reshape_Request" /> to the browser. The browser responds by reformatting the page (if necessary) and then replying with a suitable Message_PlugIn_Reshape. The plug-in must act on this in the normal way.</p>
+
+</subsection>
+
+
+<subsection title="Data pointers">
+
+<p>Many of the strings passed around in this protocol are of unspecified size and may, especially in the case of URLs, be larger than could fit within the body of a Wimp message. Therefore they are defined in this spec as string_values. These are defined as being either offsets from the start of the message body (if less than 256) or as pointers to data held in shared memory (i.e. the RMA or a dynamic area). It is always the responsibility of the sender to free the memory used for any such pointers. The protocol is defined in such a way that there should always be a reply received or the message will be bounced by the Window Manager. In either case it is then safe for the sender to free the memory allocated.</p>
+
+<p>However to avoid memory leaks it is recommended that careful track is kept of such pointers so that they can be freed when a plug-in instance is closed.</p>
+
+<p>All strings must be null terminated but need not start at a word-aligned address.</p>
+
+</subsection>
+
+
+<subsection title="Stream protocol">
+
+<p>Some plug-ins may wish the browser to fetch data from the net for them rather than having to implement their own fetching code. A flexible interface is provided for this based, in part, on the API used in the de facto standard plug-in API created by Netscape, in order to facilitate porting plug-ins to RISC OS.</p>
+
+<p>N.B. Take note of the <reference type="section" name="Non-compliances" >non-compliances section</reference>.</p>
+
+<p>There are several ways a stream can be instigated, as follows<list>
+
+    <item>The browser wishes to transfer the initial data which launched the plug-in</item>
+    <item>The plug-in requests some data be fetched for it with <reference type="message" name="PlugIn_URL_Access" /></item>
+    <item>The plug-in requests some data be posted for it with Message_PlugIn_URL_Access</item>
+    <item>The plug-in wishes to write directly to a browser window</item>
+</list>
+</p>
+
+<subsubsection title="Initial transfer">
+
+<p>
+<list type="ordered">
+<item>Browser fills in flags, mime type, stream data and sends <reference type="message" name="PlugIn_Stream_New" />.</item>
+<item>The plug-in returns the same message</item>
+    <list>
+    <item>quoting the reference</item>
+    <item>filling in the plug-in stream instance handle</item>
+    <item>updating the stream mode (if necessary)</item>
+    </list>
+<item>If mode is applicable</item>
+    <list type="ordered">
+    <item>Browser sends <reference type="message" name="PlugIn_Stream_Write" /></item>
+    <item>Plug-in replies with <reference type="message" name="PlugIn_Stream_Written" /> giving the number of bytes that is could process</item>
+    </list>
+<text>This is repeated until all data is transferred or an error occurs</text>
+<item>Browser sends <reference type="message" name="PlugIn_Stream_Destroy" /> with appropriate reason code</item>
+</list>
+</p>
+
+</subsubsection>
+
+
+<subsubsection title="Plug-in requests data be fetched or posted">
+
+<p>
+<list type="ordered">
+<item>Plug-in sends the <reference type="message" name="PlugIn_URL_Access" /> message</item>
+<item>When data starts arriving we continue as initial transfer</item>
+</list>
+</p>
+
+</subsubsection>
+
+
+
+<subsubsection title="Plug-in write to browser">
+
+<p>
+<list type="ordered">
+<item>Plug-in fills in MIME type, target, plug-in stream instance and sends <reference type="message" name="PlugIn_Stream_New" /></item>
+<item>The browser returns the same message</item>
+    <list>
+    <item>quoting the reference</item>
+    <item>filling in the stream fields</item>
+</list>
+<item>The plug-in writes data;</item>
+    <list type="ordered">
+    <item>Plug-in sends <reference type="message" name="PlugIn_Stream_Write" /></item>
+    <item>Browser replies with <reference type="message" name="PlugIn_Stream_Written" /> giving the number of bytes that it could process</item>
+    </list>
+<text>This is repeated until all data is transferred or an error occurs</text>
+<item>Plug-in sends <reference type="message" name="PlugIn_Stream_Destroy" /> with appropriate reason code</item>
+</list>
+</p>
+</subsubsection>
+</subsection>
+
+
+<subsection title="System variables">
+
+<p>For a plug-in <userreplace>yyyy</userreplace> whose file type is <userreplace>xxx</userreplace> the variables which the plug-in must set are:<br />
+
+<sysvar><userreplace>yyyy</userreplace>$Dir</sysvar> The application directory containing !Boot, !Run etc. files<br />
+<sysvar>PlugIn$Type_<userreplace>xxx</userreplace></sysvar> Name of plug-in for browser menu 
+<sysvar>Alias$@PlugInType_<userreplace>xxx</userreplace></sysvar> Command to run plug-in as a stand-alone application, no arguments</p>
+
+<p>The plug-in can optionally set these variables:<br />
+<sysvar>PlugIn$About_<userreplace>xxx</userreplace></sysvar> The directory containing plug-in copyright details</p>
+
+
+
+<p>If the plug-in is capable of being launched as a stand-alone application without the browser involvement it must define these variables:<br />
+
+<sysvar>File$Type_<userreplace>xxx</userreplace></sysvar> Up to 8 character name describing file format<br />
+<sysvar>Alias$@RunType_<userreplace>xxx</userreplace></sysvar> Command to run plug-in as a standalone application, takes filename as an argument</p>
+
+<p>If the plug-in can also be used as a helper application then this variable must also be set:<br />
+<sysvar>Alias$@HelperType_<userreplace>xxx</userreplace></sysvar> Command to run plug-in as a helper application</p>
+
+<p>For example a sample !Boot file might contain the following:
+
+<extended-example type="pseudo">
+  Set Java$Dir         &lt;Obey$Dir&gt;
+  Set File$Type_AE4    Java
+  Set PlugIn$Type_AE4  Java
+  Set PlugIn$About_AE4 &lt;Java$Dir&gt;.About
+
+  SetMacro Alias$@RunType_AE4    /&lt;Java$Dir&gt;.!RunImage -standalone %%*0
+  SetMacro Alias$@PlugInType_AE4 /&lt;Java$Dir&gt;.!RunImage -plug-in %%*0
+</extended-example>
+</p>
+
+<p>If a file is embedded with <code type="pseudo">APPLET</code>, <code type="pseudo">EMBED</code> or <code type="pseudo">OBJECT</code> then the <sysvar>Alias$@PlugInType_<userreplace>xxx</userreplace></sysvar> variable is used to start the application.</p>
+
+<p>If a file is pointed to with an anchor (eg <code type="pseudo">&lt;A HREF="applets/myapplet.class"&gt;</code>) then the file is downloaded and the <sysvar>Alias$@Runtype_<userreplace>xxx</userreplace></sysvar> variable is used.</p>
+
+</subsection>
+
+
+
+<subsection title="The OBJECT tag">
+
+<p>Note that plug-ins can be launched from an OBJECT tag as well as EMBED or APPLET. When this happens there are some minor differences to the values in the <reference type="section" name="Data formats">parameter file</reference> The following table also describes how the attribute names in the HTML tag get mapped to the entries in the parameters file:</p>
+
+<p><image type="png" src="tbl_object_tag.png" /></p>
+
+</subsection>
+
+
+<subsection title="Helper applications">
+
+<p>This same interface is also used for helper applications. Helper applications are very like plug-ins except that they open their windows external to the parent rather than embedded in the parent's window. This means that they are not constrained to close down when the parent window is closed (e.g. when the browser follows a link to another page) but can still benefit from the communication protocols with the parent. There is a flag in <reference type="message" name="PlugIn_Opening" /> to inform the parent whether a window was embedded or not.</p>
+
+<p>When trying to launch a helper application the process described in the <reference type="subsection" name="Invocation" /> section is used except that if the initial Message_PlugIn_Opening is not claimed the system variable <sysvar>Alias$@HelperType_<userreplace>xxx</userreplace></sysvar> is used to start the helper task.</p>
+
+</subsection>
+
+
+<subsection title="Help protocol">
+
+<p>A plug-in may support the Wimp Help protocol. If they do then help mesages are displayed in the browser status bar (if configured). Messages must be limited to at most 40 characters.</p>
+
+</subsection>
+
+
+<subsection title="About plug-in">
+
+<p>A plug-in may display a logo and some associated text (e.g. copyright information) in a browser's window at the user's request. The suggested URL for this is 'about:'. The system variable <sysvar>PlugIn$About_<userreplace>xxx</userreplace></sysvar> points to a directory containing text files with optional image (PNG, GIF or JPEG) files.</p>
+
+<p>Each file has a two digit reference number to allow a single plug-in to have multiple logos and copyright entries (e.g. each Replay codec). The file '<filename>About<userreplace>yy</userreplace></filename>', where <userreplace>yy</userreplace> is the two digit reference number, contains the text suitable for inclusion inside a table cell of an HTML document. For each About file there is an optional image file, of the name '<file><userreplace>yy</userreplace><userreplace>wwww</userreplace><userreplace>hhhh</userreplace></file>', where <userreplace>wwww</userreplace> and <userreplace>hhhh</userreplace> are each four digits for the size that the image will be scaled to (usually the same as the actual image size). It is strongly recommended that the width and height are specified, but a filename of just '<userreplace>yy</userreplace>' is accepted.</p>
+
+<p>If the plug-in has a single copyright message and logo, the filename '<filename>About</filename>' can be used as a shortcut for '<filename>About00</filename>'. The optional logo must still be called '<filename>00<userreplace>wwww</userreplace><userreplace>hhhh</userreplace></filename>' or '<filename>00</filename>'.</p>
+
+<p>It is the browser's responsibility to enumerate all the <sysvar>PlugIn$About_<userreplace>*</userreplace></sysvar> system variables and compile an HTML document containing all available plug-in details.</p>
+
+</subsection>
+
+</section>
+
+
+<section title="Data interchange">
+
+<p>The following new Wimp messages are defined.</p>
+
+<p><fixme>All Messages delivery elements to be checked for errors.</fixme></p>
+
+<message-definition name="PlugIn_Open"
+                    number="4D540"
+                    description="Sent by the browser to create a plug-in instance"
+                    source="Browser"
+                    destination="Plug-in">
+
+<message-table>
+<message offset="16">Message_PlugIn_Open</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0">Open the file as a helper (else open it as a plug-in)</bit>
+<bit number="1-31" state="reserved" />
+</bitfield-table>
+</message>
+<message offset="24">Reserved, must be zero</message>
+<message offset="28">Browser instance handle (provided by the browser)</message>
+<message offset="32">Parent window handle</message>
+<message offset="36">Bounding box in parent window's work area co-ordinates: Left</message>
+<message offset="40">Bounding box in parent window's work area co-ordinates: Bottom</message>
+<message offset="44">Bounding box in parent window's work area co-ordinates: Right</message>
+<message offset="48">Bounding box in parent window's work area co-ordinates: Top</message>
+<message offset="52">File type</message>
+<message offset="56">Filename (<reference type="subsection" name="Data pointers" >string_value)</reference></message>
+</message-table>
+
+
+<use>
+<p>The file specified by "Filename" at R1+56 contains a series of parameters in the form of name-value pairs. This data is the list of attributes and parameters from the <variable>APPLET</variable>, <variable>OBJECT</variable> or <variable>EMBED</variable> tag - see their respective definitions. This data is used by the plug-in to understand what is being requested of it. There are more details in the <reference type="section" name="Data formats" /> section.</p>
+
+<p>If bit 0 of the flags word at R1+20 is set then this is a request to open the file as a helper application, i.e. external to the parent application. In this case the bounding box (offset bytes 36 to 51) are invalid. The parent window handle may be valid or 0 depending on how the file is launched.</p>
+</use>
+
+<related>
+<reference type="message" name="PlugIn_Opening" />
+</related>
+</message-definition>
+
+<message-definition name="PlugIn_Opening"
+                    number="4D541"
+                    description="Sent by the plug-in task to say an instance has been created"
+                    source="Plug-in"
+                    destination="Browser">
+
+<message-table>
+<message offset="12">my_ref field from <reference type="message" name="PlugIn_Open" /></message>
+<message offset="16">Message_PlugIn_Opening</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0">Plug-in can accept input focus (else it cannot use input focus)</bit>
+<bit number="1">Plug-in wants the code resource fetched for it (else it will fetch this itself)</bit>
+<bit number="2">Plug-in wants the data resource fetched for it (else it will fetch this itself)</bit>
+<bit number="3">Plug-in will delete the parameters file itself (else the browser should delete this file now)</bit>
+<bit number="4">Plug-in has more work to do, keep showing a busy indicator in the browser (if appropriate)</bit>
+<bit number="5">Plug-in does understand the PlugIn_Action message beyond only the STOP reason code</bit>
+<bit number="6">Plug-in task has actually opened a helper window (else it embedded itself in the parent)</bit>
+<bit number="7-31" state="reserved"></bit>
+</bitfield-table></message>
+<message offset="24">Plug-in instance handle (invented by the plug-in)</message>
+<message offset="28">Browser instance handle (copied from the <reference type="message" name="PlugIn_Open" />)</message>
+</message-table>
+
+
+<use>
+<p>This is sent by the plug-in in response to <reference type="message" name="PlugIn_Open" />. Note that bit 6 of the flags word at R1+20 may indicate that the Plug-in opened a helper window even if the browser requested that it be embedded as a plug-in.</p>
+</use>
+
+<related>
+<reference type="message" name="PlugIn_Open" />
+</related>
+</message-definition>
+
+<message-definition name="PlugIn_Close"
+                    number="4D542"
+                    description="Tell a plug-in instance to close down"
+                    source="Browser"
+                    destination="Plug-in">
+
+<message-table>
+<message offset="16">Message_PlugIn_Close</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0">Browser would also like plug-in to exit</bit>
+<bit number="1-31" state="reserved"></bit>
+</bitfield-table>
+</message>
+<message offset="24">Plug-in instance handle to close</message>
+<message offset="28">Browser instance handle</message>
+</message-table>
+
+
+<use>
+<p>This message is sent by the browser to a plug-in, if it wants an instance of a plug-in to be closed down (e.g. because the browser window is being closed, or is moving to a new page). Bit 0 of the flags word at R1+20 may be set if the browser needs urgently to free up memory; it is a hint to the plug-in to free up as much memory itself as it can. Not all plug-ins will read this bit.</p>
+</use>
+
+<related>
+<reference type="message" name="PlugIn_Closed" />
+</related>
+</message-definition>
+
+<message-definition name="PlugIn_Closed"
+                    number="4D543"
+                    description="A plug-in [instance] has closed down"
+                    source="Plug-in"
+                    destination="Browser">
+
+<message-table>
+<message offset="12">my_ref field from <reference type="message" name="PlugIn_Close" />, unless bit 1 of the flags word at R1+20 is set</message>
+<message offset="16">Message_PlugIn_Closed</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0">Plug-in itself will exit after this message</bit>
+<bit number="1">The message is not in reply to a Message_PlugIn_Close (so R1+12 is irrelevant)</bit>
+<bit number="2">There is an error message at R1+32 as detailed below</bit>
+<bit number="3-31" state="reserved"></bit>
+</bitfield-table></message>
+<message offset="24">Plug-in instance handle of the closed instance</message>
+<message offset="28">Browser instance handle of the closed instance</message>
+<message offset="32">If R1+20 Bit 2 is set: Error number</message>
+<message offset="36">If R1+20 Bit 2 is set: Zero terminated message to be displayed by the browser (N.B. this message is always embedded here as the plug-in may be exitting itself)</message>
+</message-table>
+
+
+<use>
+<p>This message is usually sent as a reply to a <reference type="message" name="PlugIn_Close" /> from the browser, and confirms that the requested instance has been closed down. It may also be sent if the plug-in should exit for its own reasons without the browser asking. An error which the browser should display will be embedded in the message at R1+32, if bit 2 of the flags word at R1+20 is set.</p>
+</use>
+
+<related>
+<reference type="message" name="PlugIn_Close" />
+</related>
+</message-definition>
+
+<message-definition name="PlugIn_Reshape"
+                    number="4D544"
+                    description="Move or resize a plug-in instance"
+                    source="Browser"
+                    destination="Plug-in">
+
+<message-table>
+<message offset="12">my_ref field from <reference type="message" name="PlugIn_Reshape_Request" /> (if applicable)</message>
+<message offset="16">Message_PlugIn_Reshape</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0-31" state="reserved"></bit>
+</bitfield-table></message>
+<message offset="24">Plug-in instance handle</message>
+<message offset="28">Browser instance handle</message>
+<message offset="32">Parent window handle</message>
+<message offset="36">Bounding box in parent window's work area co-ordinates: Left</message>
+<message offset="40">Bounding box in parent window's work area co-ordinates: Bottom</message>
+<message offset="44">Bounding box in parent window's work area co-ordinates: Right</message>
+<message offset="48">Bounding box in parent window's work area co-ordinates: Top</message>
+</message-table>
+
+
+<use>
+<p>This message is sent by a browser to a plug-in. The plug-in should move the specified instance to the specified position; this may involve resizing the embedded window.</p>
+
+<p>Some plug-in types may want to resize the windows themselves (for example, some Java applets do this). In that case, they will send <reference type="message" name="PlugIn_Reshape_Request" /> to the browser and it should reply with Message_PlugIn_Reshape once it has determined where the plug-in should be moved to (since the resizing may affect page formatting and therefore the coordinates of the embedded plug-in window). A plug-in should therefore not expect an immediate reply to the message.</p>
+
+</use>
+
+<related>
+<reference type="message" name="PlugIn_Reshape_Request" />
+</related>
+</message-definition>
+
+<message-definition name="PlugIn_Reshape_Request"
+                    number="4D545"
+                    description="A plug-in instance wants to resize"
+                    source="Plug-in"
+                    destination="Browser">
+
+<message-table>
+<message offset="16">Message_PlugIn_Reshape_Request</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0-31" state="reserved"></bit>
+</bitfield-table></message>
+<message offset="24">Plug-in instance handle</message>
+<message offset="28">Browser instance handle</message>
+<message offset="32">Width (in OS units)</message>
+<message offset="36">Height (in OS units)</message>
+</message-table>
+
+
+<use>
+<p>A plug-in may sometimes want to resize its embedded window. It sends this message to the browser when it does so. The browser should respond with <reference type="message" name="PlugIn_Reshape" />, though it may not do so immediately.</p>
+
+<p>On sending this message a plug-in may immediately resize its window, or it may wait; this is undefined. The browser should not assume either. To be sure that the plug-in embedded window ends up in a sensible position, the browser must eventually reply to the message.</p>
+</use>
+
+<related>
+<reference type="message" name="PlugIn_Reshape" />
+</related>
+</message-definition>
+
+<message-definition name="PlugIn_Focus"
+                    number="4D546"
+                    description="Move the input focus between plug-in and parent"
+                    source="Browser or plug-in"
+                    destination="Browser or plug-in">
+
+<message-table>
+<message offset="16">Message_PlugIn_Focus</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0-31" state="reserved"></bit>
+</bitfield-table></message>
+<message offset="24">Plug-in instance handle</message>
+<message offset="28">Browser instance handle</message>
+</message-table>
+
+
+<use>
+<p>This message is used to transfer the input focus between a plug-in and its parent. It can be sent in either direction. If the recipient cannot or does not wish to accept the focus then it just ignores the message. Otherwise it should acknowledge the message with message type 19 to prevent it being bounced back to the originator.</p>
+</use>
+
+<related>
+
+</related>
+</message-definition>
+
+<message-definition name="PlugIn_Unlock"
+                    number="4D547"
+                    description=""
+                    source=""
+                    destination=""
+                    internal="yes">
+
+<message-table>
+<message offset="16">Message_PlugIn_Unlock</message>
+<message offset="20">flags:
+<bitfield-table>
+<bit number="0-31" state="reserved"></bit>
+</bitfield-table></message>
+<message offset="24">plug-in instance handle</message>
+<message offset="28">browser instance handle</message>
+<message offset="32">URL for which to unlock the cache file (string_value)</message>
+</message-table>
+
+
+<use>
+<p>This message is reserved, and should not be used.</p>
+</use>
+
+<related>
+
+</related>
+</message-definition>
+
+<message-definition name="PlugIn_Stream_New"
+                    number="4D548"
+                    description="Create a new stream"
+                    source="Browser"
+                    destination="Plug-in">
+
+<message-table>
+<message offset="16">Message_PlugIn_Stream_New</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0-3">Stream type field:
+<value-table>
+<value number="0">Normal</value>
+<value number="1">Seek only</value>
+<value number="2">As file</value>
+<value number="3">As file only</value>
+<value number="">All other values are reserved, and must not be used</value>
+</value-table>
+</bit>
+<bit number="4">Stream is seekable</bit>
+<bit number="5-31" state="reserved"></bit>
+</bitfield-table></message>
+<message offset="24">Plug-in instance handle</message>
+<message offset="28">Browser instance handle</message>
+<message offset="32">Plug-in stream instance handle</message>
+<message offset="36">Browser stream instance handle</message>
+<message offset="40">URL of stream source / destination (<reference type="subsection" name="Data pointers">string_value</reference>)</message>
+<message offset="44">End of stream in bytes, or 0 if unknown</message>
+<message offset="48">Last modified date of URL (in Unix time)</message>
+<message offset="52">Notify data</message>
+<message offset="56">MIME type of URL (<reference type="subsection" name="Data pointers">string_value</reference>)</message>
+<message offset="60">Window target (<reference type="subsection" name="Data pointers">string_value</reference>)</message>
+</message-table>
+
+
+<use>
+<p>This message is part of the <reference type="subsection" name="Stream protocol"/> as already described.</p>
+</use>
+
+<related>
+<reference type="message" name="PlugIn_Stream_Destroy" />
+</related>
+</message-definition>
+
+<message-definition name="PlugIn_Stream_Destroy"
+                    number="4D549"
+                    description="Destroy a stream"
+                    source="Plug-in"
+                    destination="Browser">
+
+<message-table>
+<message offset="16">Message_PlugIn_Stream_Destroy</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0-31" state="reserved"></bit>
+</bitfield-table></message>
+<message offset="24">Plug-in instance handle</message>
+<message offset="28">Browser instance handle</message>
+<message offset="32">Plug-in stream instance handle</message>
+<message offset="36">Browser stream instance handle</message>
+<message offset="40">URL of stream source / destination (<reference type="subsection" name="Data pointers">string_value</reference>)</message>
+<message offset="44">End of stream in bytes, or 0 if unknown</message>
+<message offset="48">Last modified date of URL (in Unix time)</message>
+<message offset="52">Notify data</message>
+<message offset="56">Reason code:
+<value-table>
+<value number="0">Stream finished successfully</value>
+<value number="1">Stream finished due to an error</value>
+<value number="2">Stream finished due to user intervention</value>
+<value number="">All other values are reserved, and must not be used</value>
+</value-table></message>
+</message-table>
+
+
+<use>
+<p>This message is part of the <reference type="subsection" name="Stream protocol"/> as already described.</p>
+</use>
+
+<related>
+<reference type="message" name="PlugIn_Stream_New" />
+</related>
+</message-definition>
+
+<message-definition name="PlugIn_Stream_Write"
+                    number="4D54A"
+                    description="Write data to a stream"
+                    source="Browser"
+                    destination="Plug-in">
+
+<message-table>
+<message offset="16">Message_PlugIn_Stream_Write</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0-3">Data type field:
+<value-table>
+<value number="0"><reference type="subsection" name="Data pointers">String_value</reference></value>
+<value number="1">Anchor</value>
+<value number="2">File handle</value>
+<value number="">All other values are reserved, and must not be used</value>
+</value-table></bit>
+<bit number="4-31" state="reserved"></bit>
+</bitfield-table></message>
+<message offset="24">Plug-in instance handle</message>
+<message offset="28">Browser instance handle</message>
+<message offset="32">Plug-in stream instance handle</message>
+<message offset="36">Browser stream instance handle</message>
+<message offset="40">URL of stream source / destination (<reference type="subsection" name="Data pointers">string_value</reference>)</message>
+<message offset="44">End of stream in bytes, or 0 if unknown</message>
+<message offset="48">Last modified date of URL (in Unix time)</message>
+<message offset="52">Notify data</message>
+<message offset="56">Logical offset in stream of data</message>
+<message offset="60">Length of data</message>
+<message offset="64">Data pointer</message>
+</message-table>
+
+
+<use>
+<p>This message is part of the <reference type="subsection" name="Stream protocol"/> as already described.</p>
+</use>
+
+<related>
+<reference type="message" name="PlugIn_Stream_Written" />
+</related>
+</message-definition>
+
+<message-definition name="PlugIn_Stream_Written"
+                    number="4D54B"
+                    description="Accept data that was written to a stream"
+                    source="Plug-in"
+                    destination="Browser">
+
+<message-table>
+<message offset="12">my_ref field from <reference type="message" name="PlugIn_Stream_Write" /> </message>
+<message offset="16">Message_PlugIn_Stream_Written</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0-31" state="reserved"></bit>
+</bitfield-table></message>
+<message offset="24">Plug-in instance handle</message>
+<message offset="28">Browser instance handle</message>
+<message offset="32">Plug-in stream instance handle</message>
+<message offset="36">Browser stream instance handle</message>
+<message offset="40">URL of stream source / destination (<reference type="subsection" name="Data pointers">string_value</reference>)</message>
+<message offset="44">End of stream in bytes, or 0 if unknown</message>
+<message offset="48">Last modified date of URL (in Unix time)</message>
+<message offset="52">Notify data</message>
+<message offset="56">Length of data consumed; less than zero if the plug-in experienced an error</message>
+</message-table>
+
+
+<use>
+<p>This message is part of the <reference type="subsection" name="Stream protocol"/> as already described.</p>
+</use>
+
+<related>
+<reference type="message" name="PlugIn_Stream_Write" />
+</related>
+</message-definition>
+
+<message-definition name="PlugIn_Stream_As_File"
+                    number="4D54C"
+                    description="Send stream data as a file"
+                    source="Browser"
+                    destination="Plug-in">
+
+<message-table>
+<message offset="16">Message_PlugIn_Stream_Written</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0-31" state="reserved"></bit>
+</bitfield-table></message>
+<message offset="24">Plug-in instance handle</message>
+<message offset="28">Browser instance handle</message>
+<message offset="32">Plug-in stream instance handle</message>
+<message offset="36">Browser stream instance handle</message>
+<message offset="40">URL of stream source / destination (<reference type="subsection" name="Data pointers">string_value</reference>)</message>
+<message offset="44">End of stream in bytes, or 0 if unknown</message>
+<message offset="48">Last modified date of URL (in Unix time)</message>
+<message offset="52">Notify data</message>
+<message offset="56">Filename of stream data (string_value)</message>
+</message-table>
+
+
+<use>
+<fixme>Confirm Source and Destinations for this Message.</fixme>
+<p>This message is part of the <reference type="subsection" name="Stream protocol"/> as already described.</p>
+</use>
+
+<related>
+<reference type="message" name="PlugIn_Stream_Write" />
+</related>
+</message-definition>
+
+<message-definition name="PlugIn_URL_Access"
+                    number="4D54D"
+                    description="Ask the browser to deal with a URL"
+                    source="Plug-in"
+                    destination="Browser">
+
+<message-table>
+<message offset="16">Message_PlugIn_URL_Access</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0">Return a <reference type="message" name="PlugIn_Notify" /> on completion</bit>
+<bit number="1">Fetch by POST, else fetch by GET</bit>
+<bit number="2">Should be 0 if bit 1 is unset<br />
+If bit 1 is set, bit 2 means POST a file if set, else POST a block of memory</bit>
+<bit number="3-31" state="reserved"></bit>
+</bitfield-table></message>
+<message offset="24">Plug-in instance handle</message>
+<message offset="28">Browser instance handle</message>
+<message offset="32">URL to access (<reference type="subsection" name="Data pointers">string_value</reference>)</message>
+<message offset="36">Window target (<reference type="subsection" name="Data pointers">string_value</reference>)</message>
+<message offset="40">Notify data to be returned (if bit 0 of the flags word at R1+20 is set)</message>
+<message offset="44">Length of data to be posted</message>
+<message offset="48">If R1+20 bit 2 is set: Filename (<reference type="subsection" name="Data pointers">string_value</reference>)<br />
+If R1+20 bit 2 is unset: Pointer to data (<reference type="subsection" name="Data pointers">string_value</reference>)</message>
+</message-table>
+
+
+<use>
+<p>This message is sent by a plug-in to the browser, to ask it to deal with a URL in various ways. The plug-in may ask the browser to send it a notification message when it has completed whatever action is required on the URL.</p>
+
+<p>If the window target is non-zero then the URL is fetched to the given window name. Otherwise, a stream is opened and the data is sent to the plug-in.</p>
+</use>
+
+<related>
+<reference type="message" name="PlugIn_Notify" />
+</related>
+</message-definition>
+
+<message-definition name="PlugIn_Notify"
+                    number="4D54E"
+                    description="Signal completion of handling a URL to a plug-in"
+                    source="Browser"
+                    destination="Plug-in">
+
+<message-table>
+<message offset="16">Message_PlugIn_Notify</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0-31" state="reserved"></bit>
+</bitfield-table></message>
+<message offset="24">Plug-in instance handle</message>
+<message offset="28">Browser instance handle</message>
+<message offset="32">URL accessed (<reference type="subsection" name="Data pointers">string_value</reference>)</message>
+<message offset="36">Reason for notify:
+<value-table>
+<value number="0">Stream finished successfully</value>
+<value number="1">Stream finished due to an error</value>
+<value number="2">Stream finished due to user intervention</value>
+<value number="">All other values are reserved, and must not be used</value>
+</value-table></message>
+<message offset="40">Notify data</message>
+</message-table>
+
+
+<use>
+<p>This is sent by the browser to the plug-in, because the plug-in requested it through a <reference type="message" name="PlugIn_URL_Access" />.</p>
+</use>
+
+<related>
+<reference type="message" name="PlugIn_URL_Access" />
+</related>
+</message-definition>
+
+<message-definition name="PlugIn_Status"
+                    number="4D54F"
+                    description="Send a status message to the browser"
+                    source="Plug-in"
+                    destination="Browser">
+
+<message-table>
+<message offset="16">Message_PlugIn_Status</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0-31" state="reserved"></bit>
+</bitfield-table></message>
+<message offset="24">Plug-in instance handle</message>
+<message offset="28">Browser instance handle</message>
+<message offset="32">Status message (<reference type="subsection" name="Data pointers">string_value</reference>)</message>
+</message-table>
+
+
+<use>
+<p>Requests that the parent display some information in its status bar, or similar. The message should be reasonably short.</p>
+</use>
+
+<related>
+<reference type="message" name="PlugIn_Busy" />
+</related>
+</message-definition>
+
+<message-definition name="PlugIn_Busy"
+                    number="4D550"
+                    description="Signal a plug-in state change to the parent"
+                    source="Plug-in"
+                    destination="Browser">
+
+<message-table>
+<message offset="16">Message_PlugIn_Busy</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0">Plug-in is busy</bit>
+<bit number="1">Word at R1+32 has some meaning, else ignore it</bit>
+<bit number="2-31" state="reserved"></bit>
+</bitfield-table></message>
+<message offset="24">Plug-in instance handle</message>
+<message offset="28">Browser instance handle</message>
+<message offset="32">If R1+20 bit 1 is set: Plug-in's new state:
+<value-table>
+<value number="0">Stop</value>
+<value number="1">Play</value>
+<value number="2">Pause</value>
+<value number="3">Fast Forward</value>
+<value number="4">Rewind</value>
+<value number="5">Record</value>
+<value number="">All other values are reserved, and must not be used</value>
+</value-table></message>
+</message-table>
+
+<use>
+<fixme>Flag to be changed. bit 1 seems to be used as an identifier</fixme>
+<p>Requests that the parent display some indication of business (e.g. spinning logo, etc.). If the plug-in had set the busy bit in its Opening message then it should send this message with bit 0 of the flags word at R1+20 clear when it has finished its loading.</p>
+
+<p>This is also used to notify the parent of any state change by the plug-in in case it needs to update any user interface.</p>
+</use>
+
+<related>
+<reference type="message" name="PlugIn_Status" />
+</related>
+
+</message-definition>
+
+<message-definition name="PlugIn_Action"
+                    number="4D551"
+                    description="Send a command to a plug-in"
+                    source="Browser"
+                    destination="Plug-in">
+
+<message-table>
+<message offset="16">Message_PlugIn_Action</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0-31" state="reserved"></bit>
+</bitfield-table></message>
+<message offset="24">Plug-in instance handle</message>
+<message offset="28">Browser instance handle</message>
+<message offset="32">If R1+20 bit 1 is set: State the plug-in should move to:
+<value-table>
+<value number="0">Stop</value>
+<value number="1">Play</value>
+<value number="2">Pause</value>
+<value number="3">Fast Forward</value>
+<value number="4">Rewind</value>
+<value number="5">Record</value>
+<value number="6">Mute</value>
+<value number="7">Unmute</value>
+<value number="">All other values are reserved, and must not be used</value>
+</value-table></message>
+</message-table>
+
+<use>
+<fixme>Flag to be changed. bit 1 seems to be used as an identifier</fixme>
+<p>This message is used for sending specific commands to a plug-in. Not all plug-ins will understand the commands sent.</p>
+
+<p>The new state sent is the state the plug-in should enter. If it is already in that state then it should ignore the message.</p>
+
+<p>After entering the state it should send back a <reference type="message" name="PlugIn_Busy" /> confirming the new state, except for the Mute and Unmute actions.</p>
+</use>
+
+<related>
+<reference type="message" name="PlugIn_Busy" />
+</related>
+
+</message-definition>
+
+<message-definition name="PlugIn_Abort"
+                    number="4D552"
+                    description="Stop activity for a plug-in instance"
+                    source="Browser"
+                    destination="Plug-in">
+
+<message-table>
+<message offset="16">Message_PlugIn_Abort</message>
+<message offset="20">Flags:
+<bitfield-table>
+<bit number="0-31" state="reserved"></bit>
+</bitfield-table></message>
+<message offset="24">Plug-in instance handle</message>
+<message offset="28">Browser instance handle</message>
+</message-table>
+
+<use>
+<p>This message is sent by the browser when the user clicks on the Stop icon (or performs its equivalent). The plug-in should stop as much of its activity as possible. Specifically, anything that updates the screen, anything that uses significant CPU time and anything that accesses the network.</p>
+
+<p>Note that this message is sent to each plug-in instance individually and should be treated as such.</p>
+</use>
+
+<related>
+<reference type="message" name="PlugIn_Status" />
+</related>
+
+</message-definition>
+
+</section>
+
+
+<section title="Data formats">
+
+<p>The <reference type="message" name="PlugIn_Open" /> contains a filename that refers to a file of parameters and attributes. The plug-in uses this information to locate the correct data, classes, implementation etc.</p>
+
+<p>The file contains the concatenation of one or more binary records of the following form:</p>
+
+<p><image type="png" src="tbl_data_formats.png" /></p>
+
+<p>Integers are stored in little-endian order.</p>
+
+<p>Flags (parameters with void value whose presence or absence only is significant) are represented by a parameter of type DATA with zero length.</p>
+
+<p>The parameters include:<list>
+
+    <item>all the attributes of the <variable>OBJECT</variable> (or other) element that references this plug-in</item>
+    <item>all the <variable>PARAM</variable> elements enclosed within it</item>
+    <item>special parameters created by the browser</item>
+    </list>
+</p>
+
+<p>These parameters are passed exactly as seen in the HTML without any conversions. The data/url/ref distinction is as given in the DTD (for <variable>OBJECT</variable> attributes) or in the <variable>VALUETYPE</variable> attribute of the <variable>PARAM</variable> element.</p>
+
+<p>The plug-in may implement its own URL fetching code, or it may have the browser fetch URLs on its behalf by issuing a <reference type="message" name="PlugIn_URL_Access" /> message to the browser.</p>
+
+<p>Special parameters are created by the browser (rather than being part of the object element). They are:</p>
+
+<value-table head-number="" head-name="Parameter">
+<value name="BASEHREF">(Mandatory)<br />
+The full URL of the document containing this object.</value>
+<value name="USERAGENT">(Mandatory)<br />
+The name of the browser.</value>
+<value name="UAVERSION">(Mandatory)<br />
+Version number of the browser (user agent) in format x.y. If the plug-in needs a specific browser feature it may refuse to initialise if this version is not high enough.</value>
+<value name="APIVERSION">(Mandatory)<br />
+<reference type="subsection" name="API Versions" >Version number</reference> of this API in format x.y. Changes in x mean a major incompatible change in formats. If the plug-in doesn't understand this version it should refuse to initialise. Changes in y mean some new functionality introduced in a backwards compatible way.</value>
+<value name="BGCOLOR">(Optional)<br />
+The background colour of the page, which can be used by the plug-in as the default background colour. The colour is passed in as a string in the format 'BBGGRR00'.</value>
+<value name=""></value>
+</value-table>
+
+<subsection title="API Versions">
+
+<p>Released versions of this API about are listed below. A plug-in can use this information to alter its behaviour if used with an application supporting an older version of the protocol.</p>
+
+<p>Version 1.00<br />
+Original plug-in specification (version 0.09). All messages up to and including STATUS. Supported by NCBrowser 1.06, for example.</p>
+<p>Version 1.10<br />
+This specification. Adds BUSY, ACTION, ABORT messages and support flags. Adds Helper information. Supported by NCBrowser 1.07 and above, or Browse 1.27 and above, for example.</p>
+
+</subsection>
+
+</section>
+
+
+<section title="External dependencies">
+
+<p>This specification relies on the existence of a Window Manager with nested window support.</p>
+
+</section>
+
+
+
+<section title="Acceptance test">
+
+<p>The protocol must be able to cater for the needs of <reference type="section" name="Glossary" >Shockwave</reference> and <reference type="section" name="Glossary" >Java</reference> plug-ins.</p>
+
+</section>
+
+
+<section title="Non-compliances">
+
+<p>At the time of writing, neither the NCBrowser nor Browse support all of the variations of the <reference type="subsection" name="Stream protocol">STREAM protocol</reference>. They do not support POSTing from a plug-in or streaming data from a plug-in to a browser window.</p>
+
+</section>
+
+
+<section title="Development test strategy">
+
+<p>The protocol has been tested during the development testing of a browser and during the creation of plug-ins. Each plug-in listed in the <reference type="section" name="Acceptance test">acceptance criteria</reference> tested that its interactions with the browser through this protocol performed as expected by this specification. This included deliberately generating errors to check the error recovery of the plug-in and the browser.</p>
+
+</section>
+
+
+<section title="Glossary">
+
+<value-table head-number="" head-name="Term" head-value="Description">
+<value name="Aplet">Application Programmer Interface.</value>
+<value name="API">Small application, usually written in Java, embedded in a web page</value>
+<value name="ARM">Acorn RISC Machine OR Advanced RISC Machines Ltd</value>
+<value name="Cache">Area of disk or memory used to store recently accessed files</value>
+<value name="Caret">Text cursor</value>
+<value name="Codec">COder-DECoder</value>
+<value name="Director Player">MacroMedia multi-media animation player</value>
+<value name="DLL">Dynamically linked library (loaded at runtime)</value>
+<value name="Frame">An independently scrollable portion of an HTML page</value>
+<value name="GUI">Graphical User Interface</value>
+<value name="HTML">HyperText Markup Language</value>
+<value name="HTML 4">The current base-line HTML standard</value>
+<value name="Java">Machine independent interpreted programming language</value>
+<value name="MIME ">Multipurpose Internet Mail Extensions</value>
+<value name="NC">Network Computer</value>
+<value name="OS">Operating System</value>
+<value name="Plug-in">A program that extends the browser by handling a particular type of file embedded in an HTML page</value>
+<value name="PRM">Programmers Reference Manual</value>
+<value name="RAM">Random Access Memory</value>
+<value name="RISC">Reduced Instruction Set Computer</value>
+<value name="RISC OS">Acorn's operating system, the basis of RISC OS</value>
+<value name="ROM ">Read Only Memory</value>
+<value name="Shockwave">MacroMedia multi-media browser plug-in player</value>
+<value name="Sprite">An Acorn proprietary bitmap graphics file format</value>
+<value name="SWI">Software Interrupt</value>
+<value name="UI">User Interface</value>
+<value name="URL">Uniform Resource Locator (HTML link)</value>
+<value name="Wimp">Colloquialism for Window Manager</value>
+</value-table>
+
+</section>
+
+
+<section title="References">
+
+<p>The following references may be of interest:</p>
+
+<category title="Director Player Software Functional Specification">
+<p>Document reference 2107,711 (covers Shockwave as well as Director Movies). Obtain through Developer Support.</p>
+
+</category>
+
+<category title="Java Software Functional Specification">
+
+<p>Document reference 2107,710. Obtain through Developer Support.</p>
+
+</category>
+
+<category title="[NC] Browser Software Functional Specification">
+
+<p>Obtain through Developer Support.</p>
+
+</category>
+
+<category title="Acorn Nested Window Manager Functional Specification">
+
+<p>Document reference 1215,401/FS.</p>
+
+</category>
+
+<category title="Wimp message protocol">
+
+<p>PRM Volume 3.</p>
+
+</category>
+
+
+<category title="Wimp Help protocol">
+
+<p>PRM Volume 3.</p>
+
+</category>
+
+</section>
+
+</chapter>
+
+
+
+<meta>
+
+<history>
+<revision number="2107,740 issue 1" date="" author="" title="(Developers only)" />
+<revision number="0.01" date="09 Jan 1997" author="SJM" title="Created from 2103,740 and added BUSY notification protocol" />
+<revision number="1.2" date="06 Feb 1997" author="SJM" title="New format" />
+<revision number="1.3" date="07 Feb 1997" author="SJM" title="Fixed errors in Message numbers" />
+<revision number="1.4" date="14 Feb 1997" author="SJM" title="Added PASSWORDS. Changed API version. Added Glossary" />
+<revision number="1.5" date="18 Feb 1997" author="SJM" title="Changed PASSWORDS to file. Added Message_PlugIn_Action. Added Helper app info" />
+<revision number="1.6" date="24 Feb 1997" author="SJM" title="Added ABORT message to replace some uses of STOP" />
+<revision number="1.7" date="24 Feb 1997" author="SJM" title="Fixed error in states. Changed API info" />
+<revision number="1.9" date="26 Feb 1997" author="SJM" title="Added mute" />
+<revision number="1.12" date="09 Apr 1997" author="SJM" title="Added missing history comments for 1.10 and 1.11, updated with comments from SG. Added glossary, references and development test strategy. Added Helper launching system variable" />
+<revision number="1.13" date="11 Apr 1997" author="SJM" title="Fixed typos after review" />
+<revision number="1.14" date="11 Apr 1997" author="SJM" title="Fixed some links" />
+<revision number="2.1" date="11 Apr 1997" author="" title="Signed off, AMR allocated" />
+<revision number="3.1" date="11 Aug 1997" author="" title="Few small changes; then signed off, ECO 3995 allocated" />
+<revision number="1116,010/FS issue 1 " date="" author="" title="(Developers only)" />
+<revision number="1.0" date="26 Jan 1998" author="PW" title="Added 'About Plug-in'" />
+<revision number="1.1" date="06 Feb 1998" author="PW" title="Added BGCOLOR special parameter (PW); AMR 4903 allocated" />
+<revision number="1116,010/FS Issue 2 " date="" author="" title="(General release)" />
+<revision number="1.0" date="" author="" title="" >
+<change>HTML style changes for publishing on the Web; some clarifications here and there in the body content.</change>
+<change>Various minor 'tweaks' such as changing, for example, "Netscape" to read "Navigator™".</change>
+<change>There are a few more in-document links to make finding things easier.</change>
+<change>Some typos corrected (e.g. 'data' changed to 'date').</change>
+<change>A few history and references bits removed ready for general public release (that's why the revision list given here has gaps in it).</change>
+</revision>
+<revision number="1.1" date="23 Feb 1998" author="Simon Middleton (SJM), Piers Wombwell (PW), Andrew Hodgkinson (AH)" title="AMR allocation details corrected in this history section" />
+<revision number="1.2" date="23 Feb 1998" author="SJM, PW, AH" title="ECO 4049 allocated" />
+<revision number="1.3" date="26 Mar 1998" author="SJM, PW, AH" title="Created revision 1.3 purely to fix the erroneous reference to the Nested Wimp specification which gave an incorrect drawing number. No ECO allocated for such a trivial change" />
+<revision number="1.4a" date="04 Sep 2021" author="Alan Robertson" title="Initial version in PRMinXML format" >
+<change>No major changes to text. Removed the 'Document Status' section as information captured in 'Document Information' section</change>
+<change>Added related links to message definitions</change>
+</revision>
+
+</history>
+
+<disclaimer>This document has a fairly long history; originally it was an internal-only specification (2103,740); it later became available to developers in a revised form (2107,740 and recently 1116,010/FS issue 1) and is now on general release (1116,010/FS issue 2).</disclaimer>
+
+</meta>
+
+
+
+</riscos-prm>
