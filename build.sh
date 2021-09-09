@@ -118,6 +118,11 @@ if ! type -p riscos-prminxml >/dev/null 2>&1 ; then
         git reset --soft HEAD^
         # And unstage the merged files so we don't accidentally commit them.
         git reset riscos-prminxml riscos-prminxml-resources
+        # Undo the local configuration
+        if [[ ! -f ~/.gitconfig ]] ; then
+            git config --local --unset user.email
+            git config --local --unset user.name
+        fi
     fi
     export PATH="${scriptdir}:$PATH"
 fi
