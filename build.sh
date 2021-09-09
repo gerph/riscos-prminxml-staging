@@ -1,6 +1,22 @@
 #!/bin/bash
 ##
-# Build the index, obtaining the tools first
+# Build the index, obtaining the tools first.
+#
+# We will obtain all the tools we need from the OS.
+# We will try to get a version of PRM-in-XML that we can work with.
+# We will obtain PrinceXML to generate PDFs.
+#
+# Because PrinceXML requires that you have a license to use it,
+# the installation of PrinceXML and the PDF generation will only
+# be performed if you set the environment variable:
+#
+#   PRINCEXML_I_HAVE_A_LICENSE=1
+#
+# For example running this script with:
+#
+#   PRIMCEXML_I_HAVE_A_LICENSE=1 ./build.sh
+#
+# Consult the PrinceXML documentation for license details.
 #
 
 set -e
@@ -12,14 +28,40 @@ SYSTEM="$(uname -s)"
 
 scriptdir="$(cd "$(dirname "$0")" && pwd -P)"
 
+# State for our `apt-get update` and whether we can use sudo.
 package_indexed=false
+sudo_queried=false
+
+
+##
+# Run some operations as root, if required.
+function run_root() {
+    local command=$@
+
+    if [[ $EUID -ne 0 ]] ; then
+        if ! $sudo_queried ; then
+            echo "Not running as root. I will require the installation of packages through sudo."
+            read -p "Are you sure? " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]] ; then
+                echo "OK. Cowardly refusing to continue." >&2
+                exit 1
+            fi
+            sudo_queried=true
+        fi
+        sudo "$@"
+    else
+        "$@"
+    fi
+}
+
 
 function update_packages() {
     if $package_indexed ; then
         true
     else
         if [[ "${SYSTEM}" = 'Linux' ]] ; then
-            apt-get update
+            run_root apt-get update
             package_indexed=true
         else
             echo "Cannot update packages list on ${SYSTEM}" >&2
@@ -42,7 +84,7 @@ function install_package() {
             exit 1
         elif [[ "${SYSTEM}" = 'Linux' ]] ; then
             # I'm assuming this is Ubuntu
-            update_packages && apt-get install -y "$install_pkg"
+            update_packages && run_root apt-get install -y "$install_pkg"
         else
             echo "Cannot install $pkg on ${SYSTEM}" >&2
             exit 1
@@ -64,18 +106,23 @@ install_package make
 
 if ! type -p riscos-prminxml >/dev/null 2>&1 ; then
     # riscos-prminxml isn't installed, so let's get a copy.
-    if [[ ! -x './prminxml-snapshot' ]] ; then
+    if [[ ! -x './riscos-prminxml' ]] ; then
         echo +++ Obtaining riscos-prminxml
         if [[ ! -f ~/.gitconfig ]] ; then
             git config --local user.email 'nobody@nowhere.com'
             git config --local user.name 'Automated merge'
         fi
-        git merge origin/prminxml-snapshot
+        # Merge in the snapshot branch
+        git merge origin/prminxml-snapshot -m "Automated merge of prminxml-snapshot"
+        # But don't leave those merges as part of the HEAD.
+        git reset --soft HEAD^
+        # And unstage the merged files so we don't accidentally commit them.
+        git reset riscos-prminxml riscos-prminxml-resources
     fi
     export PATH="${scriptdir}:$PATH"
 fi
 
-if ! type -p prince >/dev/null 2>&1 ; then
+if ! type -p prince >/dev/null 2>&1 && [[ "$PRINCEXML_I_HAVE_A_LICENSE" = 1 ]] ; then
     # princexml isn't installed, so we need to get a version.
     prince_install="${scriptdir}/prince-install-$PRINCE_VERSION"
     if [[ ! -d "$prince_install" ]] ; then
@@ -131,7 +178,10 @@ fi
 
 echo Environment now set up...
 riscos-prminxml --version
-prince --version
+
+if [[ "$PRINCEXML_I_HAVE_A_LICENSE" = 1 ]] ; then
+    prince --version
+fi
 
 
 echo Run the build...

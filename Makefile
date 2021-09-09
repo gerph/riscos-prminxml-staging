@@ -15,7 +15,11 @@ output: dirs
 	cat logs/2-build.log
 
 pdf: output
+ifeq (${PRINCEXML_I_HAVE_A_LICENSE},1)
 	cd output/html && prince --verbose -o ../index.pdf -l filelist.txt
+else
+	echo NOTE: Not licensed for PrinceXML, so not building the PDF.
+endif
 
 dirs:
 	mkdir -p logs
