@@ -273,7 +273,7 @@
         </xsl:attribute>
        </xsl:if>
        <xsl:variable name="deftype" select="substring-before(local-name(.),'-definition')" />
-       <xsl:value-of select="document('')//localdb:definition-titles[@type=$deftype]/@prefix" />
+       <xsl:value-of select="document('')//localdb:definition-titles[@type=$deftype]/@prefix-name" />
        <xsl:value-of select="@name" />
        <xsl:if test="((local-name(.)='message-definition') or
                       (local-name(.)='tboxmessage-definition')
