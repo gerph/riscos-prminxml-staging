@@ -28,6 +28,13 @@ yet ready for acceptance into general documentation.
         along to way to creating documentation,
     </p>
 </subsection>
+
+<subsection title="3rd Party documentation ('3rdparty')">
+    <p>
+        This area contains 3rd party documentation from a variety of sources to provide a
+        staging point before these documents are made more widely available.
+    </p>
+</subsection>
 </section>
 
 </chapter>
@@ -46,6 +53,8 @@ yet ready for acceptance into general documentation.
  <history>
   <revision number="1" author="Gerph" date="29 Aug 2021" title="Initial version">
     <change>Created to hold cut and paste, and demonstrate indexing.</change>
+  </revision>
+  <revision number="2" author="Gerph" date="07 Oct 2021" title="Added 3rd party">
   </revision>
  </history>
 </meta>
