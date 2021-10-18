@@ -45,6 +45,7 @@
     <page href="uri_handler/uri_handler">URI Handler specification</page>
     <page href="url_fetcher/url_fetcher">URL Fetcher specification</page>
     <page href="plugin_protocol/plug-in_protocol">Browser Plug-in Protocol specification</page>
+    <page href="nested_window_manager/nested_window_manager">Nested Window Manager specification</page>
 </section>
 
 </index>
