@@ -52,6 +52,9 @@
 <section title="3rd Party" dir="3rdparty">
     <page href="cryptrandom">CryptRandom module</page>
 </section>
+<section title="RISC OS 5" dir="riscos5">
+    <page href="drivehints">Drive Hints</page>
+</section>
 
 </index>
 
