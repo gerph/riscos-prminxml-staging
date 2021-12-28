@@ -1,0 +1,311 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="Chapter Title">
+<section title="Introduction">
+<p>
+ShareFS provides a simple mechanism for accessing files on locally networked
+RISC OS systems. The system uses Freeway to distribute details of the shared
+discs. This allows any Freeway reachable system (usually those on the local
+network, but may include any NetI accessible networks), to access the shared
+files. Although the objects are known as 'shared discs' they may refer to
+parts of a filing system. Under Select 1, and later, the Filer menu offers
+the option to share sub-directories.
+</p>
+
+<p>
+In the past the SWI calls for ShareFS have been undocumented. They are
+presented here to fill in this gap, but may be extended and modified without
+notice. The flags on the SWIs are inconsistent for legacy reasons.
+</p>
+
+<p>
+From ShareFS 3.97 onward, the ShareFS Filer can be disabled by setting the
+ShareFS$Filer variable to 'no'. The filer can be re-enabled by setting it to
+any other value.
+</p>
+
+</section>
+
+
+<section title="System variables">
+<sysvar-definition name="ShareFS$Filer"
+                   description="Whether the ShareFS Filer is enabled">
+<use>
+<p>Controls whether the ShareFS Filer icon is displayed. It can be disabled by
+    setting the ShareFS$Filer variable to 'no'. The filer can be re-enabled by
+    setting it to any other value.</p>
+</use>
+
+<related>
+</related>
+</sysvar-definition>
+</section>
+
+
+<section title="Service calls">
+<service-definition name="Service_Sharing"
+                    number="801C8"
+                    description="Change to shared directories">
+<entry>
+ <register-use number="0">pointer to zero-terminated filing system name ('ShareFS' in our case)</register-use>
+ <register-use number="1">&hex;801C8 (reason code)</register-use>
+ <register-use number="2">Share state: 0 if object is unshared, 1 if object is shared</register-use>
+ <register-use number="3">pointer to zero-terminated directory name being shraed</register-use>
+ <register-use number="4">pointer to zero-terminated name of the shared object</register-use>
+ <register-use number="5">private data (filesystem specific)</register-use>
+</entry>
+
+<exit>
+ <register-use number="0">What is returned</register-use>
+ <register-use number="1" state="preserved" />
+</exit>
+
+<use>
+<p>This service is issued when a path is shared or unshared by a filing system.</p>
+
+</use>
+
+<related>
+    <reference type="swi" name="ShareFS_CreateShare" />
+    <reference type="swi" name="ShareFS_StopShare" />
+</related>
+
+</service-definition>
+</section>
+
+
+<section title="SWI calls">
+
+<swi-definition name="ShareFS_CreateShare"
+                number="47AC0"
+                description="Share a directory through ShareFS"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">
+    <p>Flags:</p>
+    <p>
+    <bitfield-table>
+        <bit number="0">Share is protected</bit>
+        <bit number="1">Share is read only</bit>
+        <bit number="2">Share is hidden</bit>
+        <bit number="3">Share is a 'sub directory'</bit>
+        <bit number="4">Share is a CD ROM</bit>
+        <bit number="5">Share is authenticated (use R3 as key)</bit>
+        <bit number="6-31" state="reserved"/>
+    </bitfield-table>
+    </p>
+ </register-use>
+ <register-use number="1">Pointer to zero-terminated share name</register-use>
+ <register-use number="2">Pointer to zero-terminated directory name</register-use>
+ <register-use number="3">Authentication key number (if bit 5 of the flags is set)</register-use>
+</entry>
+<exit>
+ <register-use number="0-3" state="preserved"/>
+</exit>
+
+<use>
+<p>This SWI is used to share a directory.</p>
+</use>
+
+<related>
+    <reference type="swi" name="ShareFS_StopShare" />
+    <reference type="message" name="FileShareDir" />
+</related>
+
+</swi-definition>
+
+<swi-definition name="ShareFS_StopShare"
+                number="47AC1"
+                description="Stop sharing a directory through ShareFS"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">
+    <p>Flags (reserved, must be 0)</p>
+ </register-use>
+ <register-use number="1">Pointer to zero-terminated share name, or directory name</register-use>
+</entry>
+<exit>
+ <register-use number="0-1" state="preserved"/>
+</exit>
+
+<use>
+<p>This SWI is used to stop sharing a directory.
+</p>
+</use>
+
+<related>
+    <reference type="swi" name="ShareFS_CreateShare" />
+    <reference type="message" name="FileShareDir" />
+</related>
+
+</swi-definition>
+
+<swi-definition name="ShareFS_EnumerateShares"
+                number="47AC2"
+                description="List the currently shared directories"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">
+    <p>Flags:</p>
+    <p>
+    <bitfield-table>
+        <bit number="0">Share is protected</bit>
+        <bit number="1">Share is read only</bit>
+        <bit number="2">Share is hidden</bit>
+        <bit number="3">Share is a 'sub directory'</bit>
+        <bit number="4">Share is a CD ROM</bit>
+        <bit number="5-30" state="reserved"/>
+        <bit number="31">Share is authenticated (use R5 as key)</bit>
+    </bitfield-table>
+    </p>
+ </register-use>
+ <register-use number="4">Opaque value for enumeration, starting from 0</register-use>
+ <register-use number="5">Authentication key number (if bit 5 of the flags is set)</register-use>
+</entry>
+<exit>
+ <register-use number="1">Pointer to zero-terminated disc name</register-use>
+ <register-use number="2">Pointer to zero-terminated directory name</register-use>
+ <register-use number="3">Flags used for the share</register-use>
+ <register-use number="4">New opaque value, or -1 if no more details</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to enumerate the shared discs.</p>
+</use>
+
+<related>
+    <reference type="swi" name="ShareFS_CreateShare" />
+    <reference type="swi" name="ShareFS_IdentifyShare" />
+</related>
+
+</swi-definition>
+
+<swi-definition name="ShareFS_IdentifyShare"
+                number="47AC2"
+                description="Identify a shared disc"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">
+    <p>Flags:</p>
+    <p>
+    <bitfield-table>
+        <bit number="0" state="set">R1 contains share name</bit>
+        <bit number="0" state="clear">R1 contains directory name</bit>
+        <bit number="1-31" state="reserved"/>
+    </bitfield-table>
+    </p>
+ </register-use>
+ <register-use number="1">Pointer to zero-terminated share name or directory name</register-use>
+ <register-use number="2">Pointer to buffer for data</register-use>
+ <register-use number="3">Length of buffer</register-use>
+</entry>
+<exit>
+ <register-use number="0">Flags for share (see <reference type='swi' name="ShareFS_CreateShare"/>)</register-use>
+ <register-use number="3">Length of data written to buffer, or -ve length if the name would
+        not fit</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to identify a share given its name or directory name.
+</p>
+</use>
+
+<related>
+    <reference type="swi" name="ShareFS_CreateShare" />
+    <reference type="swi" name="ShareFS_EnumerateShares" />
+</related>
+
+</swi-definition>
+</section>
+
+
+<section title="Wimp messages">
+
+<message-definition name="Message_FileShareDir"
+                    number="408"
+                    description="Request a dialogue for sharing directories"
+                    broadcast="never"
+                    recorded="may"
+                    source="Tasks"
+                    destination="Filer tasks">
+<message-table>
+  <message offset="20">
+    <p>Flags:</p>
+    <p>
+    <bitfield-table>
+        <bit number="0">Share is protected</bit>
+        <bit number="1">Share is read only</bit>
+        <bit number="2">Share is hidden</bit>
+        <bit number="3">Share is authenticated</bit>
+        <bit number="4">Share is a CD ROM</bit>
+        <bit number="5-29" state="reserved"/>
+        <bit number="30">Open window at position given</bit>
+        <bit number="31" state="reserved"/>
+    </bitfield-table>
+    </p>
+ </message>
+ <message offset="24">x co-ordinate to open at (if bit 30 set)</message>
+ <message offset="28">y co-ordinate to open at (if bit 30 set)</message>
+ <message offset="32">zero-terminated directory name to share</message>
+</message-table>
+
+<use>
+
+<p>This message will cause ShareFS to open a dialogue box showing the share
+details requests, or the live share details if the directory is already
+shared.</p>
+
+</use>
+
+<related>
+    <reference type="swi" name="ShareFS_CreateShare" />
+    <reference type="message" name="FileShareDir" />
+</related>
+
+</message-definition>
+</section>
+
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2021.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Gerph" date="28 Dec 2021" title="Initial version">
+    <change>Created from original documentation for RISC OS Select.</change>
+  </revision>
+ </history>
+
+ <related>
+    <reference type='link' href="http://www.riscos.com/support/developers/riscos6/networking/sharefs.html" />
+ </related>
+</meta>
+</riscos-prm>
