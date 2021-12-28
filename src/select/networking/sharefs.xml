@@ -46,7 +46,7 @@ any other value.
 
 
 <section title="Service calls">
-<service-definition name="Service_Sharing"
+<service-definition name="Sharing"
                     number="801C8"
                     description="Change to shared directories">
 <entry>
@@ -240,23 +240,23 @@ any other value.
 
 <section title="Wimp messages">
 
-<message-definition name="Message_FileShareDir"
+<message-definition name="FileShareDir"
                     number="408"
                     description="Request a dialogue for sharing directories"
-                    broadcast="never"
-                    recorded="may"
+                    broadcast="must"
+                    recorded="must"
                     source="Tasks"
-                    destination="Filer tasks">
+                    destination="ShareFS Filer task">
 <message-table>
   <message offset="20">
     <p>Flags:</p>
     <p>
     <bitfield-table>
-        <bit number="0">Share is protected</bit>
+        <bit number="0">Share is protected (public access attributes are obeyed)</bit>
         <bit number="1">Share is read only</bit>
-        <bit number="2">Share is hidden</bit>
-        <bit number="3">Share is authenticated</bit>
-        <bit number="4">Share is a CD ROM</bit>
+        <bit number="2">Share is hidden (doesn't appear in display)</bit>
+        <bit number="3">Share is authenticated (blank password initially)</bit>
+        <bit number="4">Share is a CD ROM (Read only, with a different icon)</bit>
         <bit number="5-29" state="reserved"/>
         <bit number="30">Open window at position given</bit>
         <bit number="31" state="reserved"/>
@@ -273,6 +273,10 @@ any other value.
 <p>This message will cause ShareFS to open a dialogue box showing the share
 details requests, or the live share details if the directory is already
 shared.</p>
+
+<p>It should be sent by an application which wishes to present the user with
+a set of options for sharing a directory. A window will be opened either
+around the pointer, or at the position requested.</p>
 
 </use>
 
