@@ -54,6 +54,7 @@
 </section>
 <section title="RISC OS Select" dir="select">
     <page href="networking/sharefs">ShareFS module</page>
+    <page href="networking/addresscollisions">Internet address collision</page>
 </section>
 
 </index>

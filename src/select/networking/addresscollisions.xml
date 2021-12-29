@@ -1,0 +1,88 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="Internet address collisions">
+<section title="Introduction">
+<p>
+The Internet module now issues a service when it detects another system
+on the network with the same address. Components may recover from this by
+reconfiguring the interface.
+</p>
+</section>
+
+
+
+<section title="Service calls">
+<service-definition name="InternetStatus"
+                    number="B0"
+                    reasonnumber="8"
+                    description="Duplicate Internet address detected">
+<entry>
+ <register-use number="0">8 (subreason code)</register-use>
+ <register-use number="1">&hex;B0 (reason code)</register-use>
+ <register-use number="2">pointer to zero-terminated interface name, eg 'ea0'</register-use>
+ <register-use number="3">pointer to Driver Information Block for interface</register-use>
+ <register-use number="4">IPv4 address which has been duplicated (network byte order)</register-use>
+ <register-use number="5">pointer to hardware address of system with a duplicate IP address</register-use>
+</entry>
+
+<exit>
+ <register-use number="0-5" state="preserved"/>
+ <register-use number="0">0 to claim service when duplicate address has been resolved, or preserved to shut down the Internet module</register-use>
+</exit>
+
+<use>
+<p>This service call is issued by the Internet module (version 5.08 or later)
+when it detects a machine using a duplicate IP address. This is normally
+detected when an incoming ARP packet is received with our IP address but a
+different hardware address.</p>
+
+<p>
+As a probe, whenever an interface is reconfigured, the Internet module sends
+out an ARP request for our IP address to make any such machines reply. That
+will then trigger this service call.</p>
+
+<p>
+Normally, the Internet module will shut down outright as a safety measure if
+this happens. However, if this service call is claimed it will continue
+operation. It is expected that anyone claiming this service call should take
+appropriate action; for example the DHCP module might remove our IP address,
+send a DHCPDECLINE message and go back into the DHCP INIT state.
+</p>
+
+</use>
+
+<related>
+<!-- <reference type="sysvar" name="Sys$Variable" /> -->
+</related>
+
+</service-definition>
+</section>
+
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2021.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Gerph" date="28 Dec 2021" title="Initial version">
+    <change>Created from original Select documentation.</change>
+  </revision>
+ </history>
+
+ <related>
+    <reference type='link' href="http://home.gerph.org/~charles/Reference/RISCOS/LastRODocs/HTML/Networking/AddressCollision.html" />
+ </related>
+</meta>
+</riscos-prm>
