@@ -1,0 +1,166 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="DCI Driver Link Status">
+<section title="Introduction">
+<p>
+Under the DCI, network device drivers must announce their presence through
+<reference type='service' name="DCIDriverStatus" href='?'/>. It is assumed that devices announcing
+themselves in this way are available for use. The device may become
+unavailable, most likely due to link loss (such as a cable being
+disconnected) or memory shortage. No indication is available to the user
+as to the state of the device from the driver.
+</p>
+
+<p>
+    In order to allow notifications of such states to be provided to the user
+(and to other clients who may need to be aware of network infrastructure
+changes), it is proposed that the service call be extended. Authors should
+consult the DCI driver specification or the Internet chapter within PRM 5a
+for more details of the current interface. In summary,
+Service_DCIDriverStatus is issued by drivers to announce startup (reason 0)
+and shutdown (reason 1) of a driver and its associated DIB (Device
+Information Block).
+</p>
+
+<p>
+This has been extended to include announcement of link status changes (<reference type='service' name="DCIDriverStatus" reason="2"/>). Two
+new reason codes are to be used for this purpose.
+</p>
+
+</section>
+
+<section title="Service calls">
+
+<service-definition name="DCIDriverStatus"
+                    number="9D"
+                    reason='2'
+                    reasonname='LinkActive'
+                    description="Notification that the link provided by a DCI driver has become active">
+<entry>
+ <register-use number="0">Pointer to <reference type="subsection" name="Device Information Block" href='?'/></register-use>
+ <register-use number="1">&hex;9D (reason code)</register-use>
+ <register-use number="2">2 (sub-reason code)</register-use>
+ <register-use number="3">DCI version supported</register-use>
+</entry>
+
+<exit>
+ <register-use number="0-3" state="preserved" />
+</exit>
+
+<use>
+<p>This service is issued to announce changes to a Device Driver. An 'active
+link' indicates that the device driver is capable of sending and receiving
+data. An 'inactive link' will never send or receive data. This mirrors the
+use of the DCI statistics flag. For compatibility with devices which are not
+aware of these new reason codes, all modules should assume that a newly
+started device driver has an active link. It follows that any device which
+starts up and is aware of these new reason codes must issue the 'link
+inactive' (reason code 3) service if its link is not available.
+</p>
+
+<p>
+Expected uses for this service:
+</p>
+<p>
+    <list>
+        <item>
+  Dynamic address configuration in presence of new network infrastructure
+    (eg ZeroConf address re-announcement, DHCP lease renewal)</item>
+        <item>
+  User notification of network absence
+    (eg Notifier protocol)</item>
+    </list>
+</p>
+
+<p>
+Non-module clients, and module clients wishing to obtain more information
+about the state of the link should query the statistics for the DCI driver
+in the usual manner.
+</p>
+
+<p>
+Drivers may, but are not required to, defer announcement of inactive links
+if their physical state is such that transient failures (in the order of
+seconds) may occur. Drivers which can detect the physical nature of the
+network to which they are connected must signal a link state change when
+they detect such a change (eg configuration changes to a wireless network
+SSID, encryption key, channel, etc).
+</p>
+
+<p>
+Clients should expect that any 'link inactive' notification may indicate
+that the previous network connection is invalid. On 'link active'
+notification, clients may attempt to re-establish connections to remote
+systems.
+</p>
+
+<p>
+Clients should attempt to use the existing connections before restarting a
+lengthy negotiation or configuration process. Where confidential information
+is involved, clients should not attempt to re-establish any connection
+without first confirming the action with the user.</p>
+
+</use>
+
+<related>
+<reference type='service' name='DCIDriverStatus' reason='3'/>
+</related>
+
+</service-definition>
+</section>
+
+
+<service-definition name="DCIDriverStatus"
+                    number="9D"
+                    reason='3'
+                    reasonname='LinkInactive'
+                    description="Notification that the link provided by a DCI driver has become inactive">
+<entry>
+ <register-use number="0">Pointer to <reference type="subsection" name="Device Information Block" href='?'/></register-use>
+ <register-use number="1">&hex;9D (reason code)</register-use>
+ <register-use number="2">3 (sub-reason code)</register-use>
+ <register-use number="3">DCI version supported</register-use>
+</entry>
+
+<exit>
+ <register-use number="0-3" state="preserved" />
+</exit>
+
+<use>
+    <p>As described in <reference type='service' name='DCIDriverStatus' reason='2'/>.</p>
+</use>
+
+
+<related>
+<reference type='service' name='DCIDriverStatus' reason='2'/>
+</related>
+
+</service-definition>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2021.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Gerph" date="30 Dec 2021" title="Initial version">
+    <change>Created from original Select documentation</change>
+  </revision>
+ </history>
+
+ <related>
+    <reference type='link' href="" />
+ </related>
+</meta>
+</riscos-prm>
