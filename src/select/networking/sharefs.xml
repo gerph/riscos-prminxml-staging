@@ -3,7 +3,7 @@
                             "http://gerph.org/dtd/102/prm.dtd">
 
 <riscos-prm>
-<chapter title="Chapter Title">
+<chapter title="ShareFS">
 <section title="Introduction">
 <p>
 ShareFS provides a simple mechanism for accessing files on locally networked
