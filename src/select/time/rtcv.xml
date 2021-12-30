@@ -1,0 +1,189 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="Real Time Clock Vector">
+<section title="Introduction">
+<p>
+The Real Time Clock Vector is a means for alternate clock implementations to
+be provided for differing hardware. The calls which are provided by the
+Operating System (either within the Kernel or through an extension module)
+for setting the system time - OS_Word 14 calls - are decoded and passed to
+this vector for processing.
+</p>
+
+<p>
+The time values passed to the RTCV handlers will be specified as UTC time.
+That is, they will have had any time zone or daylight saving time adjustments
+removed from them. Handlers should use the values directly with the suitable
+hardware.
+</p>
+
+<p>
+Certain clock implementations, for example the RiscPC clock chip, do not
+provide sufficient information to allow the values to be read directly
+from the chip and returned. In such cases additional steps may be taken
+by the hardware driver.
+</p>
+
+<p>
+The RiscPC clock chip driver code is limited by only storing a year value
+in the range 0-3. As such, two NVRAM bytes have been allocated to augment
+this (byte &hex;80 and &hex;81). Should similar adjustments be required for other
+hardware it is recommended that these bytes be used. During the vector call
+it is safe to issue NVRAM OS_Byte calls.
+</p>
+
+</section>
+
+<section title="Software vectors">
+
+
+
+<vector-definition name="RTCV"
+                   number="3F"
+                   description="Abstracted interface to the real time clock"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+
+<entry>
+<register-use number="0">reason code:
+<p>
+<value-table>
+ <value number="0"><reference type="vector" name="RTCV" reason="0" use-description="yes" /></value>
+ <value number="1"><reference type="vector" name="RTCV" reason="1" use-description="yes" /></value>
+</value-table>
+</p>
+</register-use>
+<register-use number="0-8">Dependant on the reason code</register-use>
+</entry>
+
+<exit>
+<register-use number="0">-1 if reason claimed</register-use>
+</exit>
+
+<use>
+<p>The Real Time Clock vector is called to manipulate the real time clock.</p>
+</use>
+
+<related>
+<!-- <reference type="vector" name="BingleV" /> -->
+</related>
+</vector-definition>
+
+<vector-definition name="RTCV"
+                   number="3F"
+                   reason="0"
+                   reasonname="ReadTime"
+                   description="Read time from hardware Real Time Clock"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">0 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0">-1 if reason claimed</register-use>
+<register-use number="1">centiseconds (0-99)</register-use>
+<register-use number="2">seconds (0-59)</register-use>
+<register-use number="3">minutes (0-59)</register-use>
+<register-use number="4">hours (0-23)</register-use>
+<register-use number="5">day of month (1-31)</register-use>
+<register-use number="6">month (1-12)</register-use>
+<register-use number="7">year (0-99)</register-use>
+<register-use number="8">century (19-21)</register-use>
+</exit>
+
+<use>
+<p>This reason code is called when it is necessary to synchronise the internal
+clock with the hardware-supplied time source. For devices which take a
+significant time to be read the driver may initiate a request of the time
+from the hardware and pass on the call. When the hardware has been read
+such a driver should call SWI OS_ResyncTime request to update the Operating
+System with the new values and notify other clients of an updated internal
+clock.
+</p>
+
+<p>
+Where inaccurate values are available from hardware the driver should
+return the middle value for the relevant range.
+</p>
+</use>
+
+<related>
+<reference type="vector" name="RTCV" reason='1' />
+</related>
+</vector-definition>
+
+<vector-definition name="RTCV"
+                   number="3F"
+                   reason="1"
+                   reasonname="WriteTime"
+                   description="Update hardware Real Time Clock with a new value"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+
+<entry>
+<register-use number="0">1 (reason code)</register-use>
+<register-use number="1">centiseconds (0-99)</register-use>
+<register-use number="2">seconds (0-59)</register-use>
+<register-use number="3">minutes (0-59)</register-use>
+<register-use number="4">hours (0-23)</register-use>
+<register-use number="5">day of month (1-31)</register-use>
+<register-use number="6">month (1-12)</register-use>
+<register-use number="7">year (0-99)</register-use>
+<register-use number="8">century (19-21)</register-use>
+</entry>
+
+<exit>
+<register-use number="0">-1 if reason claimed</register-use>
+<register-use number="1-8" state='preserved' />
+</exit>
+
+<use>
+    <p>This reason code is called when a request is made to set the hardware clock
+to a specific value. The Operating System's internal representation will not
+yet have been updated to reflect these values. Any of the values passed in
+R1-R8 value may be -1 to indicate that it is not to be modified.</p>
+</use>
+
+<related>
+<reference type="vector" name="RTCV" reason='0' />
+</related>
+</vector-definition>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2021.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Gerph" date="30 Dec 2021" title="Initial version">
+    <change>Created from original Select documentation</change>
+  </revision>
+ </history>
+
+ <related>
+    <reference type='link' href="http://www.riscos.com/support/developers/riscos6/time/rtcv.html" />
+ </related>
+</meta>
+</riscos-prm>
