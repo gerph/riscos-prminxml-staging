@@ -1,0 +1,445 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="DHCPClient">
+<section title="Introduction">
+<p>
+The DHCPClient module provides an implementation of the 'Dynamic Host
+Configuration Protocol'. This allows a server to allocate addresses to a
+client based on its internal ethernet 'MAC' address.
+</p>
+
+<p>
+The module is able to control multiple interfaces simultaneously.
+Information about the DHCP configuration process is recorded to the DHCP
+log.
+</p>
+
+</section>
+
+
+<section title="Service calls">
+
+<service-definition name="InternetStatus"
+                    number="B0"
+                    reason="4"
+                    reasonname="BootPReply"
+                    description="Response received for BootP/DHCP request">
+
+<entry>
+ <register-use number="0">4 (sub-reason code></register-use>
+ <register-use number="1">&hex;B0 (reason code)</register-use>
+ <register-use number="2">Pointer to zero-terminated interface name</register-use>
+ <register-use number="3">Pointer to Device Information Block for interface</register-use>
+ <register-use number="4">Pointer to BootP/DHCP reply message buffer</register-use>
+ <register-use number="5">Size of BootP/DHCP reply</register-use>
+</entry>
+
+<exit>
+ <register-use number="0" state="preserved" />
+ <register-use number="1">0 to claim service, else preserved</register-use>
+ <register-use number="2-5" state="preserved" />
+</exit>
+
+<use>
+<p>This service call is issued by the Internet module (version 5.28 or later)
+when a BOOTP/DHCP reply is received.  Clients may inspect the contents of
+the buffer to extract any configuration information.</p>
+
+<p>
+If you want to alter information in the buffer you may do so, but you must
+then claim the service call by setting R1 to zero on exit.  If the service
+call is claimed the Internet module will reprocess the buffer as if it had
+just arrived from the network. Another Service_InternetStatus 4 will arrive
+in due course.
+</p>
+
+<p>
+    You should not normally claim this service call.
+</p>
+
+</use>
+
+<related>
+<!-- <reference type="sysvar" name="Sys$Variable" /> -->
+</related>
+
+</service-definition>
+
+
+<service-definition name="InternetStatus"
+                    number="B0"
+                    reason="5"
+                    reasonname="DHCPOffer"
+                    description="DHCPOffer has been received">
+
+<entry>
+ <register-use number="0">5 (sub-reason code></register-use>
+ <register-use number="1">&hex;B0 (reason code)</register-use>
+ <register-use number="2">Pointer to zero-terminated interface name</register-use>
+ <register-use number="3">Pointer to Device Information Block for interface</register-use>
+ <register-use number="4">Pointer to DHCPOFFER message buffer</register-use>
+ <register-use number="5">Size of DHCPOFFER message</register-use>
+</entry>
+
+<exit>
+ <register-use number="0" state="preserved" />
+ <register-use number="1">0 to claim service, else preserved</register-use>
+ <register-use number="2-5" state="preserved" />
+</exit>
+
+<use>
+<p>This service call is issued by the DHCPClient module whenever it receives an
+offer of an IP address lease which is better than its current best choice
+(or if it is the first acceptable offer). You may inspect the buffer, but it
+must not be modified.
+</p>
+
+<p>
+If clients choose to retain information about offers they MUST use the value
+of OPTION_SERVERIDENTIFIER as an opaque key to identify which offer has been
+chosen.
+</p>
+
+<p>
+If you claim this service the DHCPClient module will not accept the offer, but
+will wait for another offer to be made.
+</p>
+
+<p>
+    You should not normally claim this service call.
+</p>
+
+</use>
+
+<related>
+<!-- <reference type="sysvar" name="Sys$Variable" /> -->
+</related>
+
+</service-definition>
+
+
+<service-definition name="InternetStatus"
+                    number="B0"
+                    reason="48"
+                    reasonname="DHCPLeaseGained"
+                    description="DHCP address has been configured on an interface">
+
+<entry>
+ <register-use number="0">48 (sub-reason code></register-use>
+ <register-use number="1">&hex;B0 (reason code)</register-use>
+ <register-use number="2">Pointer to zero-terminated interface name</register-use>
+ <register-use number="3">IP address assigned to interface</register-use>
+</entry>
+
+<exit>
+ <register-use number="0-3" state="preserved" />
+</exit>
+
+<use>
+<p>
+This service call is issued by the DHCPClient module (after 0.37) when it
+has successfully configured an interface with an address leased from a DHCP
+server. If the interface is reconfigured, the server releases the lease,
+the server fails to renew the lease, a duplicate address is identified, or
+the network stack is stopped, the lease will be lost and
+InternetStatus_DHCPLeaseLost will be issued. This service will not be
+reissued for renewals of the lease.
+</p>
+
+<p>
+This service should never be claimed.
+</p>
+
+</use>
+
+<related>
+<reference type="service" name="InternetStatus" reason="49"/>
+</related>
+
+</service-definition>
+
+
+<service-definition name="InternetStatus"
+                    number="B0"
+                    reason="49"
+                    reasonname="DHCPLeaseLost"
+                    description="DHCP address has been removed from an interface">
+
+<entry>
+ <register-use number="0">49 (sub-reason code></register-use>
+ <register-use number="1">&hex;B0 (reason code)</register-use>
+ <register-use number="2">Pointer to zero-terminated interface name</register-use>
+ <register-use number="3">IP address that was assigned to interface</register-use>
+</entry>
+
+<exit>
+ <register-use number="0-3" state="preserved" />
+</exit>
+
+<use>
+<p>
+This service call is issued by the DHCPClient module (after 0.37) when it
+has lost the DHCP server leased address allocated to an interface. A new
+address may be established by the DHCPClient if the server responds, or the
+interface may be manually reconfigured (however, this service may have been
+issued because of a manual reconfiguration).
+
+See <reference type="service" name="InternetStatus" reason="48"/>
+ for details of circumstances in which this
+service will be issued.</p>
+
+<p>
+This service should never be claimed.
+</p>
+
+</use>
+
+<related>
+<reference type="service" name="InternetStatus" reason="49"/>
+</related>
+
+</service-definition>
+
+
+</section>
+
+
+<section title="SWI calls">
+
+<swi-definition name="DHCPClient_Control"
+                number="55E00"
+                description="Controls the DHCPClient interface management"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0"><p>Reason code:</p>
+    <p>
+        <value-table>
+            <value number="0">Add interface</value>
+            <value number="1">Remove interface</value>
+            <value number="2">Renew lease/re-try obtaining a lease on an interface</value>
+        </value-table>
+    </p>
+ </register-use>
+ <register-use number="1">Pointer to zero-terminated interface name</register-use>
+</entry>
+<exit>
+ <register-use number="0-1" state="preserved"/>
+</exit>
+
+<use>
+<p>This SWI is used to add or remove an interface from the DHCPClient's
+control. Once placed under the control of the DHCPClient the interface will
+continue to operate according to the DHCP protocol until either the
+interface is configured manually or it is removed from the module's control
+by being reconfigured.</p>
+</use>
+
+<related>
+    <reference type="command" name="DHCP" />
+</related>
+</swi-definition>
+
+
+<swi-definition name="DHCPClient_State"
+                number="55E01"
+                description="Reads the status of a DHCPClient managed interface"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">Pointer to zero-terminated interface name</register-use>
+ <register-use number="1"><p>Pointer to a list of information types as words, terminated by -1. Information types:</p>
+    <p>
+        <value-table>
+            <value number="0"><p>Interface state (1 word):</p>
+                <p>
+                <value-table>
+                    <value number="0">sleeping</value>
+                    <value number="1">initreboot</value>
+                    <value number="2">init</value>
+                    <value number="3">rebooting</value>
+                    <value number="4">selecting</value>
+                    <value number="5">requesting</value>
+                    <value number="6">bound</value>
+                    <value number="7">renewing</value>
+                    <value number="8">rebinding</value>
+                </value-table>
+                </p>
+            </value>
+            <value number="1">Bound address - 'yiaddr' (1 word)</value>
+            <value number="2">Server address - 'siaddr' (1 word)</value>
+            <value number="3">Gateway address - 'giaddr' (1 word)</value>
+            <value number="4">lease period in centiseconds (1 word)</value>
+            <value number="5">T1 period in centiseconds (1 word)</value>
+            <value number="6">T2 period in centiseconds (1 word)</value>
+            <value number="7">DHCP start (8 bytes; 5 bytes time, 3 bytes padding)</value>
+            <value number="8">Lease start (8 bytes; 5 bytes time, 3 bytes padding)</value>
+            <value number="9">Lease end (8 bytes; 5 bytes time, 3 bytes padding)</value>
+            <value number="10">T1 end (8 bytes; 5 bytes time, 3 bytes padding)</value>
+            <value number="11">T2 end (8 bytes; 5 bytes time, 3 bytes padding)</value>
+        </value-table>
+    </p>
+ </register-use>
+ <register-use number="2">Pointer to buffer for returned data</register-use>
+ <register-use number="3">Size of the output buffer</register-use>
+</entry>
+<exit>
+ <register-use number="0" state="preserved"/>
+ <register-use number="1">Pointer to invalid option, or -1 if all types are valid</register-use>
+ <register-use number="2">Pointer to first free byte in the output block</register-use>
+ <register-use number="3">Space left, or negative space needed if data would not fit</register-use>
+</exit>
+
+<use>
+<p>
+This SWI is used to read the current DHCP client state for an interface. R1
+points to a list of types which will be returned in the output buffer in the
+order in which they were supplied. If the block was not large enough, a
+'Buffer overflow' error will be returned, with R3 set to the -ve size
+required. If the type of information requested was invalid, an error will
+return and R1 will point to the invalid entry.
+</p>
+</use>
+
+<related>
+    <reference type="command" name="DHCPStatus" />
+</related>
+</swi-definition>
+
+<swi-definition name="DHCPClient_Enumerate"
+                number="55E02"
+                description="Enumerates names of interfaces controlled by DHCPClient"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">Pointer to zero-terminated interface name of the last interface, or 0 initially</register-use>
+ <register-use number="1">Pointer to buffer for returned data</register-use>
+ <register-use number="2">Size of the output buffer</register-use>
+</entry>
+<exit>
+ <register-use number="0">Number of state transitions</register-use>
+ <register-use number="1">pointer to buffer on entry, or 0 if no interfaces remain</register-use>
+ <register-use number="2">Space left, or negative space needed if data would not fit</register-use>
+</exit>
+
+<use>
+<p>This SWI enumerates the interfaces under DHCPClient control.</p>
+</use>
+
+<related>
+    <reference type="swi" name="DHCPClient_State" />
+</related>
+</swi-definition>
+
+</section>
+
+
+<section title="*Commands">
+
+<command-definition name="DHCP"
+                    description="Modify the DHCP control of an interface">
+
+<syntax>
+  <optional>
+    <text>-</text>
+    <text>+</text>
+  </optional>
+  <userreplace>interface</userreplace>
+</syntax>
+
+<parameter name="interface">
+ Name of the interface to change management of.
+</parameter>
+
+<use>
+<p>This command is used to control whether the DHCPClient module will configure the network automatically
+    using the DHCP protocol.</p>
+
+<p>
+If no prefix is applied to the interface name the interface will be added to
+the list of those controlled by the DHCP module.
+</p>
+
+<p>
+If a '-' prefix is used, the interface name will be removed from those
+controlled by the DHCP module and any address which is in use will be
+removed.
+</p>
+
+<p>
+If a '+' prefix is used, an existing DHCP lease on that interface will be
+renewed, or a new attempt to obtain a lease will be made.
+</p>
+
+</use>
+
+<example>
+<command>*DHCP eh0</command>
+</example>
+
+
+<related>
+<!-- <reference type="command" name="AnotherCommand" /> -->
+</related>
+
+</command-definition>
+
+<command-definition name="DHCPStatus"
+                    description="Display information on DHCP controlled interfaces">
+
+<syntax>
+</syntax>
+
+<use>
+<p>This command is used to display information about interfaces controlled by the DHCPClient module.</p>
+</use>
+
+<example>
+<command>*DHCP eh0</command>
+</example>
+
+
+<related>
+    <reference type="command" name="ShowStat" href='?'/>
+</related>
+
+</command-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2021.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Gerph" date="30 Dec 2021" title="Initial version">
+    <change>Created from original Select documentation</change>
+  </revision>
+ </history>
+
+ <related>
+    <reference type='link' href="http://www.riscos.com/support/developers/riscos6/networking/dhcpclient.html" />
+ </related>
+</meta>
+</riscos-prm>
