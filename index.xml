@@ -63,6 +63,7 @@
         <page href="addresscollisions">Internet address collision</page>
         <page href="linkstatus">DCI Driver Link Status</page>
         <page href="dhcpclient">DHCPClient</page>
+        <page href="zeroconf">ZeroConf</page>
     </section>
 </section>
 

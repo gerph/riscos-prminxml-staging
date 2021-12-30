@@ -1,0 +1,331 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="Chapter Title">
+<section title="Introduction">
+<p>
+The ZeroConf module deals with Link-Local zero-configuration network address
+assignment. This module has been present since Select 3. The implementation
+follows that of RFC3927. The module can only handle a single interface. It
+will be automatically configured by the InetConfigure module when 'Dynamic'
+network addressing is configured.
+</p>
+
+<p>
+The ZeroConf module will always configure alias 9 of an interface, for
+example 'eh0:9'.
+</p>
+
+<subsection title="Conformance">
+<p>
+The ZeroConf module and other components of the stack follow the protocol
+laid down by this RFC with certain caveats:
+</p>
+
+<p>
+<list>
+<item>Link-local addresses assigned to interfaces with routable addresses will
+    continue to be advertised by the Internet stack through the SIOCGIFCONF
+    interface. (1.9 rule 2)</item>
+
+<item>No operational changes have been made to prevent the issuing of
+    link-local packets to a router, or forwarding by a router if so
+    configured. (2.6.2, 2.7, 7)</item>
+
+<item>The use of subnetting is not prevented. (2.8)</item>
+
+<item>DNS addresses supplied by external sources may be cached for link-local
+    addresses. (2.9)</item>
+
+<item>DNS server may provide locally known link-local addresses. (2.9)</item>
+
+<item>Operation where multiple interfaces use link-local addresses is not
+    supported by the ZeroConf module and, where manual configuration occurs
+    is not expected to route correctly. (3)</item>
+</list>
+</p>
+
+<p>
+Select 3 ZeroConf implementation follows draft 7 of the link-local standard
+and had the following differences from the released RFC:
+</p>
+
+<p>
+<list>
+<item>4 probes will be sent initially (RFC now states 3).</item>
+
+<item>The maximum number of conflicts before rate limiting was 60 (RFC now
+     states 10).</item>
+</list>
+</p>
+</subsection>
+
+</section>
+
+
+<section title="Service calls">
+
+<service-definition name="InternetStatus"
+                    number="B0"
+                    reason="32"
+                    reasonname="ZeroConfAddressAcquired"
+                    description="Address has been acquired by the ZeroConf module">
+<entry>
+ <register-use number="0">32 (sub-reason code></register-use>
+ <register-use number="1">&hex;B0 (reason code)</register-use>
+ <register-use number="2">Pointer to zero-terminated aliased interface name</register-use>
+ <register-use number="3">IP address assigned to the interface</register-use>
+</entry>
+
+<exit>
+ <register-use number="1-3" state="preserved" />
+</exit>
+
+<use>
+<p>This service call is issued by the ZeroConf module when it has successfully
+configured an interface with a link-local address. This address may be used
+just like any other address. This address may be changed (and the appropriate
+services issued) if collisions occur or if manually modified.
+</p>
+
+<p>
+This service should never be claimed.
+</p>
+
+</use>
+
+<related>
+    <reference type="service" name="InternetStatus" reason="33"/>
+</related>
+
+</service-definition>
+
+<service-definition name="InternetStatus"
+                    number="B0"
+                    reason="33"
+                    reasonname="ZeroConfAddressLost"
+                    description="Address has been lost by the ZeroConf module">
+<entry>
+ <register-use number="0">33 (sub-reason code></register-use>
+ <register-use number="1">&hex;B0 (reason code)</register-use>
+ <register-use number="2">Pointer to zero-terminated aliased interface name</register-use>
+ <register-use number="3">IP address that was assigned to the interface</register-use>
+</entry>
+
+<exit>
+ <register-use number="1-3" state="preserved" />
+</exit>
+
+<use>
+<p>This service call is issued by the ZeroConf module when it has lost the
+link-local address allocated to an interface. A new address may be
+reestablished by the ZeroConf module if the reason for the address loss
+was due to a collision.
+</p>
+
+<p>
+This service should never be claimed.
+</p>
+
+</use>
+
+<related>
+    <reference type="service" name="InternetStatus" reason="32"/>
+</related>
+
+</service-definition>
+</section>
+
+
+<section title="SWI calls">
+
+<swi-definition name="ZeroConf_Control"
+                number="56A00"
+                description="Controls the ZeroConf interface management"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0"><p>Reason code:</p>
+    <p>
+        <value-table>
+            <value number="0"><reference type='swi' name='ZeroConf_Control' reason="0" use-description='yes'/></value>
+            <value number="1"><reference type='swi' name='ZeroConf_Control' reason="1" use-description='yes'/></value>
+        </value-table>
+    </p>
+ </register-use>
+ <register-use number="1-8">Dependant on reason code</register-use>
+</entry>
+<exit>
+ <register-use number="0-8">Dependant on reason code</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to control the operation of the ZeroConf module.</p>
+</use>
+
+<related>
+</related>
+</swi-definition>
+
+
+<swi-definition name="ZeroConf_Control"
+                number="56A00"
+                reason="0"
+                reasonname="ZeroConfAddInterface"
+                description="Places an interface under management by ZeroConf"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">0 (reason code)</register-use>
+ <register-use number="1">Pointer to zero-terminated interface name</register-use>
+</entry>
+<exit>
+ <register-use number="0-1" state='preserved'/>
+</exit>
+
+<use>
+<p>This SWI is used to add an interface to those that the ZeroConf module
+controls. Only a single interface can be controlled by the ZeroConf module.
+An error will be returned if the interface cannot be added.
+</p>
+</use>
+
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="ZeroConf_Control"
+                number="56A00"
+                reason="1"
+                reasonname="ZeroConfRemoveInterface"
+                description="Releases an interface from management by ZeroConf"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">0 (reason code)</register-use>
+ <register-use number="1">Pointer to zero-terminated interface name</register-use>
+</entry>
+<exit>
+ <register-use number="0-1" state='preserved'/>
+</exit>
+
+<use>
+<p>This SWI is used to remove an interface from those that the ZeroConf module
+controls. If the interface named is not controlled by ZeroConf, an error will
+be returned.
+
+</p>
+</use>
+
+<related>
+</related>
+</swi-definition>
+
+
+<swi-definition name="ZeroConf_Status"
+                number="56A01"
+                description="Reads the status of the ZeroConf module"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="1"><p>Status type:</p>
+    <p>
+        <value-table>
+            <value number="0"><reference type='swi' name='ZeroConf_Status' reason="0" use-description='yes'/></value>
+        </value-table>
+    </p>
+ </register-use>
+ <register-use number="1-8">Dependant on reason code</register-use>
+</entry>
+<exit>
+ <register-use number="0-8">Dependant on reason code</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to read the status of the ZeroConf module.</p>
+</use>
+
+<related>
+<!-- <reference type="vector" name="BingleV" /> -->
+</related>
+
+</swi-definition>
+
+<swi-definition name="ZeroConf_Status"
+                number="56A01"
+                reason="0"
+                reasonname="ConfigurationState"
+                description="Reads the current configuration status"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="1">0 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="0"><p>State of the ZeroConf module</p>
+    <p>
+    <value-table>
+        <value number="0">idle</value>
+        <value number="1">probing for address</value>
+        <value number="2">announcing address assignment</value>
+        <value number="3">configured</value>
+        <value number="4">configured, defending against address collision</value>
+    </value-table>
+    </p>
+  </register-use>
+  <register-use number="1">Pointer to zero-terminated interface name</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to read the state of the operation of the ZeroConf module.</p>
+</use>
+
+<related>
+<!-- <reference type="vector" name="BingleV" /> -->
+</related>
+
+</swi-definition>
+</section>
+
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2021.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Gerph" date="30 Dec 2021" title="Initial version">
+    <change>Created from original Select documentation</change>
+  </revision>
+ </history>
+
+ <related>
+    <reference type='link' href="http://www.riscos.com/support/developers/riscos6/networking/zeroconf.html" />
+ </related>
+</meta>
+</riscos-prm>
