@@ -53,10 +53,15 @@
     <page href="cryptrandom">CryptRandom module</page>
 </section>
 <section title="RISC OS Select" dir="select">
-    <page href="time/rtc">Real Time Clock</page>
-    <page href="time/rtcv">Real Time Clock vector</page>
-    <page href="networking/sharefs">ShareFS module</page>
-    <page href="networking/addresscollisions">Internet address collision</page>
+    <section title="Time" dir="time">
+        <page href="rtc">Real Time Clock</page>
+        <page href="rtcv">Real Time Clock vector</page>
+        <page href="systemclock">System clock</page>
+    </section>
+    <section title="Networking" dir="networking">
+        <page href="sharefs">ShareFS module</page>
+        <page href="addresscollisions">Internet address collision</page>
+    </section>
 </section>
 
 </index>
