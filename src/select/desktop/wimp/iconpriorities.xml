@@ -85,7 +85,7 @@ These applications should not provide a "Quit" option.
 
 <p>
 This is basically a place for internet servers, connection systems and
-other network utilities to live, as well as local servers. Like [1],
+other network utilities to live, as well as local servers. Like the Object sources,
 these should have their name under them. Samba, TelnetD, Newsbase,
 InetSuite, WebServe and Netplex would fall into this category. These will
 grow to the right when the user loads a new controller.
