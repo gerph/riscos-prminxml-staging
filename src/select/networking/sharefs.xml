@@ -302,7 +302,10 @@ around the pointer, or at the position requested.</p>
  </disclaimer>
 
  <history>
-  <revision number="1" author="Gerph" date="28 Dec 2021" title="Initial version">
+  <revision number="1" author="Gerph" date="2006" title="Initial version">
+    <change>Released as RISC OS Select documentation.</change>
+  </revision>
+  <revision number="2" author="Gerph" date="28 Dec 2021" title="PRM-in-XML conversion">
     <change>Created from original documentation for RISC OS Select.</change>
   </revision>
  </history>

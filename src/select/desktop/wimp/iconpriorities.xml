@@ -142,7 +142,10 @@ rationalised in future.
  </disclaimer>
 
  <history>
-  <revision number="1" author="Gerph" date="12 Jan 2022" title="Initial version">
+  <revision number="1" author="Gerph" date="08 Feb 2000" title="Initial version">
+    <change>Released as part of Technote 20000502-001.</change>
+  </revision>
+  <revision number="2" author="Gerph" date="12 Jan 2022" title="PRM-in-XML conversion">
     <change>Created from original Select documentation.</change>
   </revision>
  </history>
