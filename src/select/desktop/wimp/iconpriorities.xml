@@ -1,0 +1,154 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="Iconbar priorities">
+<section title="Introduction">
+<p>
+Iconbar priorities have been vague at best, with some usages being declared
+to be the 'easiest way to do things'. In addition to this, some entities
+such as ADFSFiler have used incorrect iconbar priorities by accident. This
+particular case means that Floppy discs do not appear where they are
+documented to appear in the PRMs. Floppies are documented to appear at
+&hex;60000000. They actually appear at &hex;70000000. ShareFS used a priority of
+&hex;68000000. This results in a mismatched iconbar, where the three cases of
+documentation, logical appearance and prior use cannot be resolved
+simultaneously.</p>
+<p>
+Thus, it has been decided to clarify the usage of parts of
+the iconbar. This should make for a more logical system, and the possibility
+of multi-tier iconbars and other such changes.
+</p>
+</section>
+
+
+<section title="Technical details">
+<p>
+These categorisations provided here amend and expand on documentation provided in the PRMs.
+The intent is to clarify the system for a logically organised iconbar, with
+clearly defined positioning for components, and whilst retaining the current
+state wherever possible.
+</p>
+
+<p>
+The iconbar should be viewed as:
+</p>
+
+<p>
+<image src="iconpriorities.png" type='png' caption="Iconbar layout"/>
+</p>
+
+<subsection title="Object sources and sinks">
+
+<p>
+These are icons for devices to which objects can be sent or retrieved from.
+They are ordered logically from read only devices on the left through
+read/write devices to write only devices towards the right. Alongside write
+only devices are the volatile devices; those devices whose contents are not
+likely to remain permanent from session to session (or even within a session).
+</p>
+
+<p>
+The full ordering is:
+</p>
+
+<p>
+<value-table head-number="Priority">
+    <value number="&hex;76000000" name="Scanners"><p>Read-only device</p></value>
+    <value number="&hex;74000000" name="CD-ROM"><p>Read-only device</p></value>
+    <value number="&hex;70000000" name="Hard disc"><p>Read-write device<br/>Examples: Any fixed RW medium falls into this category</p></value>
+    <value number="&hex;68000000" name="Floppies"><p>Read-write device<br/>Examples: Any removable RW medium falls into this category</p></value>
+    <value number="&hex;60000000" name="Network"><p>Read-write/Read-only device<br/>Examples: Any network filing system falls into this category</p></value>
+    <value number="&hex;40000000" name="Volatiles"><p>Read-write device<br/>Examples: RAMFS, Transient, Trash cans, Memphis, Scrap, etc</p></value>
+    <value number="&hex;0F000000" name="Printers"><p>Write-only device</p></value>
+    <value number="&hex;04000000" name="Accelerators"><p>Examples: ResourceFS, "Pinned" items, Director, Menon, etc.</p></value>
+</value-table>
+</p>
+
+The "Accelerator" applications are considered virtual devices.
+
+<p>
+All devices in this category should have a name underneath, ideally
+identifying the medium name with which they are associated. If no medium is
+associated (eg. a removable, or unconfigured device), they should display
+the medium name (eg. Zip disc, Printer, LanMan, etc), or a generalised
+medium identifier (eg. the drive or port number).
+</p>
+
+<p>
+These applications should not provide a "Quit" option.
+</p>
+</subsection>
+
+<subsection title="Data source / sink controllers">
+
+<p>
+This is basically a place for internet servers, connection systems and
+other network utilities to live, as well as local servers. Like [1],
+these should have their name under them. Samba, TelnetD, Newsbase,
+InetSuite, WebServe and Netplex would fall into this category. These will
+grow to the right when the user loads a new controller.
+</p>
+
+<p>
+These applications should provide "Quit" options. Most should provide a
+status window, and many will provide configuration windows.
+</p>
+
+</subsection>
+
+<subsection title="User applications">
+
+<p>
+This is where user applications appear when loaded. They will grow
+to the left as they are loaded, taking up the free gap space.
+</p>
+
+<p>
+These applications should provide a "Quit" option.
+</p>
+
+<p>
+They should not have text placed under them unless they are configured
+into a particular state that must be described. Such applications are
+discouraged unless there is a genuine need.
+</p>
+</subsection>
+
+<subsection title="System control applications">
+<p>
+This is where system control applications live. These are things that
+will control the machine, the desktop or the way in which the system
+works. Initially, this comprises the Task Manager and Display Manager.
+Because of its high priority, Help lives here too. This may be
+rationalised in future.
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2021.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Gerph" date="12 Jan 2022" title="Initial version">
+    <change>Created from original Select documentation.</change>
+  </revision>
+ </history>
+
+ <related>
+    <reference type='link' href="http://www.riscos.com/support/developers/riscos6/desktop/wimp/iconbarpriorities.html" />
+ </related>
+</meta>
+</riscos-prm>

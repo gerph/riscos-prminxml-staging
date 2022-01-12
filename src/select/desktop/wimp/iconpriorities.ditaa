@@ -1,0 +1,9 @@
+   <-- Devices and drivers                   Applications and utilities -->
+  +-----------------+--------------+---------+--------------+--------------+
+  | Object sources/ | Source/Sink  |         |     User     |    System    |
+  |     sinks       | Controllers  |   Gap   | Applications |  Controllers |
+  | RO -> RW -> WO  |              |         |              |              |
+  +-----------------+--------------+---------+--------------+--------------+
+  |   Prioritised   |     Not      |         |     Not      | Prioritised  |
+  |                 | prioritised  |         | prioritised  |              |
+  \-------=---------+------=-------/         \-------=------+-------=------/

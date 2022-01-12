@@ -55,6 +55,9 @@
 <section title="RISC OS Select" dir="select">
     <section title="Desktop" dir="desktop">
         <page href="iconbarfiledrags">Icon bar file drags</page>
+        <section title="Wimp" dir="wimp">
+            <page href="iconpriorities">Iconbar priorities</page>
+        </section>
     </section>
     <section title="Time" dir="time">
         <page href="rtc">Real Time Clock</page>
