@@ -53,18 +53,17 @@ any other value.
  <register-use number="0">pointer to zero-terminated filing system name ('ShareFS' in our case)</register-use>
  <register-use number="1">&hex;801C8 (reason code)</register-use>
  <register-use number="2">Share state: 0 if object is unshared, 1 if object is shared</register-use>
- <register-use number="3">pointer to zero-terminated directory name being shraed</register-use>
+ <register-use number="3">pointer to zero-terminated directory name being shared</register-use>
  <register-use number="4">pointer to zero-terminated name of the shared object</register-use>
  <register-use number="5">private data (filesystem specific)</register-use>
 </entry>
 
 <exit>
- <register-use number="0">What is returned</register-use>
- <register-use number="1" state="preserved" />
+ <register-use number="0-5" state="preserved" />
 </exit>
 
 <use>
-<p>This service is issued when a path is shared or unshared by a filing system.</p>
+<p>This service is issued when a path is shared or unshared by a filing system. It should not be claimed.</p>
 
 </use>
 
@@ -196,7 +195,7 @@ any other value.
 </swi-definition>
 
 <swi-definition name="ShareFS_IdentifyShare"
-                number="47AC2"
+                number="47AC3"
                 description="Identify a shared disc"
                 irqs="undefined"
                 fiqs="enabled"
