@@ -1,0 +1,458 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="Speak module">
+<section title="Introduction">
+<p>
+    Speak is a module by Jonathan Duddington which allows speech to be generated from text strings.
+</p>
+
+</section>
+
+
+
+<section title="SWI calls">
+
+<swi-definition name="Speak_Ready"
+                number="4AD80"
+                description="Check whether Speak is current speaking"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+</entry>
+<exit>
+ <register-use number="0">0 if still speaking, or -1 if not speaking.</register-use>
+ <register-use number="1">Index into the last string which is currently being spoken. The index refers to the start of the word which is currently being spoken.</register-use>
+</exit>
+
+<use>
+<p>Can be used to wait until the speak module has finished speaking, and to identify which word is currently being spoken.
+</p>
+</use>
+
+<related>
+    <reference type="swi" name="Speak_Say" />
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="Speak_Misc"
+                number="4AD82"
+                description="Miscellaneous functions"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0"><p>Reason code</p>
+  <p>
+    <value-table>
+        <value number="1">Register user (obsolete)</value>
+        <value number="2">Deregister user (obsolete)</value>
+        <value number="3"><reference type='swi' name='Speak_Misc' reason="3" use-description="yes"/></value>
+        <value number="5"><reference type='swi' name='Speak_Misc' reason="5" use-description="yes"/></value>
+    </value-table>
+  </p>
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0-8">Dependant on reason code</register-use>
+</exit>
+
+<use>
+<p>This SWI performs miscellaneous operations on the Speak module. See individual reason codes for more detail.</p>
+</use>
+
+<related>
+<!-- <reference type="vector" name="BingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="Speak_Misc"
+                number="4AD82"
+                reason="3"
+                reasonname="TranslateToPhonemes"
+                description="Translate text to phoneme string"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">3 (reason code)</register-use>
+ <register-use number="1">Pointer to the string of a single English word to translate</register-use>
+ <register-use number="2"><p>Translation type:</p>
+  <p>
+    <value-table>
+        <value number="0">ASCII phonemes</value>
+        <value number="1">IPA phonemes (as UTF-8)</value>
+    </value-table>
+  </p>
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to zero-terminated phoeme string</register-use>
+</exit>
+
+<use>
+<p>This SWI translates an English word into a string of phonemes.</p>
+</use>
+
+<related>
+<!-- <reference type="vector" name="BingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="Speak_Misc"
+                number="4AD82"
+                reason="5"
+                reasonname="ReadVoiceNames"
+                description="Read voice names"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">5 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to array of pointers to strings for the available voice names. The array is terminated by a 0.</register-use>
+ <register-use number="1">Pointer to array of pointers to strings for the available voice variant names. The array is terminated by a 0.</register-use>
+</exit>
+
+<use>
+<p>This SWI translates an English word into a string of phonemes.</p>
+</use>
+
+<related>
+<!-- <reference type="vector" name="BingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="Speak_Say"
+                number="4AD83"
+                description="Speak a string"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">Pointer to English text string to be spoken, terminated as described by R1</register-use>
+ <register-use number="1">Length of the string pointed to by R0, or 0 if the string pointed to by R0 is terminated by a 0 or 13 byte</register-use>
+ <register-use number="2">Voice index to use, or -1 for no change</register-use>
+ <register-use number="3">Must be 0 (may be used in future versions)</register-use>
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>This SWI is used to speak a text string with a given voice.
+The voice to use can be selected from those returned by
+<reference type='swi' name='Speak_Misc' reason='5' />.</p>
+<p>
+When speaking passages of text, this SWI should not
+be called for each individual word, but rather for
+sentences.  This allows the Speak module to apply an
+intonation pattern to the whole clause.
+</p>
+<p>
+The Speak module has to copy the text into an
+internal buffer before speaking it.  This limits the
+length the text string to 1000 characters.
+</p>
+<p>
+This SWI will return immediately, before the text
+has been spoken.  Use <reference type='swi' name='Speak_Ready'/> in a polling loop to
+determine when the speaking has finished.
+</p>
+</use>
+
+<related>
+    <reference type="swi" name="Speak_SayW" />
+    <reference type="swi" name="Speak_Ready" />
+    <reference type="swi" name="Speak_SetVoice" />
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="Speak_SayW"
+                number="4AD84"
+                description="Speak a string and wait for completion"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">Pointer to English text string to be spoken, terminated as described by R1</register-use>
+ <register-use number="1">Length of the string pointed to by R0, or 0 if the string pointed to by R0 is terminated by a 0 or 13 byte</register-use>
+ <register-use number="2">Voice index to use, or -1 for no change</register-use>
+ <register-use number="3">Must be 0 (may be used in future versions)</register-use>
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>This SWI is the same as <reference type='swi' name='Speak_Say'/> but waits for the string to complete before returning.</p>
+
+<p>In version 3 of this module, this SWI deoes not wait.</p>
+</use>
+
+<related>
+    <reference type="swi" name="Speak_Say" />
+</related>
+
+</swi-definition>
+
+<swi-definition name="Speak_Stop"
+                number="4AD85"
+                description="Stops any current speech"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>This SWI stops speaking any "Say" calls which have been sent to the Speak module.
+</p>
+</use>
+
+<related>
+    <reference type="swi" name="Speak_Say" />
+    <reference type="swi" name="Speak_SayW" />
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="Speak_Pitch"
+                number="4AD87"
+                description="Set the pitch used by speech"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">new value of the 'pitch' parameter. Defaults to 128.</register-use>
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>This SWI sets the pitch used by the Speak module.</p>
+</use>
+
+<related>
+    <reference type="swi" name="Speak_Speed" />
+    <reference type="swi" name="Speak_WordGap" />
+</related>
+
+</swi-definition>
+
+<swi-definition name="Speak_Speed"
+                number="4AD88"
+                description="Set the speed of speech"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">new value of the 'speed' parameter. Defaults to 128.</register-use>
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>This SWI sets the speed of speech generated by the Speak module.</p>
+</use>
+
+<related>
+    <reference type="swi" name="Speak_Pitch" />
+    <reference type="swi" name="Speak_WordGap" />
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="Speak_WordGap"
+                number="4AD89"
+                description="Sets the gap between words in speech"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0"><p>New value of the 'word gap' parameter':</p>
+ <p>
+    <value-table>
+        <value number="0">No extra gap between words</value>
+        <value number="1">Ensure a short gap between each spoken word</value>
+        <value number="&ge; 2">Larger gaps between words in multiples of 50ms</value>
+        <value number="128">Equivalent to 0</value>
+    </value-table>
+ </p>
+</register-use>
+
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>This SWI is used to change the gap applied between words of speech generated by the Speak module.</p>
+</use>
+
+<related>
+    <reference type="swi" name="Speak_Speed" />
+    <reference type="swi" name="Speak_Pitch" />
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="Speak_PitchRange"
+                number="4AD8A"
+                description="Change the range of pitches used by speech"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">new value of the 'pitch range' parameter. Default value is 128.</register-use>
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>This SWI is used to control the 'pitch range' used by the Speak module.</p>
+</use>
+
+<related>
+    <reference type="swi" name="Speak_Speed" />
+    <reference type="swi" name="Speak_Pitch" />
+    <reference type="swi" name="Speak_WordGap" />
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="Speak_Volume"
+                number="4AD8D"
+                description="Change the volume of speech"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">new volume (amplitude), range 0-255</register-use>
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>This SWI is used to control the volume of the speech generated by the Speak module.</p>
+</use>
+
+<related>
+<!-- <reference type="vector" name="BingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+SWI &hex;4ad8e   
+     R0   Pointer to voice name (eg. "en-us" for the US English voice).
+          Use + to add a voice variant (eg. "en-us+f3" use the "f3" female voice).
+
+     R1   0
+     R2   0
+
+<swi-definition name="Speak_SetVoice"
+                number="4AD8E"
+                description="Select a voice name"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">Pointer to a zero-terminated voice name to use.</register-use>
+ <register-use number="1">Must be 0</register-use>
+ <register-use number="2">Must be 0</register-use>
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>This SWI is used to select a voice name. For example, "en-us" for the US English voice.</p>
+
+<p>The voice name may be suffixed by a '+' followed by a voice variant name. For example, "en-us+f3+ to use the 'f3' female voice.</p>
+</use>
+
+<related>
+    <reference type="swi" name="Speak_Say" />
+    <reference type="swi" name="Speak_SayW" />
+</related>
+
+</swi-definition>
+</section>
+
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Jonathan Duddington.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Jonathan Duddington" date="12 Apr 2013" title="Release 1.47.06 of module">
+    <change>Original documentation of eSpeak release 1.47.06</change>
+  </revision>
+
+  <revision number="2" author="Gerph" date="14 Jan 2021" title="PRM-in-XML conversion">
+    <change>Converted to PRM-in-XML.</change>
+  </revision>
+ </history>
+
+ <related>
+    <reference type='link' href="http://espeak.sourceforge.net/" />
+ </related>
+</meta>
+</riscos-prm>

@@ -51,6 +51,7 @@
 </section>
 <section title="3rd Party" dir="3rdparty">
     <page href="cryptrandom">CryptRandom module</page>
+    <page href="speak">Speak module</page>
 </section>
 
 </index>
