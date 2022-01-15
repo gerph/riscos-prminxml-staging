@@ -27,7 +27,8 @@
 </entry>
 <exit>
  <register-use number="0">0 if still speaking, or -1 if not speaking.</register-use>
- <register-use number="1">Index into the last string which is currently being spoken. The index refers to the start of the word which is currently being spoken.</register-use>
+ <register-use number="1">Character index into the last string which is currently being spoken. The index refers to the start of the word which is currently being spoken.</register-use>
+ <register-use number="2-5">0 (reserved for future expansion)</register-use>
 </exit>
 
 <use>
@@ -55,10 +56,15 @@
  <register-use number="0"><p>Reason code</p>
   <p>
     <value-table>
+        <value number="0"><reference type='swi' name='Speak_Misc' reason="0" use-description="yes"/></value>
         <value number="1">Register user (obsolete)</value>
         <value number="2">Deregister user (obsolete)</value>
         <value number="3"><reference type='swi' name='Speak_Misc' reason="3" use-description="yes"/></value>
+        <value number="4">Reload word dictionary (obsolete)</value>
         <value number="5"><reference type='swi' name='Speak_Misc' reason="5" use-description="yes"/></value>
+        <value number="6"><reference type='swi' name='Speak_Misc' reason="6" use-description="yes"/></value>
+        <value number="7">Initialise voice (obsolete)</value>
+        <value number="8"><reference type='swi' name='Speak_Misc' reason="8" use-description="yes"/></value>
     </value-table>
   </p>
  </register-use>
@@ -69,6 +75,36 @@
 
 <use>
 <p>This SWI performs miscellaneous operations on the Speak module. See individual reason codes for more detail.</p>
+
+<p>Unrecognised reason codes will always exit with R0 = 0 and R1 = 1.</p>
+</use>
+
+<related>
+<!-- <reference type="vector" name="BingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="Speak_Misc"
+                number="4AD82"
+                reason="0"
+                reasonname="Version"
+                description="Return Speak version"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+</entry>
+<exit>
+ <register-use number="0">4</register-use>
+ <register-use number="1">347</register-use>
+</exit>
+
+<use>
+<p>This SWI returns the version of the interface provided the the Speak module.</p>
 </use>
 
 <related>
@@ -134,7 +170,7 @@
 </exit>
 
 <use>
-<p>This SWI translates an English word into a string of phonemes.</p>
+<p>This SWI returns the list of known voice names and variants.</p>
 </use>
 
 <related>
@@ -143,6 +179,88 @@
 
 </swi-definition>
 
+
+<swi-definition name="Speak_Misc"
+                number="4AD82"
+                reason="6"
+                reasonname="SetVoiceByNumber"
+                description="Select a voice by number"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">6 (reason code)</register-use>
+ <register-use number="1">Index of the voice to select for speaking.</register-use>
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>This SWI selects a voice by its index in the table of voices. If the index is out of range, the request is ignored.</p>
+</use>
+
+<related>
+    <reference type="swi" name="Speak_Misc" reason="5"/>
+    <reference type="swi" name="Speak_SetVoice"/>
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="Speak_Misc"
+                number="4AD82"
+                reason="8"
+                reasonname="ReadVoiceParameters"
+                description="Read voice parameters"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">8 (reason code)</register-use>
+ <register-use number="1">Pointer to zero-terminated language name to read parameters, or 0 to return a list of all voices</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to an array of pointers to voice parameters</register-use>
+</exit>
+
+<use>
+<p>This SWI reads a list of voices which are available, and their parameters. The list of voices is returned as a pointer to an array of voice parameters. The list of voices will be filtered by the supplied language name. The language name should be a language and optional dialect, for example "en" or "en-uk".
+</p>
+
+<p>
+    The voice parameters returned are in a voice structure:
+</p>
+
+<p>
+    <offset-table>
+        <offset number="0">Pointer to zero-terminated name of the language</offset>
+        <offset number="4">Pointer to a list of pairs of priority and language strings which this voice is appropriate for (see eSpeak documentation</offset>
+        <offset number="8">Pointer to the filename of this voice</offset>
+        <offset number="12"><p>(byte) Gender of the voice:</p>
+            <value-table>
+                <value number="0">No gender</value>
+                <value number="1">Male</value>
+                <value number="2">Female</value>
+            </value-table>
+        </offset>
+        <offset number="13">(byte) Apparent age in years of the voice, or 0 if not specified</offset>
+        <offset number="14">(byte) Reserved</offset>
+        <offset number="15">(byte) Reserved</offset>
+    </offset-table>
+</p>
+
+</use>
+
+<related>
+    <reference type="swi" name="Speak_Misc" reason="5"/>
+    <reference type="swi" name="Speak_SetVoice"/>
+</related>
+
+</swi-definition>
 
 
 <swi-definition name="Speak_Say"
@@ -259,13 +377,13 @@ determine when the speaking has finished.
                 re-entrant="no">
 
 <entry>
- <register-use number="0">new value of the 'pitch' parameter. Defaults to 128.</register-use>
+ <register-use number="0">new value of the 'pitch' parameter (0-255). Defaults to 128.</register-use>
 </entry>
 <exit>
 </exit>
 
 <use>
-<p>This SWI sets the pitch used by the Speak module.</p>
+<p>This SWI sets the pitch used by the Speak module. Out of range values for the pitch will be clipped to the limits.</p>
 </use>
 
 <related>
@@ -284,13 +402,14 @@ determine when the speaking has finished.
                 re-entrant="no">
 
 <entry>
- <register-use number="0">new value of the 'speed' parameter. Defaults to 128.</register-use>
+ <register-use number="0">new value of the 'speed' parameter (0-255). Defaults to 128.</register-use>
 </entry>
 <exit>
 </exit>
 
 <use>
 <p>This SWI sets the speed of speech generated by the Speak module.</p>
+<p>This SWI may corrupt floating point registers on exit.</p>
 </use>
 
 <related>
@@ -381,6 +500,7 @@ determine when the speaking has finished.
 
 <use>
 <p>This SWI is used to control the volume of the speech generated by the Speak module.</p>
+<p>This SWI may corrupt floating point registers on exit.</p>
 </use>
 
 <related>
@@ -390,16 +510,9 @@ determine when the speaking has finished.
 </swi-definition>
 
 
-SWI &hex;4ad8e   
-     R0   Pointer to voice name (eg. "en-us" for the US English voice).
-          Use + to add a voice variant (eg. "en-us+f3" use the "f3" female voice).
-
-     R1   0
-     R2   0
-
 <swi-definition name="Speak_SetVoice"
                 number="4AD8E"
-                description="Select a voice name"
+                description="Select a voice by name"
                 irqs="undefined"
                 fiqs="enabled"
                 processor-mode="SVC"
@@ -414,7 +527,7 @@ SWI &hex;4ad8e
 </exit>
 
 <use>
-<p>This SWI is used to select a voice name. For example, "en-us" for the US English voice.</p>
+<p>This SWI is used to select a voice by name. For example, "en-us" for the US English voice.</p>
 
 <p>The voice name may be suffixed by a '+' followed by a voice variant name. For example, "en-us+f3+ to use the 'f3' female voice.</p>
 </use>
@@ -448,6 +561,10 @@ SWI &hex;4ad8e
 
   <revision number="2" author="Gerph" date="14 Jan 2021" title="PRM-in-XML conversion">
     <change>Converted to PRM-in-XML.</change>
+  </revision>
+
+  <revision number="2" author="Gerph" date="15 Jan 2021">
+    <change>Updated SWI details with undocumented interfaces and more detail.</change>
   </revision>
  </history>
 
