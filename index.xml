@@ -53,6 +53,9 @@
     <page href="cryptrandom">CryptRandom module</page>
 </section>
 <section title="RISC OS Select" dir="select">
+    <section title="Desktop" dir="desktop">
+        <page href="iconbarfiledrags">Icon bar file drags</page>
+    </section>
     <section title="Time" dir="time">
         <page href="rtc">Real Time Clock</page>
         <page href="rtcv">Real Time Clock vector</page>

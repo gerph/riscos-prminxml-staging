@@ -1,0 +1,122 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="Icon bar file drags">
+<section title="Introduction">
+<p>
+For RISC OS 4 the behaviour of the iconbar device icons was updated to allow files dropped on them to be saed to a specified directory for the device. Usually this would be the root of the device, but is configurable. This avoids the user opening a save box but being unable to drop the file anywhere.
+</p>
+</section>
+
+
+<section title="Technical details">
+<p>
+ File drags from save boxes to icon bar Filer icons will cause the file to be saved in a specified directory of the device, most sensibly the root. The Filer will then open the directory viewer. In combination with the autofronting icon bar in the new window manager, the user will now never face the situation of having a save box open, but nowhere to drag the file to.
+</p>
+
+<p>
+For consistency, drags from Filer windows to icon bar icons will cause files to be copied/moved to the directory. As with saves, the Filer will open the directory viewer.
+</p>
+
+<p>
+The directory which a file is saved/copied to will be specified by a system variable and will default to the root directory. The system variable will be of the form <sysvar><userreplace>FSName</userreplace>Filer$DefaultPath</sysvar>. For example <sysvar>ADFSFiler$DefaultPath</sysvar> or <sysvar>NetFiler$DefaultPath</sysvar>.
+</p>
+
+<subsection title="Icon bar save protocol">
+<p>
+In order for files to be saved to icon bar device icons, the FS Filers will now be required to receive the WIMP message <reference type='message' name='DataSave' href='?'/>. They will reply with <reference type='message' name='DataSaveAck'/> specifying a pathname for the saved file. They will also receive <reference type='message' name='DataLoad' href='?'/> on completion of the save and use this as the trigger for opening the Filer window of the directory the file has been saved in.
+</p>
+</subsection>
+
+<subsection title="Icon bar copy protocol">
+<p>
+    For file copies to work, a different system is necessary. Without modification, when a file is dragged from a Filer viewer to a device icon, the Filer will send a Message_DataLoad to the FS Filer responsible for the device. All the FS filers will be changed to receive this message and then to reply with a new message, <reference type='message' name='FilerDevicePath'/>.
+</p>
+</subsection>
+
+</section>
+
+
+
+<section title="System variables">
+<sysvar-definition name="FSFiler$DefaultPath"
+                   description="Default path for files dropped on the filer icon">
+<use>
+<p>The iconbar device filers should use these variables - substituting their own filing system
+name in the name - to decide where to save files when the user drops a file on their iconbar icon.</p>
+</use>
+
+<related>
+    <reference type='message' name='FilerDevicePath'/>
+</related>
+</sysvar-definition>
+</section>
+
+
+
+<section title="Wimp messages">
+
+<message-definition name="FilerDevicePath"
+                    number="408"
+                    description="Request to Filer to copy a file to a location"
+                    broadcast="never"
+                    recorded="never"
+                    source="Icon bar Filer tasks"
+                    destination="Filer">
+<message-table>
+  <message offset="20">zero-terminated path name to copy to</message>
+</message-table>
+
+<use>
+    <p>This message is sent by icon bar filer tasks to the Filer in response to a <reference type='message' name='DataLoad' href='?'/> to request that it copy the file to a new location.</p>
+    <p>The path that should be copied to is formed as <filename><userreplace>DevicePath</userreplace>.<userreplace>path</userreplace></filename>.</p>
+    <p>Where <userreplace>DevicePath</userreplace> is the root directory of the device eg. <filename>ADFS::HardDisc4.$</filename>, and <userreplace>path</userreplace> is the expansion of
+    <sysvar>FSFiler$DefaultPath</sysvar>. If the variable is unset, the root of the device should be used. By default, these system variables will be unset but will be left to more experienced users to set, as needed.</p>
+
+<p>
+An example may help to clarify. If the user has set <sysvar>ADFSFiler$DefaultPath</sysvar> to be <filename>Files.Junk</filename> and they drag a file from a Filer viewer to the HardDisc4 icon, then the ADFS Filer should return a Message_FilerDevicePath, with the path name <filename>ADFS::HardDisc4.$.Files.Junk</filename> and the Filer will copy the file into that directory (if it exists).
+</p>
+
+<p>
+The FS Filer will also prompt the Filer to open the directory viewer for the directory who's path it has just specified, using <reference type='message' name='FilerOpenDir' href='?'/>.
+</p>
+<p>
+If the path name consists of no characters and then the terminator, it is assumed that the root directory is read only.
+<fixme> What does this mean? Does it mean that the variable can be set to an empty string to not perform the save ? </fixme>
+</p>
+</use>
+
+<related>
+  <reference type="sysvar" name="FSFiler$DefaultPath" />
+  <reference type='message' name='FilerOpenDir' href='?'/>
+</related>
+
+</message-definition>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2022.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="A-H" author="RML" date="28 Jan 1988" title="Initial version"/>
+  <revision number="2" author="Gerph" date="24 Jan 2022" title="Conversion to PRM-in-XML">
+    <change>Created from original RISC OS 4 documentation</change>
+  </revision>
+ </history>
+
+ <related>
+ </related>
+</meta>
+</riscos-prm>
