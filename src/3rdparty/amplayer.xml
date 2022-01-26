@@ -525,10 +525,6 @@ increase is to the detriment of the quality of the output data.</p>
     <reference type="service" name="AMPlayer"
                               reason="0" use-description="yes" />
    </value>
-   <value number="0">
-    <reference type="service" name="AMPlayer"
-                              reason="0" use-description="yes" />
-   </value>
    <value number="1">
     <reference type="service" name="AMPlayer"
                               reason="1" use-description="yes" />
@@ -556,7 +552,7 @@ increase is to the detriment of the quality of the output data.</p>
   </value-table>
  </register-use>
  <register-use number="1">service call number</register-use>
- <register-use number="2-R7">dependant on reason code</register-use>
+ <register-use number="2-7">dependant on reason code</register-use>
  <register-use number="8">instance handle of issuing instance, or 0 for
                           the base</register-use>
 </entry>
@@ -2756,9 +2752,13 @@ which will terminate when playback completes.</parameter>
  </disclaimer>
 
  <history>
-  <revision number="1" author="JRF" title="First XML monitored version">
+  <revision number="1" author="Gerph" date='04 Mar 2002' title="First XML monitored version">
    <change>First version of the document which includes revision
            information.</change>
+  </revision>
+  <revision number="2" author="Gerph" date='26 Jan 2021' title="Imported into source control in staging area">
+   <change>Imported from the 'Release10' PRM-in-XML documentation release.</change>
+   <change>Removed duplicate reference to reason 0 in <reference type='service' name='AMPlayer'/>.</change>
   </revision>
  </history>
 
