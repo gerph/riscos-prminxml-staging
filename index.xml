@@ -50,6 +50,7 @@
     <page href="nested_window_manager/nested_window_manager">Nested Window Manager specification</page>
 </section>
 <section title="3rd Party" dir="3rdparty">
+    <page href="amplayer">AMPlayer module</page>
     <page href="cryptrandom">CryptRandom module</page>
 </section>
 

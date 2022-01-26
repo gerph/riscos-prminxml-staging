@@ -1,0 +1,2769 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="AMPlayer">
+<section title="Introduction and Overview">
+<p>AMPlayer is a module for playing Audio MPEG data through the computers
+sound output, or to a streaming destination. Where sound is to be output, it
+will select the 8 or 16 bit output depending on the normal configuration
+(and availability).</p>
+
+<p>The module has been designed so it is easy to make other frontends, or
+add support for the module to existing player-frontends.</p>
+
+<p>The AMPlayer module supports MPEG version 1, 2 and 2.5, for layers I, II
+and III. Mixed data may be safely used with the module. The AMPlayer is
+resilient when faced with corrupt data, and will skip unknown data in a safe
+manner. Streams of data may contain ID3v2 tags, and may be terminated by
+ID3v1.1 tags. ID3v2 footers are skipped and not parsed.</p>
+
+</section>
+
+<section title="Terminology">
+<p>MPEG audio data is used as a generic term, covering MPEG 1/2/2.5 audio
+data, using layers I, II, or III.</p>
+<p>The term VBR is used to mean 'Variable Bit-Rate'. VBR data is data which
+contains non-constant bitrate through the track. It is still assumed that
+the MPEG version and layer remain constant.</p>
+
+</section>
+
+<section title="Technical Details">
+<p>In order to play MPEG audio data, AMPlayer processes data in the
+background using callbacks. This allows the module to continue in, and out
+of the desktop with no supervision from any other component.</p>
+
+
+<subsection title="MPEG data input methods">
+<p>MPEG audio data can come from either a file, or from a data stream. When
+operating in both of these modes, the functionality of AMPlayer is similar.
+</p>
+
+<category title="File playback">
+<p>During file playback, the AMPlayer module continually takes data from
+the file as it needs it. File data is buffered by the module.</p>
+
+<p>File playback will initially read the ID3v1.1 tags from the file if
+present, and store these for later retrieval by front ends. During playback,
+ID3v2 tags will be processed (if enabled) and services issued announcing
+their arrival.</p>
+</category>
+
+<category title="Streaming playback">
+<p>When streaming, an application must feed data to AMPlayer in a timely
+fashion. Data is supplied to a ring of buffers which are drained
+individually by the AMPlayer module. As each buffer is emptied it is the job
+of the streaming application to provide further data or to close the stream.
+</p>
+
+<p>The player will take data from buffers supplied by the streaming
+application in the order given. When the end of a buffer is reached, the
+player will continue seamlessly to the next buffer. There is no necessity to
+provide frame-aligned data to the buffers. Where frames straddle the buffer
+end, it may be necessary for the player to retain the buffer until the frame
+can be processed. Because of this streaming application must supply at least
+two buffers and at least 2000 <!-- Check this --> bytes in total for
+streaming playback. When a buffer is no longer required, a service will be
+issued to inform the streaming application.</p>
+
+<p>Metadata can be supplied to the AMPlayer module during streaming. This
+data will be inserted in-line with the stream and made available at the
+point at which it is played. This data is incompatible with ID3v1.1 data,
+and with ID3v2 data. During playback, ID3v1.1 and ID3v2 tags are skipped.
+ID3v2 tags larger than the total size of the ring of buffers will cause
+the player to stall.</p>
+</category>
+
+</subsection>
+
+<subsection title="File output methods">
+<p>AMPlayer is able to output to a number of different destinations. Where
+the destination is the physical sound system (8bit, 16bit or SharedSound),
+the interface to the module is unchanged.</p>
+
+<category title="8 bit sound output">
+<p>All sound output is generated as 16bit-stereo data. When only the 8bit
+sound system is available, a lookup table will be used by the output code
+to generate the correct logarithmic output. This will result in a slight
+degradation in quality, but only to the level of the system accuracy. The
+overall frequency of the sound system will track that of the sound being
+generated to the limits of the sound system itself. This may result in
+further inaccuracies.</p>
+
+<p>Because AMPlayer takes over the entire sound system to
+handle its output, no other sounds (for example, the system beep) will be
+heard in this mode. </p>
+
+</category>
+
+<category title="16 bit sound output">
+<p>Where 16 bit sound is available, but SharedSound support is not, the
+standard 16 bit sound drivers will be used. The overall frequency of the
+sound system will track the sound being output to the limits that it is
+capable.</p>
+
+<p>In this mode, AMPlayer uses the entire 16 bit sound system. As a
+consequence, no other sound will be generated whilst AMPlayer is playing.
+</p>
+
+</category>
+
+<category title="SharedSound output">
+<p>Where the SharedSound module is available, it will be used by the
+AMPlayer module. When playing through the SharedSound module, the frequency
+of the sound system is unaffected by playback. In this mode, the sound most
+closely matches that which would be generated within the limits of the sound
+system and its configuration. Importantly, if the overall sound system
+frequency is configured lower than any of the clients of SharedSound, the
+output quality will suffer.</p>
+
+<p>Sound from other sources is unaffected by AMPlayer playback, allowing
+other clients to share the sound system.</p>
+
+</category>
+
+<category title="Streaming output">
+<p>AMPlayer can be used to stream generated sound data to any other
+destination through the use of the streaming output interface. In this mode,
+the sound system is totally unaffected by processing performed by the
+module. The streaming interface can obtain the frequency at which the data
+being read should be played through this interface.
+</p>
+
+</category>
+
+</subsection>
+
+<subsection title="Multiple instantiation">
+<p>AMPlayer is able to function as a decoder for multiple clients. It
+achieves this by multiple instantiation of the AMPlayer module. The
+SWI <reference type="swi" name="AMPlayer_Instance" />
+manages the instances for clients such that it is not necessary for
+every client to duplicate the same code.</p>
+
+<p>In addition to this, all AMPlayer SWIs may have bit 31 of their flags
+set to indicate that the operation should be directed to the instance of
+the AMPlayer module held in R8. This allows background processes to
+communicate with just the instance to which they are interested. When
+services are issued to notify clients of events from the decoder, R8 will
+be set to the instance handle that generated the service.</p>
+
+<p>If a SWI is not directed at a particular instance, then the currently
+preferred instance will deal with the request.</p>
+
+<subsubsection title="User front ends">
+<p>Front end applications which are controlled by the user, queue
+tracks, or just monitor the state of the player should only communicate
+with the base instance of AMPlayer. This allows them to function with
+any number of other concurrent utilities.</p>
+
+<p>Under most circumstances it is advisable that front ends not worry
+about the existance of multiple instances and merely communicate with the
+currently preferred instance. This allows for the greatest flexibility
+with clients selecting alternative instances as the private for control
+if necessary</p>
+</subsubsection>
+
+<subsubsection title="Plugins">
+<p>Plugins should be aware of the existance of plugins, and only register
+themselves with the base instance unless explicitly requested otherwise.
+Because of their nature, plugins are only really suitable for the base
+instance, or a secondary instance which is being mixed with the base.</p>
+</subsubsection>
+
+<subsubsection title="* Commands">
+<p>*Commands will always be issued to the currently 'preferred' instance.
+In general this will be the base, but under specialised circumstances
+another instance may be preferred. The AMPlayer module itself will retain
+the current preferred instance through all operations, and therefore the
+only mechanism by which another AMPlayer instance may be the preferred is by
+explicitly issuing the relevant OS_Module, or by issuing a * Command
+directly to an instance.</p>
+</subsubsection>
+</subsection>
+
+<subsection title="Data structures">
+<p>In order to communicate with AMPlayer, a number of data structures are
+required. These provide information about the streams being processed.</p>
+
+
+<subsubsection title="File Information Block">
+<p>The File Information Block provides information about the file currently
+being played.
+
+<offset-table head-number="Offset"
+              head-name="Required flags"
+              head-value="Contents">
+<offset number="0" name="none">flags :
+  <bitfield-table>
+   <bit number="0">Total time valid</bit>
+   <bit number="1">Elapsed time valid</bit>
+   <bit number="2">ID3 tag info pointers valid</bit>
+   <bit number="3">VU values valid</bit>
+   <bit number="4">Error message pointer valid</bit>
+   <bit number="5">Next filename pointer valid</bit>
+   <bit number="6">File uses variable bit rate, high and low rates valid</bit>
+   <bit number="7">ID3v1.1 track valid</bit>
+   <bit number="8">Data comes from stream</bit>
+   <bit number="9-31">Reserved, must be zero</bit>
+  </bitfield-table>
+</offset>
+<offset number="4" name="none">buffer usage ratio in % (*)</offset>
+<offset number="8" name="bit 0">projected total time in cs</offset>
+<offset number="12" name="bit 1">time elapsed in cs</offset>
+<offset number="16" name="bit 2">pointer to ID3 song title</offset>
+<offset number="20" name="bit 2">pointer to ID3 artist</offset>
+<offset number="24" name="bit 2">pointer to ID3 album name</offset>
+<offset number="28" name="bit 2">pointer to ID3 year string</offset>
+<offset number="32" name="bit 2">pointer to ID3 comment</offset>
+<offset number="36" name="bit 3">left channel VU</offset>
+<offset number="40" name="bit 3">right channel VU</offset>
+<offset number="44" name="none">main volume (0..127) (*)</offset>
+<offset number="48" name="bit 4">pointer to most recent error/warning message, or 0 if no message is pending</offset>
+<offset number="52" name="bit 5">pointer to filename of the "next" file, or 0 if no file currently queued</offset>
+<offset number="56" name="bit 2">ID3v1 genre (a number)</offset>
+<offset number="60" name="bit 2+7">ID3v1.1 track (a number), or 0 if not specified</offset>
+<offset number="64" name="bit 6">lowest bitrate used</offset>
+<offset number="68" name="bit 6">highest bitrate used</offset>
+</offset-table>
+</p>
+
+<p>Fields marked with (*) are not valid when returned from an
+AMPlayer_FileInfo call.</p>
+
+<category title="Projected total time">
+<p>The projected total time for the track is based on the bitrate used by
+the file so far (unless supplied in another manner). It is assumed that the
+bitrate remains constant for this calculation. The total time given will be
+wrong if :
+<list>
+<item><p>the file size is unknown, e.g. if playing a stream</p></item>
+<item><p>the frame type will later change in a way that alters the number of bytes
+   per frame (eg change in bit rate)</p></item>
+<item><p>the data is partially corrupt or contains skippable data (ID3v2 tags,
+   rogue unsynchronised data, etc)</p></item>
+</list>
+</p>
+
+<p>None of the above exceptions are true in the vast majority of MPEG files.
+The first case is determined by the module, and bit 0 of the flags will be
+clear. The second case cannot be known in advance, and it will also affect
+the elapsed time. No matter what happens, the time will always move forward,
+it just might not be counting centiseconds in these cases.</p>
+
+<p>Within VBR files generated by the Xing encoder (or applying a Xing
+compatible header) the total time will be calculated from the header. If the
+file has been truncated, this time will be estimated based on the
+information in the header.</p>
+</category>
+
+<category title="ID3v1 genre values">
+<p>
+ID3v1 genre values are defined elsewhere. See http://www.id3.org for more
+details.
+</p>
+</category>
+
+<category title="ID3v1.1 track numbers">
+<p>
+ID3v1.1 is an extension to ID3 which, if present, declares the track number
+within an album.
+</p>
+</category>
+
+<category title="VU-var values">
+<p>
+When the VU level is available, it is a number between 0 and 255. The value
+is from -42 to 0 dB, in 1/6th dB steps. The level is the peak of the average
+level since last calling this SWI.
+</p>
+</category>
+
+<category title="Bitrate values">
+<p>Where VBR Audio MPEG data is being processed, the high and low bitrate
+values are used to indicate the current known limits of the data.
+</p>
+</category>
+
+</subsubsection>
+
+<subsubsection title="Frame Information Block">
+<p>The Frame Information Block provides information about the most recent
+frame processed.
+<offset-table head-number="Offset"
+              head-value="Contents">
+
+<offset number="0">MPEG version as 3 ASCII chars and a 0 terminator, e.g. "2.0"</offset>
+<offset number="4">layer type (1..3). 0 is unknown layer</offset>
+<offset number="8">sampling frequency in Hz</offset>
+<offset number="12">bitrate in kbit/sec</offset>
+<offset number="16">mode :
+ <value-table head-number="Mode" head-value="Meaning">
+  <value number="0">Stereo</value>
+  <value number="1">Joint-stereo</value>
+  <value number="2">Dual channel</value>
+  <value number="3">Single channel</value>
+ </value-table>
+</offset>
+<offset number="20">number of channels</offset>
+<offset number="24">frame flags :
+ <bitfield-table>
+  <bit number="0">Copyright</bit>
+  <bit number="1">Original</bit>
+  <bit number="2">CRC</bit>
+ </bitfield-table>
+</offset>
+<offset number="28">pointer to left channel DCT array (*)</offset>
+<offset number="32">pointer to right channel DCT array (*)</offset>
+
+</offset-table>
+</p>
+
+<p>Fields marked with (*) are not valid when returned from an
+AMPlayer_FileInfo call.</p>
+</subsubsection>
+
+<subsubsection title="Plugin Information Block">
+<p>The Plugin Information Block is used when registering and enumerating
+plugins present.
+<offset-table head-number="Offset" head-value="Contents">
+ <offset number="0">Filter name, padded with 0's (16 chars)</offset>
+ <offset number="16">Filter author, padded with 0's (32 chars)</offset>
+ <offset number="48">Filter version, padded with 0's (8 chars)</offset>
+</offset-table>
+</p>
+
+</subsubsection>
+
+<subsubsection title="IDTag Information block">
+<p>The IDTag Information Block is passed to the service handlers for ID3v2
+processing. It provides information on the overall structure of the ID3v2
+tag.
+
+<offset-table head-number="Offset" head-value="Contents">
+<offset number="0">Version of original tag data (major * 256 + minor)</offset>
+<offset number="4">Header flags :
+<bitfield-table>
+ <bit number="7" name="HEADERF_UNSYNCHRONISED">Data was unsynchronised</bit>
+ <bit number="6" name="HEADERF_EXTENDEDHEADER">Extended header was present (ignored at present)</bit>
+ <bit number="5" name="HEADERF_EXPERIMENTAL">Tag is experimental (should never be seen by decoder)</bit>
+ <bit number="4" name="HEADERF_FOOTER">Footer was included (has been ignored)</bit>
+ <bit number="other" name="">reserved, must be 0</bit>
+</bitfield-table>
+</offset>
+
+</offset-table>
+</p>
+
+</subsubsection>
+
+<subsubsection title="IDFrame Information block">
+<p>The IDFrame Information Block is passed to the service handlers for ID3v2
+processing. It provides information on the specific ID3v2 frame being
+processed.
+
+<offset-table head-number="Offset" head-value="Contents">
+ <offset number="0">frame number (within this tag)</offset>
+ <offset number="4">frame name (0 terminated)</offset>
+ <offset number="12">flags for this frame :
+  <bitfield-table>
+   <bit number="0" name="FRAMEF_HASLENGTH">Length field was given</bit>
+   <bit number="1" name="FRAMEF_UNSYNCHRONISED">Frame was unsynchronised</bit>
+   <bit number="2" name="FRAMEF_ENCRYPTED">Frame was encrypted (N/I)</bit>
+   <bit number="3" name="FRAMEF_COMPRESSED">Frame was compressed</bit>
+   <bit number="6" name="FRAMEF_GROUP">Frame is one of a group</bit>
+   <bit number="12" name="FRAMEF_READONLY">Frame should not be edited</bit>
+   <bit number="13" name="FRAMEF_FILEDISCARD">Discard frame if file changed</bit>
+   <bit number="14" name="FRAMEF_TAGDISCARD">Discard frame if tag changed</bit>
+   <bit number="other" name="">reserved, must be 0</bit>
+  </bitfield-table>
+ </offset>
+ <offset number="16">Pointer to frame data (decompressed, de-unsynchronised)</offset>
+ <offset number="20">Frame data length</offset>
+ <offset number="24">Encryption type, or -1 if not given</offset>
+ <offset number="28">Compressed length, or -1 if not compressed</offset>
+ <offset number="32">Frame group, or -1 if not given</offset>
+
+</offset-table>
+</p>
+
+<p>Flags will be promoted to those used by ID3v2.4, if they are of a lower
+version than that.</p>
+<p>Frame data will be terminated by a 0 (not included in the length) for
+   ease of decoding text fields.</p>
+
+</subsubsection>
+
+</subsection>
+
+</section>
+
+<section title="System variables">
+<sysvar-definition name="AMPlayer$Buffer$*"
+                   description="Default AMPlayer output buffer sizes">
+<use>
+<p>When starting playback, AMPlayer checks the file being played against the
+variable
+<sysvar>AMPlayer$Buffer$<userreplace>part path</userreplace></sysvar>, where
+<userreplace>part path</userreplace> is the longest component of the path
+name which is set as a system variable. For example, if you were to play
+<filename>ADFS::Music.$.Lennon.Imagine</filename> and had the system
+variables <sysvar>AMPlayer$Buffer$</sysvar> and
+<sysvar>AMPlayer$Buffer$ADFS</sysvar> set, the latter would be used in
+preference to the former.
+</p>
+
+<p>The value given is used to determine the number of 'blocks' of output
+data that will be buffered in the 'Antishock buffer'. The larger this buffer
+is, the longer the system can be busy before playback ceases. Larger buffers
+have a greater initial load on the machine as more data is decoded to fill
+the buffer when the first file is played.</p>
+
+<p>A 'block' is an arbitrary size, currently around 4.5K. The reason for
+supplying a buffering value in blocks is to provide a more robust means of
+storing the buffering size. If in future the block size changes, the amount
+of time that that buffer corresponds to will remain constant (for a given
+frequency of data).</p>
+
+<p>In the case of streams, the variable
+<sysvar>AMPlayer$Buffer$Stream</sysvar> will be used to determine the
+initial output buffer size.</p>
+
+</use>
+
+<related>
+<reference type="swi" name="AMPlayer_Control" reason="1" />
+</related>
+
+</sysvar-definition>
+
+<sysvar-definition name="AMPlayer$FileBuffer"
+                   description="Input file buffer size">
+<use>
+<p>When starting playback, AMPlayer allocates a buffer for data from the
+file. Whereas <sysvar>AMPlayer$Buffer$*</sysvar> determines the output
+buffer size, <sysvar>AMPlayer$FileBuffer</sysvar> determines the input
+buffer size. If you are accessing files on a filing system which has a
+slow start up time, (for example networks or CDs) you may wish to set this
+higher value than the default.</p>
+
+<p>The value this variable is set to is in Kilobytes. Unlike the output
+buffer, the input cannot be measured in blocks because that would require
+knowing in advance the data contained in the blocks.</p>
+
+<p>For Streams <sysvar>AMPlayer$FileBuffer</sysvar> has no meaning and is
+not used.</p>
+</use>
+</sysvar-definition>
+
+<sysvar-definition name="AMPlayer$Volume"
+                   description="Volume level to use when AMPlayer starts">
+<use>
+<p>When AMPlayer initialises, it reads <sysvar>AMPlayer$Volume</sysvar> to 
+determine the initial volume. This is a linear volume level, with a maximum
+at 127, a minimum at 0, and a default level of 112.</p>
+
+<p>Whenever the volume level is changed in the base instance, this system
+variable is updated to reflect this. When an instance starts (in the same
+manner as the base AMPlayer instantiation intialising), it reads the state
+of <sysvar>AMPlayer$Volume</sysvar> and sets its volume to that specified.
+The result of this is that at any time that an instance is created it starts
+with the same volume level as the base instance. Should an instance wish
+to control the volume level of its instance, it should do so with care and
+pay attention to the initial volume level where appropriate. For example,
+if the user is playing their base instance at a volume level of 12, they
+will not wish to have a new instance playing at 112 unless they specifically
+requested it.</p>
+</use>
+
+<related>
+<reference type="swi" name="AMPlayer_Control" reason="1" />
+</related>
+
+</sysvar-definition>
+
+<sysvar-definition name="AMPlayer$DecimationThreshold"
+                   description="Select decimation threshold to use when AMPlayer starts">
+<use>
+<p>When AMPlayer initialises, it reads
+<sysvar>AMPlayer$DecimationThreshold</sysvar> to determine the initial
+decimation threshold. This threshold is used to determine during playback
+whether decimation of input data is used to provide output data.</p>
+
+<p>Whenever the decimation threshold is changed in the base instance, this
+system variable is updated to reflect this. When an instance starts (in the
+same manner as the base AMPlayer instantiation intialising), it reads the
+state of <sysvar>AMPlayer$DecimationThreshold</sysvar> and sets its
+threshold to that specified. The result of this is that at any time that an
+instance is created it starts with the same threshold as the base
+instance.</p>
+
+<p>When decimating input data, the upper half of the frequency data is
+discarded, resulting in a frequency of half that normally required for
+the input data. This reduces the processing required by the data, and
+therefore reduces the load that AMPlayer places on the system. This speed
+increase is to the detriment of the quality of the output data.</p>
+</use>
+
+<related>
+<reference type="swi" name="AMPlayer_Control" reason="5" />
+</related>
+
+</sysvar-definition>
+</section>
+
+<section title="Service calls">
+<service-definition name="AMPlayer"
+                    number="52E00"
+                    description="Events issued by AMPlayer">
+<entry>
+ <register-use number="0">reason code :
+  <value-table head-number="Reason" head-value="Meaning">
+   <value number="0">
+    <reference type="service" name="AMPlayer"
+                              reason="0" use-description="yes" />
+   </value>
+   <value number="0">
+    <reference type="service" name="AMPlayer"
+                              reason="0" use-description="yes" />
+   </value>
+   <value number="1">
+    <reference type="service" name="AMPlayer"
+                              reason="1" use-description="yes" />
+   </value>
+   <value number="2">
+    <reference type="service" name="AMPlayer"
+                              reason="2" use-description="yes" />
+   </value>
+   <value number="3">
+    <reference type="service" name="AMPlayer"
+                              reason="3" use-description="yes" />
+   </value>
+   <value number="4">
+    <reference type="service" name="AMPlayer"
+                              reason="4" use-description="yes" />
+   </value>
+   <value number="5">
+    <reference type="service" name="AMPlayer"
+                              reason="5" use-description="yes" />
+   </value>
+   <value number="6">
+    <reference type="service" name="AMPlayer"
+                              reason="6" use-description="yes" />
+   </value>
+  </value-table>
+ </register-use>
+ <register-use number="1">service call number</register-use>
+ <register-use number="2-R7">dependant on reason code</register-use>
+ <register-use number="8">instance handle of issuing instance, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="1" state="preserved" />
+</exit>
+
+<use>
+<p>Service_AMPlayer is issued by the AMPlayer module to inform clients of a
+change in state, or other information about playback. Consult the individual
+reason codes for more details.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<!-- <reference type="swi" name="thingy" href="&riscos-swi-thingy;" /> -->
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</service-definition>
+
+<service-definition name="AMPlayer"
+                    number="52E00"
+                    reason="0"
+                    reasonname="Initialising"
+                    description="AMPlayer module is initialising">
+<entry>
+ <register-use number="0">reason code</register-use>
+ <register-use number="1">service call number</register-use>
+ <register-use number="8">instance handle of issuing instance, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="1" state="preserved" />
+</exit>
+
+<use>
+<p>Service_AMPlayer 0 is issued by the AMPlayer module when it initialises.
+Clients wishing to add plugins to the output of the module should register
+themselves.
+</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Plugin" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</service-definition>
+
+
+<service-definition name="AMPlayer"
+                    number="52E00"
+                    reason="1"
+                    reasonname="Dying"
+                    description="AMPlayer module is dying">
+<entry>
+ <register-use number="0">reason code</register-use>
+ <register-use number="1">service call number</register-use>
+ <register-use number="8">instance handle of issuing instance, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="1" state="preserved" />
+</exit>
+
+<use>
+<p>Service_AMPlayer 1 is issued by the AMPlayer module (or an instance of
+AMPlayer) when it is killed. Clients wishing to only run during the lifetime
+of AMPlayer should either become dormant or terminate. </p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Instance" reason="2" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</service-definition>
+
+
+<service-definition name="AMPlayer"
+                    number="52E00"
+                    reason="2"
+                    reasonname="Start"
+                    description="Playback is about to start">
+<entry>
+ <register-use number="0">reason code</register-use>
+ <register-use number="1">service call number</register-use>
+ <register-use number="8">instance handle of issuing instance, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="1" state="preserved" />
+</exit>
+
+<use>
+<p>Service_AMPlayer 2 is issued by the AMPlayer module when it is about to
+stat playing a track. Clients wishing to monitor the progress of the track
+in the background, or to schedule new tracks may wish to watch for this
+service.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Play" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</service-definition>
+
+
+<service-definition name="AMPlayer"
+                    number="52E00"
+                    reason="3"
+                    reasonname="Stop"
+                    description="Playback has stopped">
+<entry>
+ <register-use number="0">reason code</register-use>
+ <register-use number="1">service call number</register-use>
+ <register-use number="8">instance handle of issuing instance, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="1" state="preserved" />
+</exit>
+
+<use>
+<p>Service_AMPlayer 3 is issued by the AMPlayer module when it has stopped
+playing and moved to state 'Dormant'.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Stop" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</service-definition>
+
+
+<service-definition name="AMPlayer"
+                    number="52E00"
+                    reason="4"
+                    reasonname="Change"
+                    description="Playback has moved on to another track">
+<entry>
+ <register-use number="0">reason code</register-use>
+ <register-use number="1">service call number</register-use>
+ <register-use number="8">instance handle of issuing instance, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="1" state="preserved" />
+</exit>
+
+<use>
+<p>Service_AMPlayer 4 is issued by the AMPlayer module when it has changed
+to playing the next track queued. Clients wishing to track the file being
+played should watch for this service.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Play" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</service-definition>
+
+
+<service-definition name="AMPlayer"
+                    number="52E00"
+                    reason="5"
+                    reasonname="ID3v2"
+                    description="ID3v2 tag has been found">
+<entry>
+ <register-use number="0">reason code</register-use>
+ <register-use number="1">service call number</register-use>
+ <register-use number="2">pointer to IDTag Information Block</register-use>
+ <register-use number="3">pointer to IDFrame Information Block</register-use>
+ <register-use number="8">instance handle of issuing instance, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="1" state="preserved" />
+</exit>
+
+<use>
+<p>Service_AMPlayer 5 is issued by the AMPlayer module during playback, when
+an ID3v2 tag has been encountered. Clients wishing to process ID3v2 as they
+arrive should watch for this service.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Control" reason="3"/>
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</service-definition>
+
+
+<service-definition name="AMPlayer"
+                    number="52E00"
+                    reason="6"
+                    reasonname="StreamBuffersAvailable"
+                    description="One or more buffers previously passed to an AMPlayer have been marked as free">
+<entry>
+ <register-use number="0">reason code</register-use>
+ <register-use number="1">service call number</register-use>
+ <register-use number="2">stream handle</register-use>
+ <register-use number="3">flag word (currently 0)</register-use>
+ <register-use number="8">instance handle of issuing instance, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="1" state="preserved" />
+</exit>
+
+<use>
+<p>Service_AMPlayer 6 is issued by the AMPlayer module during playback from
+an AMPlayer stream for which service call reporting was requested at creation
+time when one or more blocks previously passed to that stream have been marked
+as being freed. Clients wishing to be informed when their blocks are no longer
+being held by the module should watch for this service.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_StreamOpen" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</service-definition>
+
+
+</section>
+
+<section title="SWI calls">
+<swi-definition name="AMPlayer_Play"
+                number="52E00"
+                description="Plays or queues a file"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0" name="Queue">Places the named file in the queue of tracks
+                                to play. If there is no file currently
+                                playing, the behaviour is exactly as if bit
+                                0 were clear.</bit>
+   <bit number="1" name="Cue">Starts the named file immediately, but paused
+                              at the first frame. Use 
+                              <reference type="swi" name="AMPlayer_Pause" />
+                              to start playback.</bit>
+   <bit number="2" name="Transient">
+                              Creates a new instance, sets the volume level,
+                              marks the instance as transient,
+                              and starts the named file within that
+                              instance.</bit>
+   <bit number="3-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">pointer to filename</register-use>
+ <register-use number="2">if bit 2 of R0 set:<br />
+                          volume level to set, or -1 for default
+                          </register-use>
+ <register-use number="3">if bit 2 of R0 set:<br />
+                          pointer to instance name, or 0 to name
+                          automatically
+                          </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+<exit>
+ <register-use number="0">if bit 2 of R0 set:<br />
+                          handle of created instance
+                          </register-use>
+</exit>
+
+<use>
+<p>This SWI is used to play or queue a file for playback. When starting
+play transiently, the current play is unchaged and only the new instance
+is affected.</p>
+
+</use>
+
+<related>
+<reference type="command" name="AMPlay" />
+<reference type="swi" name="AMPlayer_Stop" />
+<reference type="swi" name="AMPlayer_Pause" />
+<reference type="swi" name="AMPlayer_Instance" />
+<reference type="swi" name="AMPlayer_Control" reason="4" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Stop"
+                number="52E01"
+                description="Stops playback"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0" name="Cut">
+    Playback continues with the queued file if any. If no file is queued,
+    playback will stop.</bit>
+   <bit number="1-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<use>
+<p>This SWI is used to stop playback, or start the skip to the queued
+file.</p>
+
+</use>
+
+<related>
+<reference type="command" name="AMStop" />
+<reference type="swi" name="AMPlayer_Play" />
+<reference type="swi" name="AMPlayer_Pause" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Pause"
+                number="52E02"
+                description="Pauses playback"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0" name="Resume">
+    Resumes playback.</bit>
+   <bit number="1-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<use>
+<p>This SWI is used to pause or resume playback. When paused, decoding to
+the output buffer continues, but at a much reduced rate. There is no sound
+output.</p>
+
+<p>Pause mode may also be cancelled by stopping. If 
+<reference type="swi" name="AMPlayer_Stop" /> is used to
+cut to the next file, or if a different file is started, pause mode will
+continue to be in effect, freezing the new file at the start of the file.
+This can be used to ensure that playback starts at the instant of calling
+AMPlayer_Pause (as opposed to calling 
+<reference type="swi" name="AMPlayer_Play" />, which can have a delay while
+opening the file etc).</p>
+
+</use>
+
+<related>
+<reference type="command" name="AMPause" />
+<reference type="swi" name="AMPlayer_Play" />
+<reference type="swi" name="AMPlayer_Stop" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Locate"
+                number="52E03"
+                description="Locates a position in the playback"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">target time in centi-seconds</register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<use>
+<p>This SWI locates the position of the target time, and continues playback
+(or pausing) from there. This has no effect unless the status is either
+Playing, Locating or Paused. This may take some time, and the playback
+buffer may empty (which will mute the sound).</p>
+
+<p>The time given here corresponds to the elapsed time returned from
+<reference type="swi" name="AMPlayer_Info" />. This is true even when the
+elapsed time is wrong. So when, at time X, the Info call returns the wrong
+time Y, giving time Y to this call will still start playing at the right
+time X.</p>
+
+<p>Playback can only start on a frame boundary, so the resolution of the
+start point is around 2 cs (for 128kbit/sec, 44.1kHz frames).</p>
+
+</use>
+
+<related>
+<reference type="command" name="AMLocate" />
+<!-- <reference type="swi" name="AMPlayer_Play" /> -->
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Info"
+                number="52E04"
+                description="Return information on the state of playback"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+<exit>
+ <register-use number="0">Player status :
+  <value-table head-number="State" head-value="Meaning and registers">
+   <value number="0">Dormant<br />
+                     R1 - R4 preserved</value>
+   <value number="1">Starting<br />
+                     R1 = pointer to filename<br />
+                     R2 - R4 preserved</value>
+   <value number="2">Locating<br />
+                     R1 = pointer to filename<br />
+                     R2 = pointer to <reference type="subsubsection" name="File Information Block" />, or 0 if not set up yet<br />
+                     R3 = pointer to <reference type="subsubsection" name="Frame Information Block" />, or 0 if not set up yet<br />
+                     R4 = target time</value>
+   <value number="3">Playing<br />
+                     R1 = pointer to filename<br />
+                     R2 = pointer to <reference type="subsubsection" name="File Information Block" />, or 0 if not set up yet<br />
+                     R3 = pointer to <reference type="subsubsection" name="Frame Information Block" />, or 0 if not set up yet<br />
+                     R4 preserved</value>
+   <value number="4">Pausing<br />
+                     R1 = pointer to filename<br />
+                     R2 = pointer to <reference type="subsubsection" name="File Information Block" />, or 0 if not set up yet<br />
+                     R3 = pointer to <reference type="subsubsection" name="Frame Information Block" />, or 0 if not set up yet<br />
+                     R4 preserved</value>
+   <value number="5">Stopping<br />
+                     R1 = pointer to filename<br />
+                     R2 - R4 preserved</value>
+   <value number="6">Changing<br />
+                     R1 = pointer to filename<br />
+                     R2 - R4 preserved</value>
+   <value number="7">Cueing<br />
+                     R1 = pointer to filename<br />
+                     R2 - R4 preserved</value>
+  </value-table>
+ </register-use>
+</exit>
+
+<use>
+<p>This call will return information about the current state of the
+player.</p>
+
+<p>When locating, the current time can be read from the file info block, as
+it moves toward the target time returned in R4.</p>
+
+<p>This call might be made from BASIC with :</p>
+
+<p>
+<userinput>SYS "AMPlayer_Info",,"" TO ,Filename$,FIB%</userinput>
+</p>
+
+<p>This will set Filename$ to either "" or the filename. Similarily, FIB%
+will be 0 if there is no info at this stage, or a pointer to it if there
+is.</p>
+
+<p>There is a brief period when the status might be returned as Locating (2) or Playing (3), but where there is no valid FIB or FRIB, because the first
+frame has yet to be read.</p>
+
+</use>
+
+<related>
+<reference type="command" name="AMInfo" />
+<reference type="swi" name="AMPlayer_FileInfo" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Control"
+                number="52E05"
+                description="Configure the operation of the player"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-7">reason code :
+     <value-table head-number="Reason" head-value="Configuration">
+      <value number="0">
+       <reference type="swi" name="AMPlayer_Control"
+                             reason="0" use-description="yes" />
+      </value>
+      <value number="1">
+       <reference type="swi" name="AMPlayer_Control"
+                             reason="1" use-description="yes" />
+      </value>
+      <value number="2">
+       <reference type="swi" name="AMPlayer_Control"
+                             reason="2" use-description="yes" />
+      </value>
+      <value number="3">
+       <reference type="swi" name="AMPlayer_Control"
+                             reason="3" use-description="yes" />
+      </value>
+      <value number="4">
+       <reference type="swi" name="AMPlayer_Control"
+                             reason="4" use-description="yes" />
+      </value>
+      <value number="5">
+       <reference type="swi" name="AMPlayer_Control"
+                             reason="5" use-description="yes" />
+      </value>
+     </value-table>
+    </bit>
+   <bit number="8-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<use>
+<p>This SWI is used to configure various aspects of the AMPlayer module's
+operation.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<!-- <reference type="swi" name="AMPlayer_FileInfo" /> -->
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Control"
+                number="52E05"
+                reason="0"
+                reasonname="Volume"
+                description="Read or write the volume level"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-7">0 (reason code)</bit>
+   <bit number="8-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">new volume level (0-127), or -1 to read
+                          current level</register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="1">old volume level</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to read or write the main volume level of the
+player.</p>
+
+</use>
+
+<related>
+<reference type="command" name="AMVolume" />
+<reference type="swi" name="AMPlayer_Control" />
+<reference type="sysvar" name="AMPlayer$Volume" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Control"
+                number="52E05"
+                reason="1"
+                reasonname="BufferSize"
+                description="Read or write the output buffer size"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-7">1 (reason code)</bit>
+   <bit number="8">Use blocks, rather than bytes</bit>
+   <bit number="9-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">new buffer size in bytes or blocks, or -1 to read
+                          current size</register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="1">old size in bytes or blocks</register-use>
+</exit>
+
+<use>
+<p>This control call is used to read or write the size of the audio buffer
+used by AMPlayer to store decoded data. The size can be specified in bytes
+or in blocks. It is recommended that you use the blocks size to be
+compatible with the system variable usage, and to ensure that similar
+amounts of data are buffered in future.</p>
+
+<p>If the buffer isn't currently created, this controls how large it will be
+when it eventually is. If it exists, OS_ChangeDynamicArea is used to change
+the size. This may fail with an error, even if some of the job was done
+(this can happen when reducing the size, as the amount that can be released
+depends on what is currently being played). This effect is greatly reduced
+in AMPlayer 1.29 and later.</p>
+
+<p>If it succeeds, the sound may be broken up slightly. On versions of
+AMPlayer prior to 1.29, this will always cause at least one 'jump' in the
+playback.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Control" />
+<reference type="sysvar" name="AMPlayer$Buffer$*" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Control"
+                number="52E05"
+                reason="2"
+                reasonname="StackSize"
+                description="Set SVC stack check level"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-7">2 (reason code)</bit>
+   <bit number="8-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">new level (in words), or 0 for default
+ </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="1">old level</register-use>
+</exit>
+
+<use>
+<p>This SWI call is used to set the stack check level used when a callback
+occurs</p>
+
+<p>When receiving a callback, the SVC stack depth is checked to see if the
+kernel is reasonably unthreaded. By using this call, you can control what is
+considered "reasonable". The default value is currently 64, i.e. if there
+are more than 64 words on the stack by the time of the callback, a new
+callback will be registered later instead. Setting this too low will cause
+the player to stall, and you can only stop it by killing the module (or
+putting the level back up).</p>
+
+<p>It is not expected that users of the AMPlayer API will need to use this
+SWI.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Control" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Control"
+                number="52E05"
+                reason="3"
+                reasonname="ID3v2Control"
+                description="Control the ID3v2 tag processing facilities"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-7">3 (reason code)</bit>
+   <bit number="8-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">sub-reason code :
+  <value-table head-number="Sub-reason" head-value="Meaning">
+   <value number="0">
+    <reference type="swi" name="AMPlayer_Control" reason="3, 0" use-description="yes"/>
+   </value>
+   <value number="1">
+    <reference type="swi" name="AMPlayer_Control" reason="3, 1" use-description="yes"/>
+   </value>
+  </value-table>
+ </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="1">old level</register-use>
+</exit>
+
+<use>
+<p>This control call is used to control ID3v2 processing within the player.
+</p>
+
+<p>ID3v2 processing is quite intensive and can have a performance hit,
+especially when compressed frames are used.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Control" reason="3" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Control"
+                number="52E05"
+                reason="3, 0"
+                reasonname="ID3v2State"
+                description="Enable or disable ID3v2 processing"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-7">3 (reason code)</bit>
+   <bit number="8-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">0 (sub-reason code)</register-use>
+ <register-use number="2">type of change :
+  <value-table head-number="Type" head-value="Meaning">
+   <value number="0">disable</value>
+   <value number="1">enable</value>
+   <value number="-1">read current state</value>
+  </value-table>
+ </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="2">enable count, or 0 if disabled</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to enable or disable the processing of ID3v2 tags by the
+AMPlayer module.</p>
+
+<p>When disabled, no ID3v2 processing at all is performed - the tags are
+merely skipped. This will improve performance when such tags are
+encountered.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Control" reason="3" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Control"
+                number="52E05"
+                reason="3, 1"
+                reasonname="ID3v2Filtering"
+                description="Select ID3v2 frame filtering"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-7">3 (reason code)</bit>
+   <bit number="8-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">1 (sub-reason code)</register-use>
+ <register-use number="2">pointer to frame name, or 0 for 'all frames'
+ </register-use>
+ <register-use number="3">filtering operation :
+  <value-table head-number="Type" head-value="Meaning">
+   <value number="0">disable frame processing</value>
+   <value number="1">enable frame processing</value>
+   <value number="-1">read current state of processing</value>
+   <value number="-2">read frame state as matched by processing engine
+   </value>
+  </value-table>
+ </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="2">enable count, or 0 if disabled</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to enable or disable specific frames or groups of frames for processing through the service interface.</p>
+
+<p>A single character frame name will select all frames starting with that
+character. Three character frame names select the ID3v2.2 and earlier frames
+that match. Four character frame names select the ID3v2.3 and ID3v2.4 frame
+explicitly.</p>
+
+<p>Claimants of the ID3v2 service should enable the frames they wish to see,
+and disable them when they no longer require them.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Control" reason="3" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Control"
+                number="52E05"
+                reason="4"
+                reasonname="Transience"
+                description="Read or write the 'transience' flag"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-7">4 (reason code)</bit>
+   <bit number="8-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">Operation to apply:
+                           <value-table>
+                            <value number="0">Mark as intransient</value>
+                            <value number="1">Mark as transient</value>
+                            <value number="-1">Read current flag</value>
+                           </value-table>
+                          </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="1">old transience flag</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to read or write the transiency flag for an instance.
+Transiency has no meaning for the base instance, but for created instances,
+it means that when playback completes, the instance will be destroyed
+automatically.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Control" reason="3" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Control"
+                number="52E05"
+                reason="5"
+                reasonname="DecimationControl"
+                description="Read or write the decimation threshold"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-7">5 (reason code)</bit>
+   <bit number="8-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">Operation to apply:
+                           <value-table>
+                            <value number="0">Read decimation threshold</value>
+                            <value number="1">Set decimation threshold</value>
+                           </value-table>
+                          </register-use>
+ <register-use number="2">new decimation threshold</register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="1">current decimation threshold</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to read or write the 'decimation threshold'. AMPlayer
+will normally decode data at full accuracy. If the 'decimation threshold'
+frequency is met or exceeded, the module will apply automatic decimation
+to the output.</p>
+
+<p>The initial decimation value is based on the version of the module in
+use (for AMPlayer, this is 1000000, for AMPlayerFP, it is
+22050, and for AMPlayer6 it is 0). This can be overridden by setting the
+<sysvar>AMPlayer$DecimationThreshold</sysvar> variable to a number before
+starting the module. Setting the decimation threshold of the base instance
+will set the variable to the same value.
+</p>
+
+<p>On builds that do not support decimation, the calls are ignored, and
+reading the decimation always returns 1000000.
+</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Control" />
+<reference type="sysvar" name="AMPlayer$DecimationThreshold" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Plugin"
+                number="52E06"
+                description="Plugin operations"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">reason code :
+  <value-table>
+   <value number="0">Register plugin</value>
+   <value number="1">Deregister plugin</value>
+  </value-table>
+ </register-use>
+ <register-use number="2">private word to pass in R0</register-use>
+ <register-use number="3">pointer to <reference type="entry" name="Plugin_PreProcess">pre-processor (pre-DCT)</reference>, or 0 for none
+ </register-use>
+ <register-use number="4">pointer to <reference type="entry" name="Plugin_PostProcess">post-processor (post-DCT)</reference>, or 0 for
+ none</register-use>
+ <register-use number="5">pointer to static
+   <reference type="subsubsection" name="Plugin Information Block" />
+ </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<use>
+<p>This SWI is used to register or deregister plugins.</p>
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<!-- <reference type="swi" name="AMPlayer_Play" /> -->
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_FileInfo"
+                number="52E07"
+                description="Return information on the a file"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags for requested information, or 0 to return
+                          size of buffers :
+  <bitfield-table>
+   <bit number="0">Return total time, and Frame Information Block for the
+                   first frame</bit>
+   <bit number="1">Reserved, must be 0</bit>
+   <bit number="2">Return ID3 tag information</bit>
+   <bit number="3-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">pointer to filename</register-use>
+ <register-use number="2">pointer to buffer for
+  <reference type="subsubsection" name="File Information Block" />
+  </register-use>
+ <register-use number="3">pointer to buffer for 
+  <reference type="subsubsection" name="Frame Information Block" />
+  </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+<exit>
+ <register-use number="2">required size of the File Information Buffer, if
+                          reading size of buffer</register-use>
+ <register-use number="3">required size of the Frame Information Buffer, if
+                          reading size of buffer</register-use>
+</exit>
+
+<use>
+<p>This SWI attempts to return useful information about the file given. The
+more bits you set in R0, the slower it gets, as it requires more of the file
+to be read. In particular, requesting the ID3 tag information means seeking
+to the end of the file, which may be very slow on some filing systems (like
+DATFS).</p>
+
+<p>Therefore, it sometimes makes sense to make 3 calls:
+
+<list type="ordered">
+<item><p>With R0=&hex;000, to get the size of the buffers.</p></item>
+<item><p>With R0=&hex;001, to read the quick things and determine whether the file
+   is interesting at all.</p></item>
+<item><p>With R0=&hex;004, to read only the ID3 tag fields.</p></item>
+</list>
+</p>
+
+<p>Remember to read the buffer sizes first. These information blocks will no
+doubt be extended, and if you assume the old size, your program will stop
+working when a new AMPlayer module comes out. Just read the size, and your
+program will continue to work for eternity. You don't need to supply a frame
+info pointer in R3 unless bit 0 is set.</p>
+
+</use>
+
+<related>
+<reference type="command" name="AMInfo" />
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Info" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+</swi-definition>
+
+
+
+<swi-definition name="AMPlayer_StreamOpen"
+                number="52E08"
+                description="Starts a stream playing"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0" name="Queue">Places the named file in the queue of tracks
+                                to play. If there is no file currently
+                                playing, the behaviour is exactly as if bit
+                                0 were clear.</bit>
+   <bit number="1" name="Cue">Starts the named file immediately, but paused
+                              at the first frame. Use 
+                              <reference type="swi" name="AMPlayer_Pause"/>
+                              to start playback.</bit>
+   <bit number="2" name="GenerateService">Indicates that 
+                              <reference type="service" name="AMPlayer" 
+                                         reason="6"/>
+                              should be generated every time one or more
+                              blocks passed into the stream become free.
+                              </bit>
+   <bit number="3-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">pointer to stream name (for information)
+ </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+<exit>
+ <register-use number="0">stream handle, or 0 if failed to
+                          start</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to start streamed input, ready for playback.</p>
+
+<p>Called by a streaming application to get a Stream Handle.
+Most streamers will start the stream paused and feed data in until the
+buffer full flag (see <reference type="swi" name="AMPlayer_StreamInfo" />)
+is set.</p>
+
+<p>Note: The combination of Queue and Start Paused may not work.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Play" />
+<reference type="swi" name="AMPlayer_StreamClose" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="AMPlayer_StreamClose"
+                number="52E09"
+                description="Informs AMPlayer that a stream has ended"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">stream handle</register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<use>
+<p>This SWI is used to inform the AMPlayer module that no more data will be
+supplied to the stream. This does NOT release outstanding buffers that have
+been passed to AMPlayer. If you need to get these back, call
+AMPlayer_StreamClose, then <reference type="swi" name="AMPlayer_Stop" />.
+</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_StreamOpen" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="AMPlayer_StreamGiveData"
+                number="52E0A"
+                description="Inform AMPlayer of the location of input data"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">stream handle</register-use>
+ <register-use number="2">pointer to streaming data block :
+  <offset-table>
+   <offset number="0">Usage word</offset>
+   <offset number="4">Meta data list associated with this buffer, or 0
+                      for no data</offset>
+   <offset number="8">Length of data following</offset>
+  </offset-table>
+ </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<use>
+<p>Called by a streamer application to pass a block of data to AMPlayer. All
+but the first word may be considered read-only and must be in interrupt
+sharable space (i.e. in a dynamic area, module area, sprite pool etc, NOT in
+the application). By calling this SWI, the application must guarantee that
+it will keep the buffer around (and unchanged) at least until AMPlayer sets
+the usage word to zero.</p>
+
+<p>The streamer application should monitor the first word of the buffers it
+has previously passed in to see when it gets set to 0 to allow reuse.
+Buffers will be released strictly in the same order they were passed in.</p>
+		
+<p>The metadata list blocks must be kept intact for the same length of time
+as the data blocks, and can be considered 'released' by AMPlayer when their
+corresponding data blocks are.</p>
+		
+<p>Metadata blocks are in the following format:
+
+<offset-table>
+<offset number="0">Pointer to next metadata block, or 0 for the last
+                   entry</offset>
+<offset number="4">Pointer to a 0-terminated 'Key name' field</offset>
+<offset number="8">Pointer to a value field (often a 0-terminated string,
+                   but may be binary data)</offset>
+<offset number="12">Length of value buffer in bytes</offset>
+</offset-table>
+</p>
+
+<p>It is envisaged that there will be a SWI added later to allow metadata to
+be supplied for non-streaming sources.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_StreamOpen" />
+<reference type="swi" name="AMPlayer_StreamClose" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="AMPlayer_StreamInfo"
+                number="52E0B"
+                description="Read information about the streaming data"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">stream handle</register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="0">flags word :
+  <bitfield-table>
+   <bit number="0">Stream is active (actively being processed)</bit>
+   <bit number="1">Output buffer has been full</bit>
+   <bit number="2">Stream is paused</bit>
+  </bitfield-table>
+ </register-use>
+</exit>
+
+<use>
+<p>This SWI is called by a streaming application to monitor the state of the
+decoder. Typically a streamer will start a stream up paused and feed it
+data. The streamer application will then wait until the stream becomes
+active, and until either the output buffer becomes full, or until it runs
+out of buffer space itself. Then it can unpause the stream knowing that the
+maximum amount of buffering is in use.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<!-- <reference type="swi" name="AMPlayer_StreamClose" /> -->
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="AMPlayer_MetaDataPollChange"
+                number="52E0C"
+                description="Read meta-data state value"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<exit>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">opaque unique value, guaranteed to change to a new
+                          unique value when any metadata items change.
+ </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</exit>
+
+<use>
+<p>This SWI is called by streaming applications to discover when meta-data
+provided by the application has been 'passed' by the decoder and is now
+active.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_MetaDataLookup" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="AMPlayer_MetaDataLookup"
+                number="52E0C"
+                description="Read meta-data token value"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">pointer to key field to match</register-use>
+ <register-use number="2">pointer to buffer for result (or NULL to read
+                          length)</register-use>
+ <register-use number="3">length of buffer, or 0 to read required length
+ </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="0" state="preserved" />
+ <register-use number="1">buffer, filled with data to length
+                          given</register-use>
+ <register-use number="2">length of buffer required, including
+                          terminator</register-use>
+</exit>
+
+<use>
+<p>This SWI is called by applications to read meta-data passed to the
+AMPlayer module. Every element of meta-data is tagged with a 'key' which
+is used to return its value.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_MetaDataPollChange" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="AMPlayer_SoundSystem"
+                number="52E0E"
+                description="Read sound systems available, or set output sound system"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">Operation type :
+  <value-table head-number="Type" head-value="Meaning">
+   <value number="-1">Read available sound systems</value>
+   <value number="0">Select any available system (best possible)</value>
+   <value number="1">Select 8 bit sound system</value>
+   <value number="2">Select 16 bit sound system</value>
+   <value number="3">Select SharedSound</value>
+   <value number="4">Select 'User' sound system (data read via
+                     <reference type="swi" name="AMPlayer_StreamReadData" />)
+                     </value>
+  </value-table>
+ </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="0">Bit mask of avialable sound systems :
+  <bitfield-table>
+   <bit number="0">8 bit output available</bit>
+   <bit number="1">16 bit output available</bit>
+   <bit number="2">SharedSound output available</bit>
+   <bit number="3">User output available</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">Last sound system in use (as on input)
+ </register-use>
+</exit>
+
+<use>
+<p>This SWI is used to determine what sound systems are available on
+the current machine, and to select a different sound system. Its most
+common use is to select the User sound system for streaming output
+data.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_StreamReadData" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="AMPlayer_StreamReadData"
+                number="52E0F"
+                description="Read data from streaming sound system"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">Unused</register-use>
+ <register-use number="2">pointer to next byte of data to
+                          read, or 0 for first call</register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="2">pointer to first byte of data to read, or 0 if
+ none available</register-use>
+ <register-use number="3">number of bytes of data available</register-use>
+ <register-use number="4">frequency of data</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to take data from the 'user' sound system. Initially,
+users would call with R2 = 0, to determine where to read data from. They
+then take use from this address up to the limit supplied. Subsequently, the
+call this SWI again to inform AMPlayer how much data has been read. AMPlayer
+will only remove data after it has been informed that it has been read.</p>
+
+<p>Decoding will continue in the background. It may be necessary to delay
+processing if no data is ready. Data can only be generated on callbacks. It
+may, therefore, be necessary to wait for a moment or so for the decode to
+function.</p>
+
+<p>VU-bars are inactive when use user sound state is in use.</p>
+
+<p>Callers should note that only complete frames fed in will produce any
+output - not all the input stream may be used.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_SoundSystem" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Instance"
+                number="52E10"
+                description="Manipulate AMPlayer instances"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">Reason code :
+  <value-table head-number="Reason" head-value="Meaning">
+   <value number="0">
+  <reference type="swi" name="AMPlayer_Instance" reason="0" use-description="yes" />
+   </value>
+   <value number="1">
+  <reference type="swi" name="AMPlayer_Instance" reason="1" use-description="yes" />
+   </value>
+   <value number="2">
+  <reference type="swi" name="AMPlayer_Instance" reason="2" use-description="yes" />
+   </value>
+   <value number="3">
+  <reference type="swi" name="AMPlayer_Instance" reason="3" use-description="yes" />
+   </value>
+   <value number="4">
+  <reference type="swi" name="AMPlayer_Instance" reason="4" use-description="yes" />
+   </value>
+  </value-table>
+ </register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="0-7">dependant on reason code</register-use>
+</exit>
+
+<use>
+<p>This SWI is used control instances of AMPlayer. You should use it in
+preference to directly creating instances of the AMPlayer module yourself.
+Consult the reason code descriptions for more details.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<!-- <reference type="swi" name="AMPlayer_StreamReadData" /> -->
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="AMPlayer_Instance"
+                number="52E10"
+                reason="0"
+                reasonname="Current"
+                description="Read current instance handle"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">0 (reason code)</register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="0">instance handle</register-use>
+</exit>
+
+<use>
+<p>This SWI is used return the instance handle of the current instance of
+AMPlayer. This may be used to discover the handle of the preferred instance
+such that the preferred instance may be changed to allow fading from one
+track to another. It is not expected that this call be used often.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<!-- <reference type="swi" name="AMPlayer_StreamReadData" /> -->
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Instance"
+                number="52E10"
+                reason="1"
+                reasonname="Create"
+                description="Create a new instance of the module"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">1 (reason code)</register-use>
+ <register-use number="2">pointer to zero terminated suffix for the
+                          instance name. Ideally you should keep this to
+                          &lt; 16 characters.</register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="0">instance handle of new instance</register-use>
+</exit>
+
+<use>
+<p>This SWI is used create a new instance of the AMPlayer module. This
+instance may be used in exactly the same manner as any other, if SWIs are
+directed at it. Set bit 31 of any SWIs flags to direct the call to the
+instance whose handle is in R8.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<!-- <reference type="swi" name="AMPlayer_StreamReadData" /> -->
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Instance"
+                number="52E10"
+                reason="2"
+                reasonname="Destroy"
+                description="Destroy an instance of the module"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">2 (reason code)</register-use>
+ <register-use number="2">instance handle to destroy</register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+<!-- 'probably' preserved, says Robin ! -->
+</exit>
+
+<use>
+<p>This SWI is used destroy an instance of the AMPlayer module. You should
+destroy instances when you have no further use for them, to free up
+resources and processing time.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<!-- <reference type="swi" name="AMPlayer_StreamReadData" /> -->
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Instance"
+                number="52E10"
+                reason="3"
+                reasonname="ReadBase"
+                description="Read handle of base instance"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no"
+                internal="yes">
+
+<!-- we won't see this entry because it's marked as 'internal' -->
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">3 (reason code)</register-use>
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="0">instance handle of base instance</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to read the internal instance handle of the base
+instance.</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<!-- <reference type="swi" name="AMPlayer_StreamReadData" /> -->
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="AMPlayer_Instance"
+                number="52E10"
+                reason="4"
+                reasonname="Enumerate"
+                description="Enumerate handles of known instances"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">flags :
+  <bitfield-table>
+   <bit number="0-30">Reserved, must be 0.</bit>
+   <bit number="31">R8 contains the instance handle to which this call
+                    should be directed.</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">4 (reason code)</register-use>
+ <register-use number="2">last instance handle, or -1 to start enumerating
+ </register-use>
+ <register-use number="3">pointer to buffer to write name into</register-use>
+ <register-use number="4">length of buffer</register-use>
+ 
+ <register-use number="8">if bit 31 of R0 set:<br />
+                          instance handle to direct at, or 0 for
+                          the base</register-use>
+</entry>
+
+<exit>
+ <register-use number="2">instance handle, or -1 if no more</register-use>
+ <register-use number="4">length written to buffer, or -ve length if failed
+                          to write</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to enumerate the instances currently in use by AMPlayer.
+A 'visualisation' application might use this call to select what source to
+provide a representation of.
+</p>
+
+</use>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<!-- <reference type="swi" name="AMPlayer_StreamReadData" /> -->
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</swi-definition>
+
+</section>
+
+<section title="Entry points">
+
+<entry-definition name="Plugin_PreProcess"
+                 description="Pre-process DCT blocks"
+                 irqs="disabled"
+                 fiqs="enabled"
+                 processor-mode="SVC"
+                 re-entrant="no"
+                 >
+<entry>
+ <register-use number="0">private word</register-use>
+ <register-use number="1">pointer to 'out 1' buffer</register-use>
+ <register-use number="2">pointer to 'out 2' buffer</register-use>
+ <register-use number="3">pointer to 32 frequencies (16.16 format)
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0">0 if frequencies processed<br />
+                          1 if DCTs done (not recommended)
+ </register-use>
+</exit>
+
+<use>
+<p>This entry is called prior to 'dct64' which decodes the frequencies into the buffer. Note that there is no way in which to identify whether the buffer is for the left or right channel.</p>
+
+</use>
+
+<related>
+</related>
+
+</entry-definition>
+
+<entry-definition name="Plugin_PostProcess"
+                 description="Post-process DCT output buffers"
+                 irqs="disabled"
+                 fiqs="enabled"
+                 processor-mode="SVC"
+                 re-entrant="no"
+                 >
+<entry>
+ <register-use number="0">private word</register-use>
+ <register-use number="1">pointer to 'out 1' buffer</register-use>
+ <register-use number="2">pointer to 'out 2' buffer</register-use>
+ <register-use number="3">pointer to samples buffer</register-use>
+</entry>
+<exit>
+ <register-use number="0">0 if buffer processed
+ </register-use>
+</exit>
+
+<use>
+<p>This entry is called after the 'dct64' which decodes the frequencies into
+the buffer. Note that there is no way in which to identify whether the
+buffer is for the left or right channel. </p>
+
+</use>
+
+<related>
+</related>
+
+</entry-definition>
+</section>
+
+<section title="*Commands">
+<command-definition
+ name="AMInfo"
+ description="Read information on playback, plugins or file">
+<syntax>
+ <optional><switch name="plugins" /></optional>
+ <optional>
+  <switch name="file"><userreplace>filename</userreplace></switch>
+ </optional>
+</syntax>
+
+<parameter switch="plugins">
+ Display information about the plugins currently active.
+</parameter>
+<parameter switch="file" name="filename">
+ Display information about a file, rather than about the current playback
+ state.
+</parameter>
+
+<use>
+<p>This command is used to display information about the current playback
+state, or the state of the plugins.</p>
+</use>
+
+<example>
+<command>*AMInfo -file Corrs,The.01ForgivenNotForgotten.01ErinShore(TraditionalIntro)</command>
+</example>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Info" />
+<reference type="swi" name="AMPlayer_FileInfo" />
+<reference type="swi" name="AMPlayer_Plugin" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</command-definition>
+
+
+
+<command-definition name="AMLocate"
+                    description="Skip to a position in the current file">
+<syntax>
+ <optional alternates="true">
+  <text>+</text>
+  <text>-</text>
+ </optional>
+ <userreplace>hours</userreplace>:<userreplace>minutes</userreplace>:<userreplace>seconds</userreplace>
+</syntax>
+<syntax>
+ <userreplace>minutes</userreplace>:<userreplace>seconds</userreplace>
+</syntax>
+
+<parameter name="hours">Number of hours to search for</parameter>
+<parameter name="minutes">Number of minutes to search for</parameter>
+<parameter name="seconds">Number of seconds to search for</parameter>
+
+<use>
+<p>This command is used to jump to a point in the playback of the file. Use
++ and - to indicate a location relative to the current playback position.
+</p>
+</use>
+
+<example>
+<command>*AMLocate 7:23</command>
+</example>
+
+<related>
+<reference type="swi" name="AMPlayer_Locate" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</command-definition>
+
+
+
+<command-definition
+ name="AMPause"
+ description="Pause, or resume, playback">
+<syntax>
+ <optional><switch name="off" /></optional>
+</syntax>
+
+<parameter switch="off">resume playback, instead of pausing</parameter>
+
+<use>
+<p>This command is used to pause, or resume playback.</p>
+</use>
+
+<example>
+<command>*AMPause</command>
+</example>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Pause" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</command-definition>
+
+
+
+<command-definition name="AMPlay"
+                    description="Play a new file">
+<syntax>
+ <optional><switch name="next" /></optional>
+ <optional><switch name="queue" /></optional>
+ <optional><switch name="cue" /></optional>
+ <optional><switch name="transient" /></optional>
+ <userreplace>filename</userreplace>
+</syntax>
+
+<parameter switch="next">Start playback of queued file immediately</parameter>
+<parameter switch="queue">Queue this file, rather than playing it
+immediately</parameter>
+<parameter switch="cue">Start decoding this track, but leave the player
+paused</parameter>
+<parameter switch="transient">Start decoding this track in a new instance
+which will terminate when playback completes.</parameter>
+
+<use>
+<p>This command is used to play a new file.</p>
+</use>
+
+<example>
+<command>*AMPlay -queue ADFS::4.$.Music.Artists.Dido.NoAngel.06Thankyou</command>
+</example>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Play" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</command-definition>
+
+
+
+<command-definition
+ name="AMStop"
+ description="Stops playback">
+
+<use>
+<p>This command is used to stop playback.</p>
+</use>
+
+<example>
+<command>*AMStop</command>
+</example>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Stop" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</command-definition>
+
+
+
+<command-definition name="AMVolume"
+                    description="AMVolume">
+<syntax>
+ <optional alternates="true">
+  <text>+</text>
+  <text>-</text>
+ </optional>
+ <userreplace>volume</userreplace>
+</syntax>
+
+<parameter name="volume">volume level (0-127)</parameter>
+
+<use>
+<p>This command is set the playback volume. Initially, 113 is selected.</p>
+</use>
+
+<example>
+<command>*AMVolume 113</command>
+</example>
+
+<related>
+<!-- <reference type="command" name="Com" /> -->
+<reference type="swi" name="AMPlayer_Control" reason="0" />
+<reference type="sysvar" name="AMPlayer$Volume" />
+<!-- <reference type="vector" name="bingleV" /> -->
+</related>
+
+</command-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="AMPlayer developers" address="amplayer@amplayer.org" />
+ </maintainer>
+ <disclaimer>
+  <p>
+  This document is, to the best of our knowledge, a correct representation
+  of the API of AMPlayer.
+  </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="JRF" title="First XML monitored version">
+   <change>First version of the document which includes revision
+           information.</change>
+  </revision>
+ </history>
+
+ <related>
+  <!-- no related documents as yet -->
+ </related>
+</meta>
+</riscos-prm>
