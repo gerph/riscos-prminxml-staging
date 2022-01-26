@@ -55,6 +55,7 @@
 <section title="RISC OS Select" dir="select">
     <section title="Desktop" dir="desktop">
         <page href="iconbarfiledrags">Icon bar file drags</page>
+        <page href="filters-iconborders">Icon border filters</page>
         <section title="Wimp" dir="wimp">
             <page href="iconpriorities">Iconbar priorities</page>
         </section>

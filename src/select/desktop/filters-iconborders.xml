@@ -1,0 +1,762 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="Icon bordering filters">
+
+<section title="Introduction">
+<p>
+    The WindowManager has, since RISC OS 3, been able to render icons with styled borders. In RISC OS 3.0
+    this was through the 'Z' validation, and with RISC OS 3.1 this settled on the 'R' validation to select
+    the button style.
+    The forms
+    of borders that the WindowManager renders were, at that time, fixed to be 3D-effect rectangular
+    regions. The <reference type='document' name='WindowManager' href='?'/> and
+    <reference type='document' name='FilterManager' href='?'/> have been updated to provide the ability
+    to offload the rendering of icon borders to third party extensions through Icon border filters.
+</p>
+<p>
+    Icon border filters are able to change the presentation of the icons with styled borders through
+    extension modules. A 'plain' rendering, which matches the original style used by RISC OS 3 onwards,
+    is supplied in the form of the IconBorderPlain. As the first registrant, this is used as a fallback
+    when no other custom form of buttons is available. This results in an experience for users which is
+    unchanged until another customised module is loaded (or activated).
+</p>
+<p>
+    Customisation of the icon borders is intended to allow greater degrees of customisation for the
+    user, and easier development of 'themes' which group many stylistic elements into a cohesive
+    look and feel. RISC OS Select is supplied with a customisable border filter which allows for
+    rounded buttons, and some variation on the standard rectangular button.
+</p>
+<p>
+    Icon border filtering is available in RISC OS Select versions of the WindowManager from 4.64 onwards.
+</p>
+</section>
+
+<section title="Overview">
+<p>
+    Icon border filters are provided by relocatable modules, registered through
+    <reference type='swi' name='Filter_RegisterIconBorderFilter'/>. The WindowManager will call the
+    FilterManager to dispatch requests to draw icon borders to the registered filters. The WindowManager
+    does not contain any code to render the styled borders - and if no filters are registered which
+    can provide the rendering of the requested icons, there will be no border drawn.
+</p>
+
+<p>
+    Icon border filters are dispatched in most recent registration order. This is the same behaviour
+    as other filters within FilterManager, and of the software vectors. This means that filters may
+    layer their behaviour upon one another if necessary.
+</p>
+
+<p>
+    Icon border filters can:
+</p>
+<list>
+    <item>Change the outer border style</item>
+    <item>Change the inner fill style</item>
+    <item>Change the colouring of borders and filled regions</item>
+    <item>Change the position of text within the border</item>
+    <item>Look different when selected</item>
+    <item>Look different when the mouse is over them</item>
+</list>
+
+</section>
+
+<section title="Technical details">
+
+<subsection title="Registration">
+<p>
+    Icon border filters may be registered by modules when they start, using
+    <reference type='swi' name='Filter_RegisterIconBorderFilter'/>. When they are finalised they must
+    de-register themselves with <reference type='swi' name='Filter_DeRegisterIconBorderFilter'/>.
+</p>
+<p>
+    Modules should be aware of the FilterManager's service calls. They should register themselves if
+    they receive <reference type='service' name='FilterManagerInstalled' href='?'/>, and note that they
+    are not registered on receipt of  <reference type='service' name='FilterManagerDying' href='?'/>
+</p>
+</subsection>
+
+<subsection title="Rendering icons">
+<p>When an icon with a styled border needs to be redrawn by the Window Manager the following steps
+   are followed:</p>
+
+<list type='ordered'>
+    <item><p>
+        Call <reference type='entry' name='IconBorder_State'/> to determine whether a full redraw is required
+        due to the shape changing.
+        <br/>
+        If it does require a full redraw, redraw all the content from the window background up to the icon.
+    </p>
+    </item>
+
+    <item><p>
+        Call <reference type='entry' name='IconBorder_Colour'/> to determine the colours to use for the
+        icon, supplying the initial colours given by the icon itself.
+        </p>
+    </item>
+
+    <item>
+        <p>Apply any additional changes to the colour of the icon indicated by its validation:</p>
+        <list>
+            <item>Apply any tinting validation</item>
+            <item>Apply selected icon highlighting</item>
+            <item>Apply shading of the colours</item>
+        </list>
+    </item>
+
+    <item>
+        If the icon is filled,
+        call <reference type='entry' name='IconBorder_Fill'/> to render the background of the icon.
+    </item>
+
+    <item>
+        <p>
+        Call <reference type='entry' name='IconBorder_Draw'/> to render the border of the icon.
+        </p>
+    </item>
+
+    <item>
+        Call <reference type='entry' name='IconBorder_Size'/> to determine the size to set the graphics
+        window to, to render the text and/or sprite within the icon.
+    </item>
+</list>
+</subsection>
+
+<subsection title="Customisable features">
+<p>
+    Icon borders can customise some of the rendering features of the icon, but are constrained by
+    the existing use of the icons within applications, and the expectations of users. A given filter
+    can change just as much of an icon's rendering as it wants, although if this matches up poorly
+    with other filters, or the applications, it may give an unappealing look.
+</p>
+<p>
+    In general, there are a few features of icons that icon border filters may wish to check before
+    attempting to render icons.
+</p>
+
+<list>
+    <item>Filled flag: Some icons are commonly filled, for example buttons (type 5 and 6) and writable
+          boxes (type 7). Recognising unfilled forms of these icons and rejecting them may prevent
+          unexpected effects.</item>
+    <item>Sprite icons: Any of the styled borders which use sprites are likely to have undesireable
+          effects if the icon border deviates far from the expected 3D effect.</item>
+    <item>Long text: The 'L' validation to render long text inside the icon may not wrap correctly
+          if the borders of the icon change significantly.</item>
+    <item>Oversize icons: For stylistic reasons, styled borders may have been used to create tall
+          regions, or vertical dividers with a very thing icon. Checking the size of the icon
+          is suitable and rejecting the icon if it is unsuitable may ensure that the intended
+          effect is retained for the user.</item>
+    <item>Inactive buttons: The button type borders (type 5 and 6) may have been used in cases
+          where the icon's button type is set to a type which does not react to the user's clicks.
+          It may be undesireable to style such buttons as if they are pressable.</item>
+</list>
+
+
+<category title="Border colouring">
+<p>
+    Border colours may be changed by the filter. This might be as simple as changing the strength
+    of the 3D effect, or forcing the colours to match a different style. The colouring of the
+    border can be modified at will by the filter, but this may need to be done with care to avoid
+    explicit choices by application authors being overridden in ways that produce unusable
+    interfaces.
+</p>
+<p>
+    For example, forcing the border of all icons to be solid black with no 3D effect
+    would look fine within a regular application, but any application which used a black background
+    with white text would find that the border became indistinguishable from the filled background
+    of the icon. Filters should either declare that they are not suitable for use with applications
+    which do not follow its expectations, or should attempt to cater for non-standard forms. This
+    might mean disabling themselves when colours are not as expected, or providing variations which
+    retain contrast.
+</p>
+
+<p>
+    Restricting effects to just where the button borders (type 5 and 6) may avoid making too
+    great a set of changes to the buttons.
+</p>
+</category>
+
+<category title="Fill colouring">
+<p>
+    The background fill colour can equally be changed as freely, but has a much greater impact on
+    the user's experience as most button icons (type 5 and 6) will be filled. Informational fields
+    which are shown as sunk borders (type 2) are commonly filled, but that form of field is also
+    commonly used as a colour selector region.
+</p>
+</category>
+
+<category title="Bordering">
+<p>
+    Although the border is expected by designers and users to be a rectangular border, equally
+    surrounding the text of the icon, the icon border author will find that there is flexibility
+    in how the border is drawn.
+</p>
+<p>The most obvious change that can be made is to use non-rectangular borders. The round borders
+    supplied with RISC OS Select through the IconBorderReound module show that with some degree of
+    freedom for regular button icons (type 5 and 6) the corners can be varied. Any changes to the
+    rendered border width must also be reflected when the size of the text is calculated.
+</p>
+<p>
+    The border shape can be different for a selected and unselected border. This can have useful
+    effects for pressing buttons. For example, when pressed, the button might bulge outwards
+    (although it must still not exceed the bounds given by the icon). If the rendered shape of
+    the border changes when pressed, the border filter must return with bit 0 set in the filter
+    flags when <reference type='entry' name='IconBorder_State'/> is called.
+</p>
+<p>
+    The border is not required to use the colours supplied to it. Whilst using other colours
+    will mean that layered filters will be unable to change the style of a button, it may allow
+    certain styles which are otherwise impossible. For example, an default button might have a
+    more stylised shape which uses more colours than the single 'well colour'. Used with care,
+    this may make for an interesting effect.
+</p>
+<p>
+    Generally it is best to keep to colours based on those supplied. For example, the
+    IconBorderRound implementation allows a graduated fill to be used to make the button appear
+    more rounded. This uses a colour slightly lighter and slightly darker than the supplied
+    colour, with the horizontal mid-line being the colour supplied.
+</p>
+</category>
+
+<category title="Filling">
+<p>
+    The fill operation is performed before the text is rendered, and should fill the region
+    within the bordered itself. Not all icons are filled, and those that are not filled will
+    never receive the call to their <reference type='entry' name='IconBorder_Fill'/> entry point.
+</p>
+<p>
+    As with the border, filling is not required to use the colours supplied to it. The problems
+    of selecting different colours for the fill are worse than that of the border as the text
+    must be visible on top of whatever colour is filled.
+</p>
+<p>
+    Generally it is best to keep to colours based on those supplied. For example, the
+    IconBorderRound implementation allows a graduated fill to be used to make the button appear
+    more rounded. This uses a colour slightly lighter and slightly darker than the supplied
+    colour, with the horizontal mid-line being the colour supplied.
+</p>
+</category>
+
+<category title="Sizing the text">
+<p>
+    Although the expectation is that the icon will have a symmetric border, this is not required.
+    Varying degrees of success have been found with creating icon borders for buttons which have
+    one size larger than the other. When the border has different sizes, the size which the text
+    can be rendered into must be returned correctly when the
+    <reference type='entry' name='IconBorder_Size'/> entry point is called.
+</p>
+<p>
+    The default behaviour when buttons (type 5 and 6) are selected is to change the border
+    rendering. However, for some effects, moving the text to one side when selected may be a
+    useful effect. This can be acheived by changing the size of the region which the text can
+    be rendered into. As most bordered text is centred horizontally, this will generally have
+    the effect of moving the text by half the distance that the border was increased.
+</p>
+</category>
+
+<category title="Highlighting">
+<p>
+    Where supported by the WindowManager, the icon borders may be aware of the pointer being placed
+    over the bordered icon. This is indicated by bit 23 (the 'deleted' bit) being set in the icon
+    flags. The highlighting of the icons will only happen when the
+    <reference type='entry' name='IconBorder_State'/> call returns with bit 1 set, indicating that
+    the icon supports being highlighted.
+</p>
+<p>
+    Highlighting the icon may be as simple as changing the colours. However, it may mean a
+    completely different border shape, or even a different text position.
+</p>
+</category>
+
+</subsection>
+
+<subsection title="Common parameters">
+
+<p>
+    The entry points have some common parameters passed through the registers on entry.
+</p>
+
+<category title="Icon flags word">
+    <p>
+        The icon flags word supplied to the border rendering entry points is the same as that used in the
+        icon block, with a small exception. The 'icon is deleted' bit (bit number 23) is repurposed
+        to indicate that the pointer is currently over the icon. This bit is only set when the entry
+        point has declared that the filter is able to change when the pointer is over the icon.
+    </p>
+    <p>
+        The inverted and shaded bits in the flags word will be set according to the original icon's
+        state, and may change the rendering of the border. The colours supplied to the border rendering
+        entry points will have been updated by the WindowManager to reflect the icon's state when
+        the <reference type="entry" name="IconBorder_Draw"/> and
+        <reference type="entry" name="IconBorder_Fill"/> entry points are called.
+    </p>
+</category>
+
+<category title="Icon border rendering box">
+    <p>
+    The icon rendering box is supplied as a parameter to the border entry points to describe the region the icon
+    border should cover. It contains 8 words which describe the box, together with the size of the pixels
+    on the screen. The coordinates are in half-open format (x0 and x1 are inclusive coordinates,
+    and x1 and y1 are exclusive coordinates).
+    </p>
+    <offset-table>
+        <offset number="0">x0 coordinate in OS units</offset>
+        <offset number="4">y0 coordinate in OS units</offset>
+        <offset number="8">x1 coordinate in OS units</offset>
+        <offset number="12">y1 coordinate in OS units</offset>
+        <offset number="16">x pixel size in OS units</offset>
+        <offset number="20">y pixel size in OS units</offset>
+        <offset number="24">x pixel size in OS units - 1</offset>
+        <offset number="28">y pixel size in OS units - 1</offset>
+    </offset-table>
+</category>
+
+<category title="Icon border colour table">
+    <p>
+        The colour table is supplied as a parameter to the border entry points to describe the colours to
+        be used for the icon border regions. The colours are supplied as 32bit palette entries in the form
+        &hex;BBGGRRxx.
+    </p>
+    <offset-table>
+        <offset number='0'>Foreground colour</offset>
+        <offset number='4'>Background colour</offset>
+        <offset number='8'>Selected background colour (for border type 5 and 6)</offset>
+        <offset number='12'>Well colour (for border type 6)</offset>
+        <offset number='16'>'Face' colour (usually the light highlight colour)</offset>
+        <offset number='20'>'Opposite' colour (usually the dark highlight colour)</offset>
+    </offset-table>
+</category>
+
+<category title="Icon rendering flags">
+    <p>
+        The icon rendering flags passed to the icon border filter allow the WindowManager to control
+        additional features of the rendering. This allows the icon to be rendered consistent with
+        configuration of the WindowManager by honouring the configuration to dither colours, or
+        sprites.
+    </p>
+    <bitfield-table>
+        <bit number="0">Dither background colours</bit>
+        <bit number="1">Dither deep sprites</bit>
+        <bit number="2" state="reserved"/>
+    </bitfield-table>
+</category>
+
+</subsection>
+
+
+<subsection title="Configuration">
+<p>
+    Modules which provide icon border filters should include *Commands to allow them to be activated
+    and deactivated. They may also provide the ability to configure their capabilities. It is strongly
+    recommended that modules initialise in their disabled state. This will allow users to load multiple
+    filter modules and select which are active.
+</p>
+</subsection>
+
+</section>
+
+<section title="SWI calls">
+
+<swi-definition name="Filter_RegisterIconBorderFilter"
+                number="4264C"
+                description="Register a filter to handle the rendering of icon borders"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+    <register-use number="0">Pointer to zero-terminated string describing the filter (must be static for the lifetime of the filter)</register-use>
+    <register-use number="1">Pointer to entry point for the filter code</register-use>
+    <register-use number="2">R12 value to supply to the filter code</register-use>
+    <register-use number="3"><p>Mask of border types supported by this filter</p>
+        <bitfield-table>
+            <bit number="0">Simple bordered icons (not used in current versions)</bit>
+            <bit number="1">R1 border supported (Raised region)</bit>
+            <bit number="2">R2 border supported (Lowered region)</bit>
+            <bit number="3">R3 border supported (Ridge group)</bit>
+            <bit number="4">R4 border supported (Channel group)</bit>
+            <bit number="5">R5 border supported (Action button)</bit>
+            <bit number="6">R6 border supported (Default button)</bit>
+            <bit number="7">R7 border supported (Writable box)</bit>
+            <bit number="8-31" state='reserved'/>
+        </bitfield-table>
+    </register-use>
+</entry>
+<exit>
+    <register-use number='0-9' state='preserved'/>
+</exit>
+
+<use>
+<p>
+    The Filter_RegisterIconBorderFilter SWI is used to register a new filter with the FilterManager
+    which is capable of providing rendering of the borders on icons. The new filter code is registered
+    for only certain border types through the use of mask bits. The filter will only be called for
+    those button types which have been registered.
+</p>
+
+<p>
+    Although the filter may report an interest in a given set of borders, it is not required to
+    actually service any of the requests. For example, a filter might only take effect for a particular
+    size of border, and for all others it can pass on the call to other filters.
+</p>
+</use>
+
+<related>
+    <reference type='swi' name='Filter_DeRegisterIconBorderFilter'/>
+</related>
+</swi-definition>
+
+<swi-definition name="Filter_DeRegisterIconBorderFilter"
+                number="4264D"
+                description="De-register a filter from handling the rendering of icon borders"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+    <register-use number="0">Pointer to zero-terminated string describing the filter (should be the same pointer as used on registration)</register-use>
+    <register-use number="1">Pointer to entry point for the filter code</register-use>
+    <register-use number="2">R12 value to supply to the filter code</register-use>
+</entry>
+<exit>
+    <register-use number='0-9' state='preserved'/>
+</exit>
+
+<use>
+<p>
+    The Filter_DeRegisterIconBorderFilter SWI is used to remove the registration of border rendering code.
+    The values supplied in R0-R2 must match those that were supplied on registration.
+</p>
+
+</use>
+
+<related>
+    <reference type='swi' name='Filter_RegisterIconBorderFilter'/>
+</related>
+</swi-definition>
+</section>
+
+
+<section title="Entry points">
+
+<entry-definition number="0"
+                  name="IconBorder_Draw"
+                  description="Draw an icon border on behalf of the WindowManager"
+                  irqs="enabled"
+                  fiqs="enabled"
+                  processor-mode="SVC"
+                  re-entrant="no">
+
+<entry>
+ <register-use number="0">Border type (0-7) of the bordered icon</register-use>
+ <register-use number="1"><reference type='category' name="Icon flags word"/> of the bordered icon</register-use>
+ <register-use number="2">Pointer to <reference type="category" name="Icon border rendering box"/> for the icon being drawn</register-use>
+ <register-use number="3">Pointer to <reference type="category" name="Icon border colour table"/> for the icon being rendered</register-use>
+ <register-use number="4"><reference type="category" name="Icon rendering flags"/> for the icon</register-use>
+ <register-use number="9">0 (reason code)</register-use>
+</entry>
+
+<exit>
+ <register-use number="9">-1 if handled, or preserved to pass to the next filter</register-use>
+</exit>
+
+<use>
+<p>
+    This entry point is called when the WindowManager wishes to render the border of an icon. The border
+    type will have been filtered by the mask supplied on registration. Filters may decide to handle the border
+    returning with R9 set to -1, or pass it on to other border filters by preserving R9.
+</p>
+<p>
+    The filter may update the icon border rendering box if it is passing on the call.
+    This can be used if the border wishes to handle part of the outer rendering of the border before the
+    next filter handles it.
+</p>
+<p>
+    The filter may use any of the parameters to decide whether it wishes to
+    handle rendering of the border.
+    For example, a filter may only handle certain sizes of boxes, or only icons which have a particular
+    combination of flags set. Care must be taken to ensure that this presents a consistent experience
+    to the user, as icons which change in style may be confusing.
+</p>
+<p>
+    The filter should draw a suitable border within the bounds of the icon border rendering box, and reduce
+    the bounding box size accordingly. To be consistent with the user's configuration, the flags in R4
+    should be used to decide whether dithering should be used to draw the border.
+</p>
+</use>
+
+<related>
+<reference type="swi" name="Filter_RegisterIconBorderFilter" />
+<reference type="entry" name="IconBorder_Fill" />
+<reference type="entry" name="IconBorder_Colour" />
+<reference type="entry" name="IconBorder_Size" />
+<reference type="entry" name="IconBorder_State" />
+</related>
+
+</entry-definition>
+
+<entry-definition number="1"
+                  name="IconBorder_Fill"
+                  description="Fill an icon border on behalf of the WindowManager"
+                  irqs="enabled"
+                  fiqs="enabled"
+                  processor-mode="SVC"
+                  re-entrant="no">
+
+<entry>
+ <register-use number="0">Border type (0-7) of the bordered icon</register-use>
+ <register-use number="1"><reference type='category' name="Icon flags word"/> of the bordered icon</register-use>
+ <register-use number="2">Pointer to <reference type="category" name="Icon border rendering box"/> for the icon being drawn</register-use>
+ <register-use number="3">Pointer to <reference type="category" name="Icon border colour table"/> for the icon being rendered</register-use>
+ <register-use number="4"><reference type="category" name="Icon rendering flags"/> for the icon</register-use>
+ <register-use number="9">1 (reason code)</register-use>
+</entry>
+
+<exit>
+ <register-use number="9">-1 if handled, or preserved to pass to the next filter</register-use>
+</exit>
+
+<use>
+<p>
+    This entry point is called when the WindowManager wishes to render the fill of a bordered icon. The border
+    type will have been filtered by the mask supplied on registration. Filters may decide to handle the border
+    returning with R9 set to -1, or pass it on to other border filters by preserving R9.
+</p>
+<p>
+    The filter may use any of the parameters to decide whether it wishes to
+    handle rendering of the border.
+    Usually this is the same criteria used to decide whether icon should be handled in
+    the <reference type="entry" name="IconBorder_Draw"/> entry point.
+    For example, a filter may only handle certain sizes of boxes, or only icons which have a particular
+    combination of flags set. Care must be taken to ensure that this presents a consistent experience
+    to the user, as icons which change in style may be confusing.
+</p>
+<p>
+    The filter should fill the region not covered by the border within the bounds of the icon border
+    rendering box. The bounding box supplied will be that of the icon itself. The filter will only be
+    called icon flag bit is set in the icon flags word which indicates that the icon is filled.
+    To be consistent with the user's configuration, the flags in R4
+    should be used to decide whether dithering should be used to fill the icon.
+</p>
+</use>
+
+<related>
+<reference type="swi" name="Filter_RegisterIconBorderFilter" />
+<reference type="entry" name="IconBorder_Draw" />
+<reference type="entry" name="IconBorder_Colour" />
+<reference type="entry" name="IconBorder_Size" />
+<reference type="entry" name="IconBorder_State" />
+</related>
+</entry-definition>
+
+
+<entry-definition number="2"
+                  name="IconBorder_Size"
+                  description="Return the size available for text after rendering the icon border"
+                  irqs="enabled"
+                  fiqs="enabled"
+                  processor-mode="SVC"
+                  re-entrant="no">
+
+<entry>
+ <register-use number="0">Border type (0-7) of the bordered icon</register-use>
+ <register-use number="1"><reference type='category' name="Icon flags word"/> of the bordered icon</register-use>
+ <register-use number="2">Pointer to <reference type="category" name="Icon border rendering box"/> for the icon being drawn</register-use>
+ <register-use number="9">2 (reason code)</register-use>
+</entry>
+
+<exit>
+ <register-use number="9">-1 if handled, or preserved to pass to the next filter</register-use>
+</exit>
+
+<use>
+<p>
+    This entry point is called when the WindowManager wishes to render the text of a bordered icon.
+    The text within an icon will be bounded by the edges of the border. In order that this text be clipped
+    to those edges, this entry point must reduce the size of the icon border reendering box in R2 by the
+    space covered by the border. The border
+    type will have been filtered by the mask supplied on registration. Filters may decide to handle the border
+    returning with R9 set to -1, or pass it on to other border filters by preserving R9.
+</p>
+<p>
+    The filter may use any of the parameters to decide whether it wishes to
+    handle this border. Usually this is the same criteria used to decide whether icon should be handled in
+    the <reference type="entry" name="IconBorder_Draw"/> entry point.
+    For example, a filter may only handle certain sizes of boxes, or only icons which have a particular
+    combination of flags set. Care must be taken to ensure that this presents a consistent experience
+    to the user, as icons which change in style may be confusing.
+</p>
+<p>
+    The filter should increase the x0 and y0 values, and decrease the x1 and y1 values in the bounding
+    box to reflect the region that the text of the icon may use.
+</p>
+</use>
+
+<related>
+<reference type="swi" name="Filter_RegisterIconBorderFilter" />
+<reference type="entry" name="IconBorder_Draw" />
+<reference type="entry" name="IconBorder_Fill" />
+<reference type="entry" name="IconBorder_Colour" />
+<reference type="entry" name="IconBorder_State" />
+</related>
+
+</entry-definition>
+
+
+<entry-definition number="4"
+                  name="IconBorder_Colour"
+                  description="Update the colours for an icon border on behalf of the WindowManager"
+                  irqs="enabled"
+                  fiqs="enabled"
+                  processor-mode="SVC"
+                  re-entrant="no">
+
+<entry>
+ <register-use number="0">Border type (0-7) of the bordered icon</register-use>
+ <register-use number="1"><reference type='category' name="Icon flags word"/> of the bordered icon</register-use>
+ <register-use number="2">Pointer to <reference type="category" name="Icon border rendering box"/> for the icon being drawn</register-use>
+ <register-use number="3">Pointer to <reference type="category" name="Icon border colour table"/> for the icon being rendered</register-use>
+ <register-use number="9">4 (reason code)</register-use>
+</entry>
+
+<exit>
+ <register-use number="9">-1 if handled, or preserved to pass to the next filter</register-use>
+</exit>
+
+<use>
+<p>
+    This entry point is called when the WindowManager is about to render a bordered icon, to give the
+    border rendering filters an opportunity to override the icon's own colours. The border
+    type will have been filtered by the mask supplied on registration. Filters may decide to handle the border
+    colours returning with R9 set to -1, or pass it on to other border filters by preserving R9.
+</p>
+<p>
+    The filter may use any of the parameters to decide whether it wishes to
+    handle rendering of the border.
+    Usually this is the same criteria used to decide whether icon should be handled in
+    the <reference type="entry" name="IconBorder_Draw"/> entry point.
+    For example, a filter may only handle certain sizes of boxes, or only icons which have a particular
+    combination of flags set. Care must be taken to ensure that this presents a consistent experience
+    to the user, as icons which change in style may be confusing.
+</p>
+<p>
+    The filter should update the values in the icon border colour table in R3 if it wishes to override
+    the colours that the icon has selected. The colours in the table have not yet been updated to
+    invert, shade, tint or apply other colour effects to the icon. As such, the colours chosen here
+    are the base colours. After this entry point has returned, the colours will be updated by the
+    WindowManager to reflect the effects that the icon requests.
+</p>
+</use>
+
+<related>
+<reference type="swi" name="Filter_RegisterIconBorderFilter" />
+<reference type="entry" name="IconBorder_Draw" />
+<reference type="entry" name="IconBorder_Fill" />
+<reference type="entry" name="IconBorder_Size" />
+<reference type="entry" name="IconBorder_State" />
+</related>
+</entry-definition>
+
+
+<entry-definition number="5"
+                  name="IconBorder_State"
+                  description="Get information about the type of icon border filter"
+                  irqs="enabled"
+                  fiqs="enabled"
+                  processor-mode="SVC"
+                  re-entrant="no">
+
+<entry>
+ <register-use number="0">Border type (0-7) of the bordered icon</register-use>
+ <register-use number="1"><reference type='category' name="Icon flags word"/> of the bordered icon</register-use>
+ <register-use number="2">Pointer to <reference type="category" name="Icon border rendering box"/> for the icon being drawn</register-use>
+ <register-use number="3"><p>Filter flags word</p>
+    <bitfield-table>
+        <bit number="0">The border changes in shape, so must be redrawn completely on all state transitions</bit>
+        <bit number="1">The border has a different style when the pointer is over it (the border is 'highlightable')</bit>
+        <bit number="2" state="reserved"/>
+    </bitfield-table>
+ </register-use>
+ <register-use number="9">5 (reason code)</register-use>
+</entry>
+
+<exit>
+ <register-use number="3">Filter flags word updated with this filter's behaviour for the icon</register-use>
+ <register-use number="9">-1 if handled, or preserved to pass to the next filter</register-use>
+</exit>
+
+<use>
+<p>
+    This entry point is called when the WindowManager needs to know about the filter's behaviour with the
+    icon. The border type will have been filtered by the mask supplied on registration. Filters may decide
+    to handle the border colours returning with R9 set to -1, or pass it on to other border filters by
+    preserving R9.
+</p>
+<p>
+    The filter may use any of the parameters to decide whether it wishes to
+    handle rendering of the border.
+    Usually this is the same criteria used to decide whether icon should be handled in
+    the <reference type="entry" name="IconBorder_Draw"/> entry point.
+    For example, a filter may only handle certain sizes of boxes, or only icons which have a particular
+    combination of flags set. Care must be taken to ensure that this presents a consistent experience
+    to the user, as icons which change in style may be confusing.
+</p>
+<p>
+    The entry point is used to decide whether to redraw it fully from the background when a state change happens,
+    or if the icon needs to be drawn at all as the pointer moves over it. The filter should update the flags
+    by OR-ing any new flags into the supplied filter flags word and returning the new value in R3.
+</p>
+<category title="Shape changes">
+    <p>
+    If the rendered border changes shape when there are state transitions, then bit 0 should be set on return.
+    This might happen if the icon had rounded edges normally and square edges when selected, or if the outer
+    edges were not drawn in any colour unless the pointer was over the icon.
+    </p>
+</category>
+
+<category title="Highlightable borders">
+    <p>
+    If the rendered border provides a form of highlighting when the pointer is over the icon, then bit 1 should
+    be set on return. The highlighting will only be performed on border types 5 and 6.
+    </p>
+</category>
+
+</use>
+
+<related>
+<reference type="swi" name="Filter_RegisterIconBorderFilter" />
+<reference type="entry" name="IconBorder_Draw" />
+<reference type="entry" name="IconBorder_Fill" />
+<reference type="entry" name="IconBorder_Colour" />
+<reference type="entry" name="IconBorder_Size" />
+</related>
+</entry-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2002-2021.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Gerph" date="04 Aug 2021" title="Initial version">
+    <change>Created the documentation from implementation details, as original documentation has been lost.</change>
+  </revision>
+ </history>
+
+ <related>
+    <reference type='link' href="https://github.com/gerph/iconborders-example"/>
+ </related>
+</meta>
+</riscos-prm>
