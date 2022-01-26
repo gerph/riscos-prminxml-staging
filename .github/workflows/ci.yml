@@ -1,0 +1,109 @@
+---
+# Build of the RISC OS PRM-in-XML staging repository.
+#
+
+name: PRMinXML
+
+# Controls when the action will run. Triggers the workflow on:
+#   * push on any branch.
+on:
+  push:
+    branches: ["*"]
+    tags: ["v*"]
+
+jobs:
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      # Step intended to be reused in CI pipelines.
+      - name: Fetch the PRM-in-XML code for us to use
+        run: |
+          git fetch origin prminxml-snapshot
+
+      - name: Build it
+        run: |
+          # PrinceXML (http://www.princexml.com/) requires a license to be used.
+          # If the documents produced contain no advertising, and are provided for
+          # no cost to anyone, and are published on a site that has no cost and has
+          # no advertising, and providing that a link is provided to the PrinceXML
+          # site, the non-commercial license can be used (even on a server).
+          # Consult https://www.princexml.com/purchase/license_faq/ for more details.
+          #
+          # These criteria are met by the builds we're creating here, and so we can
+          # use the non-commercial license.
+          sudo env PRINCEXML_I_HAVE_A_LICENSE=1 ./build.sh
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: PRMinXML-Staging
+          path: output
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: Build-Logs
+          path: logs
+
+  # The release only triggers when the thing that was pushed was a tag starting with 'v'
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download built documentation
+        uses: actions/download-artifact@v1
+        with:
+          name: PRMinXML-Staging
+
+      - name: Get the version
+        id: get_version
+        run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+
+      - name: Build the zip archive from the documentation
+        run: |
+          cd PRMinXML-Staging
+          zip -9r ../PRMinXML-Staging.zip *
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.event.release.tag_name }}
+          draft: true
+          prerelease: false
+
+      - name: Upload full archive Assets
+        id: upload-asset-full
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`.
+          # See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: PRMinXML-Staging.zip
+          asset_name: PRMinXML-Staging-${{ steps.get_version.outputs.VERSION }}
+          asset_content_type: application/zip
+
+      - name: Upload PDF only Asset
+        id: upload-asset-pdf
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`.
+          # See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: PRMinXML-Staging/index.pdf
+          asset_name: PRMinXML-Staging-${{ steps.get_version.outputs.VERSION }}.pdf
+          asset_content_type: application/pdf
