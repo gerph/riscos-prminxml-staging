@@ -99,12 +99,14 @@
 <entry>
 </entry>
 <exit>
- <register-use number="0">4</register-use>
- <register-use number="1">347</register-use>
+ <register-use number="0">4 (API version)</register-use>
+ <register-use number="1">347 (module version * 100)</register-use>
 </exit>
 
 <use>
 <p>This SWI returns the version of the interface provided the the Speak module.</p>
+
+<p>Up to version 3.30 of the module the version returned in R0 was 3, and R1 is preserved. After 3.30 the version returns in R0 is 4, and the module version is returned * 100 in R1.</p>
 </use>
 
 <related>
@@ -171,6 +173,7 @@
 
 <use>
 <p>This SWI returns the list of known voice names and variants.</p>
+<p>In version 3 of the API, R1 is always preserved.</p>
 </use>
 
 <related>
@@ -237,7 +240,7 @@
 
 <p>
     <offset-table>
-        <offset number="0">Pointer to zero-terminated name of the language</offset>
+        <offset number="0">Pointer to zero-terminated name of the voice</offset>
         <offset number="4">Pointer to a list of pairs of priority and language strings which this voice is appropriate for (see eSpeak documentation</offset>
         <offset number="8">Pointer to the filename of this voice</offset>
         <offset number="12"><p>(byte) Gender of the voice:</p>
