@@ -1,0 +1,751 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm doc-group="Acorn Functional Specification">
+<chapter title="Acorn Nested Window Manager Functional Specification">
+<section title="Overview">
+
+<p>Version 3.97 and 3.98 of the Wimp are beta versions, incorporating extensions required by numerous projects. The main features are: </p>
+<list>
+<item><p>Nested windows</p></item>
+<item><p>Icon bar auto-fronting</p></item>
+<item><p>Icon bar scroll regulation and acceleration</p></item>
+<item><p>24-bit icon colour specification</p></item>
+<item><p>Border-less windows</p></item>
+<item><p>New filter types</p></item>
+<item><p>Redraw optimisation</p></item>
+<item><p>Numerous bugfixes and other optimisations</p></item>
+</list>
+
+</section>
+<section title="Technical Background">
+
+<p>This document documents changes to the Wimp over the version present in RISC OS 3.71, as determined from the PRM volumes 3 and 5a and the old Wimp itself.</p>
+
+<p>The Wimp has been written so that any given version can be built to soft-load on any OS version back to 3.10. Builds of version 3.97 and version 3.98 suitable for RISC OS 3.1x, 3.5x, 3.6x and 3.7x have been released with beta status for external testing, because a nested Wimp is a prerequisite of the browser and Java. The main differences from the RISC OS 3.7x build in those for earlier operating systems are as follows:</p>
+
+<p>In RISC OS 3.6x and earlier, the Wimp</p>
+
+<list>
+<item><p>has no support for StrongARM</p></item>
+<item><p>handles task memory management (rather than delegating to OS_AMBControl) </p></item>
+</list>
+
+<p>In RISC OS 3.5x and earlier, the Wimp</p>
+<list>
+<item><p>always plots sprites using a translation table (ColourTrans module isn't new enough to plot paletted sprites from the palette)</p></item>
+</list>
+
+
+
+<p>In RISC OS 3.1x, the Wimp</p>
+<list>
+<item><p>handles memory management significantly differently (for example, it doesn't use dynamic areas)</p></item>
+<item><p>doesn't assume FPEmulator 4.00 or later will be present</p></item>
+<item><p>doesn't support mode specifiers</p></item>
+</list>
+
+</section>
+<section title="User Interface">
+<subsection title="Child and Nested Windows">
+<p>The single biggest enhancement to the Wimp is support for child windows: windows that are linked to and are only displayed within their parent. Each edge, and both scroll offsets of every child window are independently linked to the work area or one edge of the parent window, in whatever way suits the task. Thus, when a parent window is moved, scrolled or resized, any related changes to child windows are dealt with automatically by the Wimp.</p>
+
+<p>Any window may have any number of children, and within each window there is a stack of child windows, whose relative depth can change in the same manner as the top-level window stack. Child windows may change their parent at any time, jumping between stacks. Child windows may themselves have nested children within them, which may in turn have their own children, and so on. Child windows are considered to lie above any icons in their parent window, and above the parent window's caret.</p>
+
+<p>It should be noted that with all this added flexibility comes a potential for badly designed, non-intuitive application front-ends, so care must be taken when designing a user interface which uses the window nesting facilities.</p>
+
+<subsubsection title="Child Windows Without a Work Area">
+<p>In the past, it has not been possible to display windows without a work area, for example to implement a scroll bar in a non-standard place. This was due not only to a hard-coded minimum size visible area (see <reference type="subsubsection" name="Minimum Sizes" />) but also due to the ever-present single-pixel border drawn by the Wimp along any edge of a window that lacks window furniture. In fact, it has previously been possible to remove the single-pixel border, but at the expense of the removal of all the window furniture at the same time, leaving an isolated work area. These restrictions have been lifted.</p>
+
+<p>This behaviour is in fact also available with top-level windows, but its usefulness is expected to be limited to child windows.</p>
+
+</subsubsection>
+<subsubsection title="Furniture Windows">
+<p>Normally, child windows are clipped according to the visible area of the parent window. However, there are occasions where it is desirable for the child windows to be clipped by the window outline - that is, allowing them to overlap the window furniture. This might, for example, be used to display status information within the scrollbars, or add window furniture buttons. An additional window flag has been introduced, allowing a child window to overlap the window furniture of its parent in this way.</p>
+
+<p>Further, it is realised that to place such a furniture window at, for example, the bottom left of a window, would obscure the parent's scroll arrow icon. In order to compensate for this, scrollbars are allowed to move to accommodate any child window found to be touching both the outside edge of the scrollbar, and the end of the scrollbar. A window is deemed to be touching the end of the scrollbar if its end outline coordinate is within 1 pixel of the end of the scrollbar, i.e. there must be no gap between the child window outline and the final pixel of the scrollbar. The end of the scrollbar is adjusted so that it just underlaps the other end of the child window outline. The child window should normally be wide enough to cover all the area where the scroll bar would have been, as only a blank area of colour will be drawn there otherwise.</p>
+
+<p>Notice that these constraints allow for four furniture windows within the scrollbars of the parent. If, for example, the developer wanted two child windows in the bottom left, one window would have to be made a child of the other. Under current Wimp behaviour, if two sibling child windows are placed side by side in this manner, the scrollbar will move to accommodate both of them, but only if they are in a certain stacking order; this behaviour is not guaranteed in future versions of the Wimp, and must not be relied upon.</p>
+
+<p>Again, the flexibility offered by these child windows must not be abused: developers must, for example, take steps to ensure that the parent's minimum visible area is large enough for the furniture window never to overlap the parent's adjust size button.</p>
+
+<p>Furniture windows which are independently moveable and/or resizable are beyond the scope of the Nested Window Manager, and any attempt to give them such abilities will result in unpredictable behaviour. Such designs are thus strongly discouraged.</p>
+
+</subsubsection>
+</subsection>
+<subsection title="Windows in General">
+<subsubsection title="Invalid Rectangle Handling">
+<p>The way in which the Wimp calculates the invalid and block-copy rectangle lists is optimised over old Wimps, in order to increase the proportion of block-copy operations, which are usually much faster than redraws. This is done by compiling a list of changes between each call to Wimp_Poll, and only then calculating which rectangles are genuinely invalid, and which can be displayed using a quick block-copy operation. The block-copies themselves are re-ordered so that wherever possible, one copy does not invalidate screen area needed as source for another copy operation; in the rare cases where this is not possible, the least damaging alternative is chosen - that is, the one requiring the smallest invalid area to be redrawn.</p>
+
+<p>The upshot of this is that wherever touching or overlapping windows move together - external and internal panes, and of course, nested windows - the shuffling effect present in earlier Window Managers, where an area is alternately covered by the top window, and exposed and redrawn, is eliminated. There is also some speed gain from combining block-copy operations. In the unusual event that the window opening queue needs to be flushed before the Wimp_Poll, an extension to <reference type="swi" name="Wimp_OpenWindow" /> is provided.</p>
+
+</subsubsection>
+<subsubsection title="Standard Window Furniture">
+<p>All window furniture buttons slab in, including close and toggle size.</p>
+
+<p>The bug regarding slabbing-in of the other furniture buttons, which could be unreliable following a Service_InvalidateCache, is fixed.</p>
+
+<p>Single-pixel borders can be removed from windows without removing all the other window furniture at the same time.</p>
+
+<p>For large work area windows, when the scroll sliders start being dragged, they jump less than in previous Wimps, and are displayed more accurately when they reach the end of the document.</p>
+
+<p>A plain-colour background is no longer drawn underneath the solid toolsprites, thereby reducing flicker.</p>
+
+
+</subsubsection>
+<subsubsection title="Minimum Sizes">
+<p>All windows are optionally shrinkable to zero size visible area (subject to the continued visibility of any back, close, toggle size and adjust size buttons). In order to achieve this, scroll bars no longer have a minimum length (except in special cases). After the scroll slider region has been shrunk to zero length, the scroll arrows start to be plotted scaled down until the entire bar shrinks to nothing.</p>
+
+<p>Most conventional programs which rely upon the old behaviour continue to function as before, due to the special-case exemptions in <reference type="swi" name="Wimp_CreateWindow" />.</p>
+
+</subsubsection>
+<subsubsection title="Shift-Toggle-Sized Windows">
+<p>Windows which have been toggle-sized with Shift held down (i.e. made to fill all the screen except the icon bar) are now internally marked as being full size, and the toggle-size button indicates this by switching to the "fulled" sprite. A further click on the toggle size button will then reduce the window's size to its original size, as opposed to the previous, unhelpful behaviour, which was to enlarge the window to full screen, including covering the icon bar!</p>
+
+</subsubsection>
+<subsubsection title="Error Report Dialogue Boxes">
+<p>Since each error button in a Wimp error box can contain user-defined text, it is possible for the text to be wider than the fixed width action buttons used in previous Wimps' error boxes. The Wimp now enlarges each action button if the width of its text (plus 36 OS units to allow for borders) is greater than that of its standard action button.</p>
+
+</subsubsection>
+</subsection>
+<subsection title="Icons">
+<p>A number of long-standing bugs relating to "3-D" icons are fixed: clicking on an action button that uses an antialiased font doesn't reset the Wimp font to the old bitmap system font; multiple selection of action buttons via dragging off one button and Adjust-clicking on another is no longer possible; menu clicks on action buttons no longer cause a flicker; and the 3-D plinths are drawn correctly in EX0 and/or EY0 screen modes and/or when not pixel-aligned. Icon foregrounds and backgrounds can be drawn using any 24-bit specified colour, not just one one of the Wimp colours.</p>
+
+<p>Any 2-, 4-, 16- or 256-colour sprites with palettes within icons are now plotted using the palette directly, rather than via a translation table. The effect of this is better colour reproduction of such sprites in 32 thousand colour and 16 million colour modes.</p>
+
+<p>Line spacing for multi-line text icons, first specified for RISC OS 3.10, via the parameters to the "L" command of an icon's validation string, has finally been implemented.</p>
+
+</subsection>
+<subsection title="Menus">
+<p>Submenus and dialogue boxes opened from "reversed menus" are opened at the correct horizontal position again. However, the automatically-opened position still does not perfectly mirror normal menus for cases where the pointer is held over the "tick" space opposite the arrow.</p>
+
+</subsection>
+<subsection title="Icon Bar">
+<p>The icon bar scrolls at a rate independent of processor speed or loading - the position is determined according to the time elapsed since scrolling started, irrespective of how many screen updates have been possible since.</p>
+
+<p>Also, the speed of scrolling increases linearly over time; it accelerates. This eases navigation of very wide icon bars.</p>
+
+<p>If the pointer is left over the bottom pixel row of the screen for 0.5 seconds, the icon bar now pops to the top of the window stack, much as it would if you had used the Shift-F12 hotkey. The icon bar remains at the top of the stack (and therefore accessible) while the pointer stays over the icon bar and/or there is an icon bar menu open. When this condition is no longer true, the icon bar returns to its original position in the window stack (note that this differs from Shift-F12 behaviour, where the icon bar always becomes a "back" object again).</p>
+
+</subsection>
+<subsection title="Panic Redraws">
+<p>When a panic redraw occurs due to there being too many invalid rectangles for the Wimp to handle, the first thing drawn is a plain background. In a feature dating back to Arthur, this was hard-coded to Wimp colour 15 (now light blue) - hardly appropriate. This is changed to a mid-grey colour.</p>
+
+<p>Also, anticipating the increased number of invalid rectangles made likely by the nested windows system, the number of invalid rectangles allowed before a panic redraw is triggered is raised from 128 to 256.</p>
+</subsection>
+</section>
+<section title="Programmer's interface">
+<p>The following SWIs detail the changes from the previous version of the Window Manager. They are not full definitions for each SWI call.</p>
+<swi-definition name="Wimp_Initialise"
+                number="400C0"
+                description=""
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="svc"
+                re-entrant="no"
+                >
+
+<entry>
+<p>-</p>
+</entry>
+
+<exit>
+<p>-</p>
+</exit>
+
+<use>
+<p>Wimp_Initialise recognises a new version number, in addition to the established 200, 300 and 310 versions. 380 will, at a sufficiently advanced version of the Wimp, be necessary in order to activate most of the features described in this specification. As of Wimp version 3.97, <strong>only</strong> the window foreground colour byte of the window block is affected by the version passed to Wimp_Initialise, but this must not be relied upon for future releases of the Wimp; other Nested-Wimp features may in future become reliant upon having passed 380.</p>
+</use>
+
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_CreateWindow"
+                number="400C1"
+                description=""
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="svc"
+                re-entrant="no"
+                >
+
+<entry>
+<register-use number="1">Window block
+<offset-table>
+<offset number="28">window flags:
+<bitfield-table>
+<bit number="22"><p>This bit is overwritten by the Wimp, and may be read using Wimp_GetWindowState. When set, it indicates that the window is, or <em>will be</em>, toggled to full size without covering the icon bar. Note that this behaviour is different to bit 18, which is set if the window is, or <em>has been</em>, toggled to full size including the icon bar.</p>
+<p>Toggling behaviour can only be properly resolved after Wimp_Poll returns an Open_Window_Request reason code and before the subsequent call to Wimp_OpenWindow. Flags bit 19 is set, by definition; applications may distinguish between different types of toggle-size clicks using the following truth table:</p>
+<p><image src="tbl_toggle_bits.png" type="png" /></p>
+<p>These are the only values that can be returned in combination with bit 19 being set.</p>
+</bit>
+<bit number="23">If this is a child window, make it a furniture window. (This has no meaning for top-level windows, so the bit should always be cleared in such cases to allow for future expansion).</bit>
+</bitfield-table></offset>
+<offset number="32">Title foreground and window frame colour:
+<value-table>
+<value number="&hex;FF">Window has no 1-pixel border components, but furniture can still be present (as controlled by the usual flag bits). Title foreground colour defaults to Style Guide standard colour (Wimp colour 7).</value>
+</value-table>
+</offset>
+<offset number="68"><p>Minium width of window (16 bits).</p>
+<p>This used to be the minimum visible width in OS units, unless a greater width was required by either of the following:</p>
+<p>
+<list>
+<item><p>The top edge furniture - any combination of the back, close, title and (as a special case when the vertical scrollbar is absent) the toggle-size icons. The width required by the title icon was defined as 8 OS units, except when 0 was used here, indicating that the full width of the title text or sprite will apply;</p></item>
+<item><p>The bottom edge furniture - the minimum (unsquashed) size horizontal scrollbar (if present), plus any adjust-size button (in the special case when the vertical scrollbar is absent).</p></item>
+</list>
+</p>
+<p>The 0 special case retains exactly the same behaviour as before (horizontal scroll bars, if present, cannot be squashed below a certain minimum width). Any other values activate the new behaviour: a horizontal scrollbar can be squashed down to zero width, and the title bar can be squashed down to zero width as long as the back and close buttons are both absent (otherwise, 8 OS units remains the minimum title icon width). A new special case, 1, is introduced, activating the new behaviour, but with an actual minimum window width of 0 rather than 1 (although it is obviously still subject to any non-squashable furniture width requirements as discussed).</p>
+</offset>
+<offset number="70"><p>Minium height of window (16 bits).</p>
+<p>This used to be the minimum visible height in OS units, unless a greater height was required by a minimum (unsquashed) size vertical scrollbar, plus any toggle-size and adjust-size buttons (in the special cases where there is no title or horizontal scrollbar, respectively). It was also subject to a restraint that the minimum height could not be less than 2 pixels high when the vertical scrollbar was absent.</p>
+<p>The value 0 becomes a special case, and retains exactly the same behaviour as before. That is, the vertical scroll bar, if present, cannot be squashed down below a certain size. All other values activate the new behaviour: any vertical scrollbar may be squashed down to zero height, and the 2-pixel hard-minimum no longer applies. A special case, 1, is introduced, activating the new behaviour but with a minimum window height of zero rather than of 1 (subject to constraints imposed by window furniture as described).</p>
+</offset>
+</offset-table>
+</register-use>
+</entry>
+
+<exit>
+<p>unchanged</p>
+</exit>
+
+<use>
+<p>The meanings of certain parts of the window block are altered and extended as shown.</p>
+</use>
+
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_CreateIcon"
+                number="400C2"
+                description=""
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="svc"
+                re-entrant="no"
+                >
+
+<entry>
+<p>unchanged</p>
+</entry>
+
+<exit>
+<p>unchanged</p>
+</exit>
+
+<use>
+<p>The (C)olour validation string command is introduced to allow icon colours to be set from a 24-bit palette. It is typically followed by two hexadecimal numbers (BBGGRR) separated by a /, but either one may be omitted, and the relevant colour from the icon flags (or the F command) will then be used instead. It is suggested that the old-style colours should be specified to something sensible, in case the program gets run on a Window Manager that doesn't support the command.</p>
+
+<p><image src="tbl_icon_validation_c.png" type="png" /></p>
+
+<p>Note also that the line spacing specified after the (L)ine spacing command is now acted upon.</p>
+
+<p>Bit 20 of the icon flags has not been part of the Exclusive Selection Group (ESG) number since at least RISC OS 3.10, and should be considered 'reserved'.</p>
+
+</use>
+
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_OpenWindow"
+                number="400C5"
+                description=""
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="svc"
+                re-entrant="no"
+                >
+
+<entry>
+<register-use number="1">Pointer to block, or NULL (0 or -1) to flush all pending opens to the screen.</register-use>
+<register-use number="2"><p>"TASK" (&hex;4B534154)</p>
+<p>This is a 'magic word' to tell Wimp that the extended version of this SWI call is being made.</p>
+
+<p>In the extended call, R3 and R4 are as described below. Otherwise, the previous parent and flags (if any) are reused. The parent defaults to -1 and the flags default to 0, i.e. traditional Wimp behaviour is still the default.</p>
+
+<p><strong>It is important to ensure that R2 does <em>not</em> accidentally get left with this value from a previous call in code which mixes old and new style calls.</strong> This is mostly an issue for C SWI veneers.</p>
+</register-use>
+<register-use number="3">Handle of window to make parent (or -1 to make a top-level window)</register-use>
+<register-use number="4">flags
+<bitfield-table>
+<bit number="0">Use extended OpenWindow block in R1 (R1 + 32 = window flags).</bit>
+<bit number="16-17">left edge of child</bit>
+<bit number="18-19">bottom edge of child</bit>
+<bit number="20-21">right edge of child</bit>
+<bit number="22-23">top edge of child</bit>
+<bit number="24-25">x-scroll of child</bit>
+<bit number="26-27"><p>y-scroll of child</p>
+<p>These flag pairs have the following meanings (as high bit, low bit):</p>
+<value-table head-number="Setting" head-value="Action">
+<value number="00">linked to work area of parent</value>
+<value number="01">linked to left / bottom of visible area of parent</value>
+<value number="10">linked to right / top of visible area of parent</value>
+<value number="11">reserved</value>
+</value-table>
+</bit>
+<bit number="1-31" state="reserved"></bit>
+</bitfield-table>
+</register-use>
+</entry>
+
+<exit>
+<p>unchanged</p>
+</exit>
+
+<use>
+<p>This call is the key to the nested window system. Changes are as shown.</p>
+
+<p>If R3 is -1, bits 16-27 must all be clear. Otherwise, they specify how certain aspects of the child are aligned with the parent window.</p>
+
+<p>If R4 bit 0 is set, then R1 + 32 holds the new window flags to use. This can be used, for example, to add or remove window furniture without having to delete and re-create the window.</p>
+
+<p>Not all window flags can be altered in this way. In particular, bits 16-22 can only be set or cleared by the Wimp, in order to reflect the window status. The Wimp will also modify the bits relating to the window furniture as follows: if bit 31 is unset (indicating the old-style bits are to be used) then bits 24-30 are updated to reflect the status indicated by bits 0, 2, 3 and 7 (but note that bit 31 itself is left unchanged). If bit 31 is set, however, bits 0, 2, 3 and 7 are cleared. All other bits are preserved (and acted upon) by the Wimp.</p>
+
+<p>Under previous Wimps, the window handle at R1+0 had to be owned by the task calling Wimp_OpenWindow. Because a child window need not belong to the same task as its parent, this restriction has now been lifted; this is the case even for the non-extended form (R2 not equal to the magic word "TASK").</p>
+
+<p>Since RISC OS 2 (and possibly even earlier), Wimp_OpenWindow has had undocumented return conditions: values at R1+4 - R1+24 are updated to represent the actual parameters of the opened window after valid ranges have been taken into account, and the window has been forced on-screen (if applicable). Rather than continue to have programs waste time following a Wimp_OpenWindow with a Wimp_GetWindowState (except in cases where the new window flags are required), the exit conditions can now be considered official.</p>
+</use>
+
+<related>
+</related>
+</swi-definition>
+<swi-definition name="Wimp_GetWindowState"
+                number="400CB"
+                description=""
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="svc"
+                re-entrant="no"
+                >
+
+<entry>
+<p>changes detailed below</p>
+</entry>
+
+<exit>
+<p>unchanged</p>
+</exit>
+
+<use>
+<p>This call mirrors Wimp_OpenWindow. If R2 = "TASK" on entry, then on exit R3 and R4 are as <reference type="swi" name="Wimp_OpenWindow" >described above</reference>. Note however that Wimp_GetWindowState has always returned the window flags in R1+32, but despite this, R4 bit 0 will always be returned cleared.</p>
+
+</use>
+
+<related>
+</related>
+</swi-definition>
+<swi-definition name="Wimp_GetWindowInfo"
+                number="400CC"
+                description=""
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="svc"
+                re-entrant="no"
+                >
+
+<entry>
+<p>unchanged</p>
+</entry>
+
+<exit>
+<p>changes detailed below</p>
+</exit>
+
+<use>
+<p>The returned window block's extended meanings are as for <reference type="swi" name="Wimp_CreateWindow" />.</p>
+
+</use>
+
+<related>
+</related>
+</swi-definition>
+<swi-definition name="Wimp_ForceRedraw"
+                number="400D1"
+                description=""
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="svc"
+                re-entrant="no"
+                >
+
+<entry>
+<register-use number="0">Window handle (as before) </register-use>
+<register-use number="1">"TASK" (&hex;4B534154)<br />
+This signals that the extended version of Wimp_ForceRedraw is being used, and R2-R4 are as stated below. </register-use>
+<register-use number="2">
+<value-table>
+<value number="+3">Redraw title bar</value>
+<value number="">Other values are reserved</value>
+</value-table>
+</register-use>
+<register-use number="3-4">Ignored</register-use>
+</entry>
+
+<exit>
+<p>unchanged</p>
+</exit>
+
+<use>
+<p>Wimp_ForceRedraw is changed so that it can be applied to windows owned by other tasks, because a child window may belong to another task.</p>
+
+<p>In the past, redrawing the title bar of a window has been accomplished either by working out where the window's title bar is on the screen and calling Wimp_ForceRedraw with R0=-1 to invalidate that area, or alternatively by toggling the input focus in and out of the window to force its borders to be redrawn.</p>
+
+<p>Neither of these methods is particularly satisfactory: the first could cause other windows on top of the one in question to be redrawn unnecessarily, and the second redraws the rest of the borders as well, and in the case of child windows, would also cause a redraw of the parent's title bar.</p>
+
+<p>So Wimp_ForceRedraw is extended as shown above.</p>
+<p>Note: Since the value &hex;4B534154 ("TASK") is far too big to be an minimum x coordinate, it is safe to use as described above. </p>
+</use>
+
+<related>
+</related>
+</swi-definition>
+<swi-definition name="Wimp_GetWindowOutline"
+                number="400E0"
+                description=""
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="svc"
+                re-entrant="no"
+                >
+
+<entry>
+<p>unchanged</p>
+</entry>
+
+<exit>
+<p>unchanged</p>
+</exit>
+
+<use>
+<p>Previously, a window had to be open and visible on screen for this call to work. It will now work on windows which are closed or not yet visible.</p>
+
+</use>
+
+<related>
+</related>
+</swi-definition>
+<swi-definition name="Wimp_RegisterFilter"
+                number="400F5"
+                description=""
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="svc"
+                re-entrant="no"
+                >
+
+<entry>
+<register-use number="1">Reason code:
+<value-table>
+<value number="4">Register / deregister post-rectangle filter</value>
+<value number="5">Register / deregister post-icon filter</value>
+</value-table>
+</register-use>
+</entry>
+
+<exit>
+<p>unchanged</p>
+</exit>
+
+<use>
+<p>Each type of filter may only be registered once using this call, and so it remains for the use of the Filter Manager only (which will normally be responsible for delegating filter calls for specific tasks) unless you want to replace the whole filter system. The SWI is thus, in effect, only really for internal use but since it is documented in the PRMs the extended version is included here for completion.</p>
+
+<p>As far as the Filter Manager is concerned, note that certain filter types require a newer Filter Manager than present in the RISC OS 3.60 / RISC OS 3.71 ROMs.</p>
+
+<p>There are two new reason codes that may be passed to Wimp_RegisterFilter (4 &amp; 5)</p>
+
+<p>Notes:<br />
+There is an undocumented entry condition for any registered pre-filter: R3 points to the poll word if R0 bit 22 was set on entry to Wimp_Poll. On exit, R1 and R3-R10 must be preserved. The PRMs have also forgotten to mention that on entry to the post-filter, R12 holds the value given in R2 when the routine was registered. On exit, R1 and R3-R10 must be preserved. Future documentation will include this information.</p>
+
+<p>The Wimp now calls the post-filter, with a null reason code, whenever Wimp_StartTask returns, even if the child task didn't call Wimp_Poll. In either case, any attempt to claim the null event will now be ignored.</p>
+
+<p>The entry and exit conditions for reason code 2 and 3 filters have not previously been documented, and those for reason codes 4 and 5 are new in Wimp version 3.86, so they are in numerical order by reason code in the section entitled <reference type="section" name="Filter Entry Points" />.</p>
+
+</use>
+
+<related>
+</related>
+</swi-definition>
+<swi-definition name="Wimp_Extend"
+                number="400FB"
+                description=""
+                irqs="unchanged"
+                fiqs="unchanged"
+                processor-mode="undefined"
+                re-entrant="undefined"
+                >
+
+<entry>
+<register-use number="0">Reason code (see exit conditions for R1)</register-use>
+<register-use number="1">Window handle, or for reason codes in R0 of 7 and 8, a value of -1 to enquire about the top-level stack.</register-use>
+</entry>
+
+<exit>
+<register-use number="1">     The value of R1 depends on the reason code and R1 value supplied on entry:
+<value-table>
+<value number="0 - 5"><em>Internal use only</em></value>
+<value number="6">Parent window</value>
+<value number="7">Frontmost child window</value>
+<value number="8">Backmost child window</value>
+<value number="9">Sibling immediately behind</value>
+<value number="10">Sibling immediately in front</value>
+</value-table>
+</register-use>
+</exit>
+
+<use>
+<p>It is possible to enumerate window stacks using only Wimp_GetWindowState, but it requires that you open a "special" window of your own at the back of each stack to be enumerated, and you can only enumerate the stack from back to front. It may also return rather more information that you actually need, and so may be a little bit slower than it might be.</p>
+
+<p>Consequently, five new index values are added to Wimp_Extend. For each of the following, R1 holds the window handle being queried, or a value of -1 to enquire about the top-level stack (for index values 7 and 8 only).</p>
+
+<p>Any of the above calls can return R1 = -1 for "no window", indicating that the end of the stack was reached, or the window had no parent or child, or R1 was -1 on entry and R0 was not 7 or 8.</p>
+
+<p>Note also that pane windows are not skipped by any of the above calls.</p>
+
+</use>
+
+<related>
+</related>
+</swi-definition>
+</section>
+<section title="Filter Entry Points">
+
+<entry-definition
+      name="Rectangle Copy Filter"
+      number=""
+      reason=""
+      reasonname=""
+      description=""
+      internal=""
+      irqs="enabled"
+      fiqs="enabled"
+      processor-mode="svc"
+      re-entrant="no"
+      >
+
+<entry>
+<register-use number="2">Destination bounding box: min x</register-use>
+<register-use number="3">Destination bounding box: min y</register-use>
+<register-use number="4">Destination bounding box: max x</register-use>
+<register-use number="5">Destination bounding box: max y</register-use>
+<register-use number="6">Source bounding box: min x</register-use>
+<register-use number="7">Source bounding box: min y</register-use>
+<register-use number="8">Source bounding box: max x</register-use>
+<register-use number="9">Source bounding box: max y</register-use>
+<register-use number="10">Window handle, minus one<br />
+(only in Nested Wimp variants from v3.90 onwards)</register-use>
+<register-use number="12">Value of R2 when registered</register-use>
+
+</entry>
+
+<exit>
+<register-use number="0-1" state="preserved" />
+<register-use number="3-10" state="preserved" />
+</exit>
+
+<use>
+<p>The rectangle copy filter is called when the Wimp is about to copy a rectangle across the screen, not exclusively due to Wimp_BlockCopy. The current and previous graphics cursor positions are describing the area to be copied, ready for the VDU block copy operation, but the actual operation has not yet been performed.</p>
+
+<p>All bounding boxes (R6-R9 values on entry) are in screen coordinates.</p>
+</use>
+
+<related>
+</related>
+</entry-definition>
+<entry-definition
+      name="Get Rectangle Filter"
+      number=""
+      reason=""
+      reasonname=""
+      description=""
+      internal=""
+      irqs="enabled"
+      fiqs="enabled"
+      processor-mode="svc"
+      re-entrant="no"
+      >
+
+<entry>
+<register-use number="2">Task handle</register-use>
+<register-use number="6">Rectangle to be drawn: min x</register-use>
+<register-use number="7">Rectangle to be drawn: min y</register-use>
+<register-use number="8">Rectangle to be drawn: max x</register-use>
+<register-use number="9">Rectangle to be drawn: max y</register-use>
+<register-use number="12">Value of R2 when registered</register-use>
+
+</entry>
+
+<exit>
+<register-use number="0-1" state="preserved" />
+<register-use number="3-10" state="preserved" />
+</exit>
+
+<use>
+<p>The get rectangle filter is called just before the redrawing of a rectangle begins, before the window background has been filled (if appropriate), and even before the VDU graphics window has been set up. This filter is no longer called when it is only the caret which is being redrawn; the new rectangle filters below never have been.</p>
+
+<p>Note that on entry, R10 is undefined (this may change to match the other rectangle filters, but don't rely on it).</p>
+
+<p>All bounding boxes (R6-R9 values on entry) are in screen coordinates.</p>
+</use>
+
+<related>
+</related>
+</entry-definition>
+<entry-definition
+      name="Post-Rectangle Filter"
+      number=""
+      reason=""
+      reasonname=""
+      description=""
+      internal=""
+      irqs="enabled"
+      fiqs="enabled"
+      processor-mode="svc"
+      re-entrant="no"
+      >
+
+<entry>
+<register-use number="2">Task handle</register-use>
+<register-use number="6">Rectangle to be drawn: min x</register-use>
+<register-use number="7">Rectangle to be drawn: min y</register-use>
+<register-use number="8">Rectangle to be drawn: max x</register-use>
+<register-use number="9">Rectangle to be drawn: max y</register-use>
+<register-use number="10">Window handle, minus one</register-use>
+<register-use number="12">Value of R2 when registered</register-use>
+
+</entry>
+
+<exit>
+<register-use number="0-1" state="preserved" />
+<register-use number="3-10" state="preserved" />
+</exit>
+
+<use>
+<p>The post-rectangle filter is called after the window background is filled as part of a rectangle redraw, i.e. shortly before Wimp_GetRectangle or Wimp_RedrawWindow (or their internal equivalents) reset the VDU state and return, unless the call is returning with "no more to do" status. The filter is linked to the filling-in of the window background; redraw loops initiated by Wimp_UpdateWindow never cause this filter to be called, because they do not cause the window background to be redrawn. However, the filter is called after a "transparent" window background would have been filled.</p>
+
+<p>All bounding boxes (R6-R9 values on entry) are in screen coordinates.</p>
+</use>
+
+<related>
+</related>
+</entry-definition>
+<entry-definition
+      name="Post-Icon Filter"
+      number=""
+      reason=""
+      reasonname=""
+      description=""
+      internal=""
+      irqs="enabled"
+      fiqs="enabled"
+      processor-mode="svc"
+      re-entrant=""
+      >
+
+<entry>
+<register-use number="2">Task handle</register-use>
+<register-use number="6">Rectangle to be drawn: min x</register-use>
+<register-use number="7">Rectangle to be drawn: min y</register-use>
+<register-use number="8">Rectangle to be drawn: max x</register-use>
+<register-use number="9">Rectangle to be drawn: max y</register-use>
+<register-use number="10">Window handle, minus one</register-use>
+<register-use number="12">Value of R2 when registered</register-use>
+
+</entry>
+
+<exit>
+<register-use number="0-1" state="preserved" />
+<register-use number="3-10" state="preserved" />
+</exit>
+
+<use>
+<p>   In the past, the rectangle redraw cycle has consisted of the Wimp filling the background and returning control to the application, which then draws whatever it wants and calls Wimp_GetRectangle. The Wimp subsequently draws the icons before moving on to the next rectangle and filling its background, and so on. This did mean that applications never got a chance to draw on top of the icons; the post-icon filter now allows them to.</p>
+
+<p>All bounding boxes (R6-R9 values on entry) are in screen coordinates.</p>
+</use>
+
+<related>
+</related>
+</entry-definition>
+
+</section>
+<section title="References">
+<category title="The Filter Manager">
+<p>PRM Volume 3, section 56, pp. 303-312 and erratum, Volume 5a, page 668.</p>
+
+</category>
+<category title="The Window Manager: Wimp_RegisterFilter">
+<p>PRM Volume 3, section 53, pp. 224-225</p>
+
+</category>
+<category title="Acorn Filter Manager v0.18: Functional Specification">
+<p>Document reference 1215,102/FS.</p>
+
+</category>
+</section>
+</chapter>
+
+
+<meta>
+<disclaimer>
+<p>Originally appearing as 1116,011/FS up to issue 3, this specification now has a document number of 1215,401/FS for General Release.</p>
+
+<p>Various authors for original document, including:</p>
+
+<list>
+<item><p>Piers Wombwell</p></item>
+<item><p>Kevin Bracey</p></item>
+</list>
+
+<p>Later revisions for first formal specification:</p>
+
+<list>
+<item><p>Ben Avison</p></item>
+<item><p>Andrew Hodgkinson</p></item>
+</list>
+
+
+</disclaimer>
+<history>
+<revision number="1116,011/FS_1" date="06 Feb 1998" author="" title="Original Version (not released)" />
+
+<revision number="1116,011/FS_2" date="10 Feb 1998" author="" title="" >
+<change>HTML version completed for publishing on the Web</change>
+</revision>
+
+<revision number="1116,011/FS_3" date="16 Feb 1998" author="" title="" >
+<change>Fixed up the HTML a bit</change>
+<change>in Wimp_CreateWindow the title foreground colour defaults to 7, not to 2</change>
+</revision>
+
+<revision number="-" date="23 Feb 1998" author="" title="" >
+<change>Various HTML tweaks; no content change</change>
+</revision>
+
+<revision number="1215,401/FS_1" date="02 Mar 1998" author="" title="General Release" >
+<change>Document number now 1215,401/FS</change>
+<change>Updated history, and navigation links in the page footer now include the specifications section.</change>
+<change>no other content changes</change>
+</revision>
+
+<revision number="1215,401/FS_2" date="08 Apr 1998" author="" title="" >
+<change>Added Wimp_RegisterFilter details.</change>
+<change>Some missing spaces added.</change>
+<change>Alphabetic components of the hex SWI numbers in body text capitalised.</change>
+<change>Added References section.</change>
+<change>Used &lt;acronym&gt; tag for acronyms.</change>
+</revision>
+
+<revision number="1215,401/FS_3" date="21 Sep 2021" author="Alan Robertson" title="Initial version in PRMinXML format">
+<change>No major changes to text. Removed the 'Document Status' section as information captured in 'Document information' section</change>
+<change>Prefixed the Acorn Functional Specification Document Number to each Issue revision (where possible) in original</change>
+<change>Removed links to external files</change>
+<change>The Filter Entry Points are now defined within their own section, rather than as part of Wimp_RegisterFilter </change>
+</revision>
+
+</history>
+</meta>
+
+</riscos-prm>
