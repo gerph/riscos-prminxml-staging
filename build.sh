@@ -14,7 +14,7 @@
 #
 # For example running this script with:
 #
-#   PRIMCEXML_I_HAVE_A_LICENSE=1 ./build.sh
+#   PRINCEXML_I_HAVE_A_LICENSE=1 ./build.sh
 #
 # Consult the PrinceXML documentation for license details.
 #
@@ -30,6 +30,8 @@ set -e
 set -o pipefail
 
 PRINCE_VERSION=14.2
+#PRMINXML_VERSION=1.02.65
+PRMINXML_VERSION=1.03.65.html5-css.105
 SYSTEM="$(uname -s)"
 
 if [[ "$SYSTEM" = 'Darwin' ]] ; then
@@ -163,25 +165,16 @@ install_package make
 
 if ! type -p riscos-prminxml >/dev/null 2>&1 ; then
     # riscos-prminxml isn't installed, so let's get a copy.
-    if [[ ! -x './riscos-prminxml' ]] ; then
+    if [[ ! -x "./riscos-prminxml-$PRMINXML_VERSION/riscos-prminxml" ]] ; then
         echo +++ Obtaining riscos-prminxml
-        if [[ ! -f ~/.gitconfig ]] ; then
-            git config --local user.email 'nobody@nowhere.com'
-            git config --local user.name 'Automated merge'
-        fi
-        # Merge in the snapshot branch
-        git merge origin/prminxml-snapshot -m "Automated merge of prminxml-snapshot"
-        # But don't leave those merges as part of the HEAD.
-        git reset --soft HEAD^
-        # And unstage the merged files so we don't accidentally commit them.
-        git reset riscos-prminxml riscos-prminxml-resources
-        # Undo the local configuration
-        if [[ ! -f ~/.gitconfig ]] ; then
-            git config --local --unset user.email
-            git config --local --unset user.name
-        fi
+        archive="/tmp/prminxml-${PRINCE_VERSION}.tar.gz"
+        url="https://github.com/gerph/riscos-prminxml-tool/releases/download/v${PRMINXML_VERSION}/POSIX-PRMinXML-${PRMINXML_VERSION}.tar.gz"
+        wget -q -O "${archive}" "$url" || echo "Could not obtain PRM-in-XML from $url" >&2
+        rm -rf "riscos-prminxml-$PRMINXML_VERSION"
+        mkdir -p "riscos-prminxml-$PRMINXML_VERSION"
+        tar zxv -C "riscos-prminxml-$PRMINXML_VERSION" -f "${archive}"
     fi
-    export PATH="${scriptdir}:$PATH"
+    export PATH="${scriptdir}/riscos-prminxml-$PRMINXML_VERSION:$PATH"
 fi
 
 if ! type -p prince >/dev/null 2>&1 && [[ "$PRINCEXML_I_HAVE_A_LICENSE" = 1 ]] ; then
