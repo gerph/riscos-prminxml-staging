@@ -1,0 +1,386 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="CryptRandom">
+
+<section title="Introduction">
+<p>
+CryptRandom is a module for generating cryptographically useful random
+bytes under RISC OS. It can use a number of sources to provide this
+information to clients needing secure, or high quality random data.
+</p>
+</section>
+
+<section title="Overview">
+
+<p>
+Computers are, by their nature, deterministic - so applying the same sequence
+of inputs to any program is likely to produce the same result.  This is a <strong>bad
+thing</strong> when it comes to cryptography, as if you use a known sequence to
+encrypt a data stream, next time you turn on your machine you'll use the same
+known sequence, making the code possible to break.  Thus we need a random
+sequence so that no pattern can be spotted in it.  Basic provides a
+pseudo-random sequence, but this is the same every time the machine is turned
+on, so is not very good.  It is also just a sequence, which will eventually
+repeat.  True randomness is only possible on a computer by attaching it to
+other devices such as a radioactive source - not very practical.
+</p>
+
+<p>
+CryptRandom applies another method, which will produce different values showing to no
+known pattern, which are different each time you switch the machine on.
+This is much less secure than using a true random source, but better than
+using a predictable random number generator like that Basic uses.
+</p>
+
+<p>
+The CryptRandom module provides SWI calls which allow access to random data retrieved
+from a variety of sources.
+</p>
+
+<subsection title="Installation">
+<p>
+CryptRandom is supplied in an archive containing a !System directory.
+It can be installed by decompressing this archive, then using a !System merge tool - such as that
+accessible by running !Boot, or !SysMerge for RISC OS 3.1 machines.
+</p>
+
+<p>
+CryptRandom provides a service to clients that require it.  Such
+applications should load it in the following way:
+</p>
+
+<p>
+<extended-example type='pseudo'>
+RMEnsure CryptRandom a.bc RMLoad System:Modules.CryptRand
+RMEnsure CryptRandom a.bc Error CryptRandom version a.bc is required
+</extended-example>
+</p>
+
+<p>
+where a.bc is the oldest version supporting the features the application
+requires (see the history file).  Note that this version should be at least
+that of the latest security advisory (if any).
+</p>
+
+</subsection>
+
+<subsection title="Lineage">
+<p>
+CryptRandom is based on code from PuTTY, the Windows SSH client by Simon
+Tatham (see <reference type='link' href="http://www.chiark.greenend.org.uk/~sgtatham/putty/"/>).  It consists
+of a 'pool' of random data, which is 'stirred' every time a byte is
+requested, using a complex hashing function to ensure there is no
+discernible pattern.  The pool is supplied by 'entropy' from various sources,
+designed so that they are different every time they are called.  The numerous
+sources include:
+</p>
+</subsection>
+</section>
+
+<section title="Technical details">
+<p>
+<list>
+    <item>
+        <p>On initialisation of CryptRandom:</p>
+        <p>
+            <list>
+                <item>Unique machine ID</item>
+                <item>Current WIMP tasks</item>
+                <item>Current dynamic areas</item>
+                <item>Disc free space</item>
+                <item>Disc directory listings</item>
+                <item>Previous saved CryptRandom seed</item>
+            </list>
+        </p>
+    </item>
+
+    <item>
+        <p>Every time a byte is requested:</p>
+        <p>
+            <list>
+                <item>Real time clock</item>
+                <item>System interval timer</item>
+                <item>Battery manager data (voltages/temperatures etc)</item>
+            </list>
+        </p>
+    </item>
+
+    <item>
+        <p>Every mouse and key press:</p>
+        <p>
+            <list>
+                <item>Press data</item>
+                <item>Mouse position</item>
+                <item>System timer</item>
+            </list>
+        </p>
+    </item>
+
+</list>
+</p>
+
+<p>
+Sources are ignored if they don't work (eg a Risc PC doesn't have a battery
+manager).
+</p>
+
+<p>
+Interrupts are disabled on SWIs as mentioned above - this is to allow
+multiple users to access the pool from interrupt routines (events/callbacks
+etc) - this may be subject to change in future versions.
+</p>
+
+<p>
+The seed is saved over sessions to preserve the entropy - it'll
+first look for <sysvar>CryptRandom$SeedFile</sysvar>, and if this is set use this as the
+seed location, otherwise try <filename>Choices:Crypto.CryptRand.Seed</filename> or if
+<sysvar>Choices$Path</sysvar> is unset use <filename>&lt;Wimp$ScrapDir&gt;.Seed</filename>.
+</p>
+
+<p>
+I don't claim to prove the security of the hashing process, so I can't
+guarantee the randomness of the output, but it appears to be white noise - if
+in doubt, do your own tests.  The hash is based on SHA-1, which is believed
+by the computing community to be secure.  Any comments in this respect would
+be welcomed.
+</p>
+
+
+<subsection title='contact'>
+<p>
+Newer versions (if any) of this software may be found at
+http://www.markettos.org.uk/
+or else by contacting the author at: email theo@markettos.org.uk
+</p>
+
+<p>
+Theo Markettos<br/>
+5 Willow Close<br/>
+Liphook<br/>
+Hants<br/>
+GU30 7HX<br/>
+UK
+</p>
+
+<p>
+I'd also welcome any bug reports or fixes, or any other comments.
+</p>
+</subsection>
+
+<subsection title="Sources">
+    <p>
+Sources can be obtained from http://www.markettos.org.uk/
+</p>
+
+<p>
+To build them you'll need:
+</p>
+
+<p>
+<list>
+
+    <item>Acorn C v4 or v5
+(the Makefiles are designed for Castle's 32bit C compiler, so may need
+modification otherwise)</item>
+
+    <item>SDLS if have Acorn C v4
+http://www.excessus.demon.co.uk/acorn/ssr/</item>
+
+    <item>Syslog (optional)
+http://www.drobe.co.uk/archives/freenet.barnet.ac.uk/Acorn/freenet/j.ribbens/syslog-0.17.spk
+(note that Syslog 0.19 appears to have bugs in it which may cause problems)</item>
+
+    <item>Makatic (optional)
+http://www.mirror.ac.uk/collections/hensa-micros/local/riscos/projects/makatic.zip</item>
+
+    <item>OSLib
+http://ro-oslib.sourceforge.net/</item>
+</list>
+</p>
+
+</subsection>
+</section>
+
+<section title="SWIs">
+
+<swi-definition name="CryptRandom_Byte"
+                number="51980"
+                description="Reads a byte from the random pool"
+                irqs="disabled"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<exit>
+    <register-use number="0">Random byte value (0-255)</register-use>
+</exit>
+<use>
+<p>
+This SWI reads a byte from the pool, and subsequently stirs it.
+</p>
+</use>
+
+<related>
+<reference type='swi' name='CryptRandom_Block'/>
+<reference type='swi' name='CryptRandom_Word'/>
+</related>
+</swi-definition>
+
+
+<swi-definition name="CryptRandom_Stir"
+                number="51981"
+                description="Stirs the random pool"
+                irqs="disabled"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>
+This SWI stirs the random pool - this should not be necessary in normal use
+</p>
+</use>
+
+<related>
+<reference type='swi' name='CryptRandom_AddNoise'/>
+</related>
+</swi-definition>
+
+
+<swi-definition name="CryptRandom_AddNoise"
+                number="51982"
+                description="Introduce data to the random pool"
+                irqs="disabled"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+    <register-use number="0">Pointer to block of noise data to add</register-use>
+    <register-use number="1">Size of data in the block</register-use>
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>
+Adds a block of noise to the random pool - shouldn't be necessary in normal
+use.
+</p>
+</use>
+<related>
+<reference type='swi' name='CryptRandom_Stir'/>
+</related>
+</swi-definition>
+
+
+
+<swi-definition name="CryptRandom_Block"
+                number="51983"
+                description="Reads multiple bytes from the random pool"
+                irqs="disabled"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+    <register-use number="0">Pointer to block to fill with random bytes</register-use>
+    <register-use number="1">Number of bytes to fill into the buffer</register-use>
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>
+Generates a block of random data.  Note this is called with interrupts
+off, so large blocks may cause your machine to hang while they are generated.
+Note also the entropy generated by this call is likely to be less than
+multiple <reference type='swi' name='CryptRandom_Byte' /> calls
+(since times/battery status etc are likely to
+be the same during this call, but not if _Byte calls are spread at different
+points in your program), so randomness may suffer as a result.
+</p>
+</use>
+<related>
+<reference type='swi' name='CryptRandom_Byte'/>
+<reference type='swi' name='CryptRandom_Word'/>
+</related>
+</swi-definition>
+
+
+<swi-definition name="CryptRandom_Word"
+                number="51984"
+                description="Reads a 32-bit word from the random pool"
+                irqs="disabled"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<exit>
+    <register-use number="0">Random 32-bit word from the pool</register-use>
+</exit>
+<use>
+<p>
+This reads a 4 bytes from the pool, and assembles them into a 32-bit word.
+</p>
+</use>
+<related>
+<reference type='swi' name='CryptRandom_Byte'/>
+<reference type='swi' name='CryptRandom_Block'/>
+</related>
+</swi-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+  <email name="Theo Markettos" address="theo@markettos.org." />
+ </maintainer>
+ <disclaimer>
+<p>
+Copyright 2000-1 Theo Markettos.<br/>
+Portions copyright Simon Tatham, Gary S. Brown and Eric Young
+</p>
+
+<p>
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including without
+limitation the rights to use, copy, modify, merge, publish, distribute,
+sublicense, and/or sell copies of the Software, and to permit persons to whom
+the Software is furnished to do so, subject to the following conditions:
+</p>
+
+<p>
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+</p>
+
+<p>
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+SIMON TATHAM OR THEO MARKETTOS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+</p>
+</disclaimer>
+
+ <history>
+  <revision number="0.13" author="Theo Markettos" title="Text documentation">
+   <change>Original documentation for the CryptRandom module.</change>
+  </revision>
+
+  <revision number="0.13a" author="Gerph" title="PRM-in-XML documentation">
+   <change>Documentation re-written as PRM-in-XML.</change>
+  </revision>
+ </history>
+</meta>
+</riscos-prm>
+

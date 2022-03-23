@@ -15,7 +15,15 @@ output: dirs
 	cat logs/2-build.log
 
 pdf: output
-	cd output/html && prince --verbose -o ../index.pdf -l filelist.txt
+ifeq (${PRINCEXML_I_HAVE_A_LICENSE},1)
+	if [ -f output/html/filelist.txt ] ; then \
+		cd output/html && prince --verbose -o ../index.pdf -l filelist.txt ; \
+	else \
+		echo NOTE: riscos-prminxml tool is too old to generate PDF. ; \
+	fi
+else
+	echo NOTE: Not licensed for PrinceXML, so not building the PDF.
+endif
 
 dirs:
 	mkdir -p logs
