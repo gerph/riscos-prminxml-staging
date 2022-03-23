@@ -20,7 +20,6 @@ build-linux:
   dependencies: []
   stage: build
   script:
-    - git fetch origin prminxml-snapshot
     - ./build.sh
   tags:
     - linux
