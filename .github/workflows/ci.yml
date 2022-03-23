@@ -23,11 +23,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Step intended to be reused in CI pipelines.
-      - name: Fetch the PRM-in-XML code for us to use
-        run: |
-          git fetch origin prminxml-snapshot
-
       - name: Build it
         run: |
           # PrinceXML (http://www.princexml.com/) requires a license to be used.
