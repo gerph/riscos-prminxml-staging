@@ -87,7 +87,7 @@ jobs:
           # See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: PRMinXML-Staging.zip
-          asset_name: PRMinXML-Staging-${{ steps.get_version.outputs.VERSION }}
+          asset_name: PRMinXML-Staging-${{ steps.get_version.outputs.VERSION }}.zip
           asset_content_type: application/zip
 
       - name: Upload PDF only Asset
