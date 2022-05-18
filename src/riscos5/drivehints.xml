@@ -1,0 +1,134 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="Filing system drive information">
+<section title="Introduction">
+<p>
+Filing systems may be based on devices which are able to be changed dynamically in use ('hot pluggable').
+These devices may issue an UpCall to indicate that a device is now available, or has become
+unavailable.
+</p>
+</section>
+
+
+<section title="Technical details">
+<p>
+Two UpCalls are used to indicate that a filing system path residing on a device is now available,
+or has been made unavailable:
+</p>
+<p>
+<list>
+    <item><reference type='upcall' name="DriveAdded"/></item>
+    <item><reference type='upcall' name="DriveRemoved"/></item>
+</list>
+</p>
+
+<p>Not all devices and filing systems issue these UpCalls, so clients should treat them as
+    advisory.
+</p>
+</section>
+
+
+<section title="UpCalls">
+
+<upcall-definition name="DriveAdded"
+                   number="18"
+                    description="A filing system may be available on a given path.">
+<entry>
+ <register-use number="0">24 (&hex;18)</register-use>
+ <register-use number="1">Pointer to a zero-terminated filing system path prefix for a new device</register-use>
+</entry>
+
+<exit>
+ <register-use number="0-1" state="preserved" />
+</exit>
+
+<use>
+<p>This UpCall is issued by a device when filing system path has been made available.
+    This may happen due to a new disc being inserted, a device being formatted, or a remote
+    system becoming available.</p>
+<p>At the time that the UpCall is issued the filing system path should be accessible through
+   normal filing system operations. The nature of hot pluggable systems mean that by the time
+   this call is received, the device may have already become unavailable, or the filing system
+   on the device may not be present.</p>
+<p>The filing system path takes the form of a filing system name, a disc name specification
+    and an optional path specification. For some devices, the disc name may be a number,
+    indicating that no name has been determined yet, or that there is no name available. For
+    others, a name may be given. It is recommended that the path be canonicalised to obtain
+    the correct name of the device.</p>
+<p>Example prefix names:</p>
+<p>
+<list>
+    <item><code>ADFS::4</code></item>
+    <item><code>SDFS::0</code></item>
+    <item><code>Share::Storage</code></item>
+    <item><code>HostFS::Host.$.Mountpoint</code></item>
+</list>
+</p>
+<p>This UpCall must not be claimed.</p>
+</use>
+
+<related>
+<reference type="upcall" name="DriveRemoved" />
+</related>
+
+</upcall-definition>
+
+<upcall-definition name="DriveRemoved"
+                   number="19"
+                    description="A filing system is no longer available on a given path.">
+<entry>
+ <register-use number="0">25 (&hex;19)</register-use>
+ <register-use number="1">Pointer to a zero-terminated filing system path prefix for a new device</register-use>
+</entry>
+
+<exit>
+ <register-use number="0-1" state="preserved" />
+</exit>
+
+<use>
+<p>This UpCall is issued by a device when filing system path is no longer available.
+    This may happen due to a disc being removed, a device being formatted, or a remote
+    system becoming unavailable.</p>
+<p>At the time that the UpCall is issued the filing system path will not be accessible and
+    no further information is available. As such, clients should attempt to track the
+    paths to which the drive may refer. In particular, devices may refer to drive numbers,
+    without any name being canonicalised, and clients may therefore need to track which
+    drive numbers refer to which canonicalised disc names.</p>
+<p>This UpCall must not be claimed.</p>
+</use>
+
+<related>
+<reference type="upcall" name="DriveAdded" />
+</related>
+
+</upcall-definition>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2021.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Gerph" date="23 Dev 2021" title="Initial version">
+    <change>Created from examples of sources using it.</change>
+  </revision>
+ </history>
+
+ <related>
+    <reference type='link' href="https://gitlab.riscosopen.org/RiscOS/Sources/FileSys/SDFS/SDFS/-/blob/master/c/service" />
+    <reference type='link' href="https://gitlab.riscosopen.org/RiscOS/Sources/FileSys/ADFS/ADFSFiler/-/blob/master/s/ADFSFiler#L1055" />
+ </related>
+</meta>
+</riscos-prm>
