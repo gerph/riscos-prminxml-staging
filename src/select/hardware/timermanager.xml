@@ -1,0 +1,332 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
+
+<riscos-prm>
+<chapter title="Hardware timer device driver (TimerManager)">
+<section title="Introduction">
+<p>
+The Timer module provides an abstraction of the hardware timers. It is used by the Kernel in order to provide the monotonic timer used for the system clock, interval timer, monotonic timer, and system timed events. The module also provides an interface to allow other hardware timers to be controlled by other components. Timers may run off independant clock sources and so may have different granularity and ranges of rates at which they may generate interrupts.
+</p>
+
+<p>
+Each hardware implementation has an independant Timer module implementation specific to the timers which are available to the operating system.
+</p>
+</section>
+
+<section title="Overview">
+<p>
+The number of timers provided by the hardware can be read using
+<reference type="swi" name="Timer_ReturnNumber" />.
+Timers may be claimed and released by components using
+<reference type="swi" name="Timer_Claim" /> and
+<reference type="swi" name="Timer_Release" />.
+The rate at which a timer is running can be modified after it has been claimed by using
+<reference type="swi" name="Timer_SetRate" />.
+The relationship between timer rates and external measurements can be obtained by using
+<reference type="swi" name="Timer_Convert" />.
+</p>
+</section>
+
+
+<section title="Technical details">
+
+<p>
+    A number of timers may be provided by a TimerManager hardware device driver. These timers
+    can be claimed by a single client at any time. The timer's rate may be defined in a number
+    of different forms, to allow clients to specify the rate in the most natural manner.
+    Not all timers may support the exact rate requested, so clients should expect to handle
+    different forms of timers.
+</p>
+
+<p>
+Timers are numbered from 0, and timer 0 is reserved for use by the Kernel as the monotonic timer.
+</p>
+
+<category title="Measurement format">
+<p>
+Many of the SWIs take a number of flags to indicate the measurement format of the timer. The measurement format flags take the form of 8 bits:
+</p>
+
+<p>
+    <bitfield-table>
+       <bit number="0-2">
+            <p>
+                Unit scaler:
+            </p>
+            <p>
+                <value-table>
+                    <value number="0">Invalid</value>
+                    <value number="2">Scaled by 1/1000000</value>
+                    <value number="3">Scaled by 1/1000</value>
+                    <value number="4">Scaled by 1</value>
+                    <value number="5">Scaled by 1000</value>
+                    <value number="6">Scaled by 1000000</value>
+                    <value number="7">Scaled by 1000000000</value>
+                </value-table>
+            </p>
+        </bit>
+
+       <bit number="3" state="reserved" />
+       <bit number="4-5">
+            <p>
+                Measurement type:
+            </p>
+            <p>
+                <value-table>
+                    <value number="0">Native ticks</value>
+                    <value number="1">Frequency (interrupts per second)</value>
+                    <value number="2">Period (in seconds)</value>
+                    <value number="3">Invalid</value>
+                </value-table>
+            </p>
+        </bit>
+       <bit number="6-7" state="reserved" />
+    </bitfield-table>
+</p>
+
+<p>
+For example, to request a frequency of 100 Hz one could use a measurement type of 1, a scaler of 4 (scale by 1) and a value of 100. Alternatively, this could be represented as a period of 1/100th second by using a measurement type of 2, a scaler of 3 (scale by 1/1000) and a value of 10.
+</p>
+
+<p>
+For SWIs which take an input rate the measurement format flags are held in the bits 0-7 of the SWI flags.
+</p>
+
+<p>
+For SWIs which return a rate the measurement format flags are held in bits 8-15 of the SWI flags.
+</p>
+</category>
+</section>
+
+
+<section title="SWI calls">
+
+<swi-definition name="TimerManager_ReturnNumber"
+                number="58B80"
+                description="Return number of supported timers"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">Flags (must be 0)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Number of timers available</register-use>
+</exit>
+
+<use>
+<p>
+This SWI is used to find the number of timers available to the operating system.
+Timers are numbered from 0, so the maximum timer number that may be used is the value returned - 1.</p>
+</use>
+
+<related>
+<!-- <reference type="vector" name="BingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="TimerManager_Claim"
+                number="58B81"
+                description="Claim a hardware timer"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0"><p>Flags:</p>
+     <p>
+        <bitfield-table>
+            <bit number="0-7">Measurement format for the timer rate</bit>
+            <bit number="8-15">Measurement format for the returned timer rate</bit>
+            <bit number="16-31" state="reserved"/>
+        </bitfield-table>
+    </p>
+ </register-use>
+ <register-use number="1">Timer number</register-use>
+ <register-use number="2">Timer rate, using the measurement format from bits 0-7</register-use>
+ <register-use number="3">Pointer to function to call on interrupt</register-use>
+ <register-use number="4">Value to pass in R12 to interrupt function</register-use>
+</entry>
+<exit>
+ <register-use number="2">Actual timer rate, using the measurement format from bits 8-15, or 0 if the rate cannot be represented</register-use>
+</exit>
+
+<use>
+<p>
+    This SWI is used to claim a timer for dedicated use by a client. Only a single client may claim a timer; subsequent claims will return an error. The timer specified will be set to the rate given and interrupts will call the routine specified. The interrupt routine may corrupt R0-R3 but should preserve all other registers.
+</p>
+
+<p>
+An error will be returned if the input measurement format in R0 bits 0-7 is not valid or cannot be provided by the timer.
+</p>
+
+<p>
+If the meaurement format used for return in R0 bits 8-15 is invalid the value returned in R2 will be 0, but no error will be raised. The return value is provided as a convenience.
+</p>
+</use>
+
+<related>
+    <reference type="vector" name="TimerManager_Release" />
+    <reference type="vector" name="TimerManager_SetRate" />
+    <reference type="vector" name="TimerManager_Convert" />
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="TimerManager_Release"
+                number="58B82"
+                description="Release a hardware timer"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">Flags (must be zero)</register-use>
+ <register-use number="1">Timer number</register-use>
+</entry>
+<exit>
+</exit>
+
+<use>
+<p>
+This SWI is used to release a previously claimed timer. The IRQ will no longer cause the specified routine to be called.
+</p>
+</use>
+
+<related>
+    <reference type="vector" name="TimerManager_Claim" />
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="TimerManager_SetRate"
+                number="58B83"
+                description="Change the rate used by a hardware timer"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0"><p>Flags:</p>
+     <p>
+        <bitfield-table>
+            <bit number="0-7">Measurement format for the timer rate</bit>
+            <bit number="8-15">Measurement format for the returned timer rate</bit>
+            <bit number="16-31" state="reserved"/>
+        </bitfield-table>
+    </p>
+ </register-use>
+ <register-use number="1">Timer number</register-use>
+ <register-use number="2">Timer rate, using the measurement format from bits 0-7</register-use>
+</entry>
+<exit>
+ <register-use number="2">Actual timer rate, using the measurement format from bits 8-15, or 0 if the rate cannot be represented</register-use>
+</exit>
+
+<use>
+<p>
+This SWI is used to change the rate used by a timer. Only timers which have been claimed can have their rate changed; unclaimed timers will return an error. The timer specified will be set to the rate given.
+</p>
+
+<p>
+An error will be returned if the input measurement format in R0 bits 0-7 is not valid or cannot be provided by the timer.
+</p>
+
+<p>
+If the meaurement format used for return in R0 bits 8-15 is invalid the value returned in R2 will be 0, but no error will be raised. The return value is provided as a convenience.
+</p>
+</use>
+
+<related>
+    <reference type="vector" name="TimerManager_Claim" />
+    <reference type="vector" name="TimerManager_Convert" />
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="TimerManager_Convert"
+                number="58B84"
+                description="Convert between rate formats used by a hardware timer"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0"><p>Flags:</p>
+     <p>
+        <bitfield-table>
+            <bit number="0-7">Measurement format for the timer rate</bit>
+            <bit number="8-15">Measurement format for the returned timer rate</bit>
+            <bit number="16-31" state="reserved"/>
+        </bitfield-table>
+    </p>
+ </register-use>
+ <register-use number="1">Timer number</register-use>
+ <register-use number="2">Timer rate, using the measurement format from bits 0-7</register-use>
+</entry>
+<exit>
+ <register-use number="2">Timer rate in form specified by R0 bits 8-15</register-use>
+</exit>
+
+<use>
+<p>
+    This SWI is used to convert between timer rate formats. The values converted will be checked to ensure that the timer is capable of those rates.
+</p>
+
+<p>
+An error will be returned if the input measurement format in R0 bits 0-7 is not valid or cannot be provided by the timer.
+</p>
+
+<p>
+An error will be returned if the meaurement format used for return in R0 bits 8-15 is invalid.
+</p>
+</use>
+
+<related>
+    <reference type="vector" name="TimerManager_Claim" />
+    <reference type="vector" name="TimerManager_SetRate" />
+</related>
+
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2022.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Gerph" date="17 Nov 2022" title="Initial version">
+    <change>Created from Select technical documentation.</change>
+  </revision>
+ </history>
+
+ <related>
+    <reference type='link' href="http://www.riscos.com/support/developers/riscos6/hardware/timer.html" />
+ </related>
+</meta>
+</riscos-prm>
