@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
-<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.00//EN" 
-                            "http://www.movspclr.co.uk/dtd/100/prm.dtd">
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
+                            "http://gerph.org/dtd/102/prm.dtd">
 
 <riscos-prm>
 <chapter title="The Image File Renderer">
@@ -25,12 +25,12 @@ formats, this will be aligned with the origin - for example a bitmap
 graphic. For others, this bounding box may be elsewhere in the image - for
 example vector formats such as DrawFiles.</p>
 
-<p>The resolution at which they have been drawn describes how accurate the
+<p>The resolution at which they have been drawn describes how accurately the
 images is stored. Usually this is stored in 'dots per inch' (DPI) along
 with the image itself. Screen resolution is usually - this depends on the
 eigenfactors for the screen mode in use - treated as 90 DPI. Some formats
 may use much more accurate internal representations than this; for example
-DrawFiles are stored at 46080 DPI.</p>
+DrawFiles are stored at 2048 DPI.</p>
 
 <p>For the purposes of rendering the image file, we ignore the colour depth
 because the rendering process will generate its results in the most accurate
@@ -124,8 +124,13 @@ scaled to fit the width and height supplied.</p>
   <offset number="0">width (in OS units)</offset>
   <offset number="4">height (in OS units)</offset>
   <offset number="8">border (to apply to all edges)</offset>
-  <offset number="12">angle (in degrees, as a 16.16 fixed point value)</offset>
+  <offset number="12">angle (in degrees clockwise, as a 16.16 fixed point value)</offset>
 </offset-table>
+</p>
+
+<p>As the shape is scaled to fit the size specified, the point about which
+rotation occurs is not important. It can be considered to be the centre of
+the image.
 </p>
 
 </category>
@@ -158,7 +163,7 @@ matrices are provided in standard RISC OS tranformation blocks (as used by
 SpriteExtend, Draw, DrawFile and others).</p>
 
 <p>The transformation has the following structure:</p>
-  
+
 <p>
 <offset-table>
   <offset number="0">m00</offset>
@@ -292,7 +297,7 @@ renderers.</p>
   <item><p>A routine which renders an image</p></item>
   <item><p>A routine which declares fonts in a document (may be omitted)
            </p></item>
-  <item><p>A routine which returned information about an image</p></item>
+  <item><p>A routine which returns information about an image</p></item>
 </list></p>
 
 <p>In addition, they provide a number of informational fields which describe
@@ -334,31 +339,31 @@ renderer. This is a bit field, structured:</p>
 <bitfield-table>
   <bit number="0-1"><p>Renderer transformation capabilities:</p>
     <value-table>
-       <value number="0">Renderer cannot draw anything but identity 
+       <value number="0">Renderer cannot draw anything but identity
        scaling and translation</value>
-       <value number="1">Renderer can translate and scale, but scaling 
+       <value number="1">Renderer can translate and scale, but scaling
        must be by identical factors</value>
-       <value number="2">Renderer can translate and scale by any values 
+       <value number="2">Renderer can translate and scale by any values
        in both axes</value>
        <value number="3">Renderer supports any form of transformation
        </value>
     </value-table>
-    
+
     <p>These bits should be set to the capabilities of the renderer.</p>
-    <p>Attempts to render files of which the capabilities word indicates 
-    are not possible by the renderer will be faulted by ImageFileRender 
+    <p>Attempts to render files of which the capabilities word indicates
+    are not possible by the renderer will be faulted by ImageFileRender
     module.</p>
   </bit>
   <bit number="2">
     <p>Renderer supports colour mapping.</p>
     <p>This bit should be set if the renderer can perform colour mapping.
-    If unset, attempts to use colour mapping on this file type will be 
+    If unset, attempts to use colour mapping on this file type will be
     faulted by ImageFileRender.</p>
   </bit>
   <bit number="3">
-    <p>Renderer can draw irregular shapes so must be called to calculate 
+    <p>Renderer can draw irregular shapes so must be called to calculate
     bounding boxes.</p>
-    
+
     <p>This bit should be set if transforming a shape using a complex
     matrix (eg skew or rotate) may result in a different bounding
     box than that which would be generated for a rectangular area.
@@ -483,12 +488,13 @@ filetype matches those which they are interested in.</p>
          <value number="0">Render to fit</value>
          <value number="1">Render scaled</value>
          <value number="2">Render transformed</value>
+         <value number="3-7">Reserved</value>
        </value-table>
      </bit>
      <bit number="3">Colour mapping function supplied</bit>
      <bit number="4">Ignore document origin</bit>
      <bit number="5" state="reserved" />
-     <bit number="6-8">Quality to render at:
+     <bit number="6-9">Quality to render at:
        <value-table>
          <value number="0">Use default quality</value>
          <value number="1">Lowest quality</value>
@@ -496,7 +502,7 @@ filetype matches those which they are interested in.</p>
          <value number="15">Highest quality</value>
        </value-table>
      </bit>
-     <bit number="9-16" state="reserved" />
+     <bit number="10-16" state="reserved" />
      <bit number="17-31" state="reserved" />
    </bitfield-table>
  </register-use>
@@ -505,12 +511,12 @@ filetype matches those which they are interested in.</p>
  <register-use number="3">Length of data</register-use>
  <register-use number="4">Pointer to extension data, or 0 if
 none</register-use>
- <register-use number="5">Image sequence number, or 0 for default 
+ <register-use number="5">Image sequence number, or 0 for default
 image</register-use>
  <register-use number="6">X coord for origin</register-use>
  <register-use number="7">Y coord for origin</register-use>
  <register-use number="8">Transformation data:
-   <value-table head-value="Transformation type in R0>
+   <value-table head-value="Transformation type in R0">
      <value number="0" name="Pointer to size">
        <offset-table>
          <offset number="0">Width</offset>
@@ -565,12 +571,14 @@ image</register-use>
          <value number="0">Render to fit</value>
          <value number="1">Render scaled</value>
          <value number="2">Render transformed</value>
+         <value number="3-7">Reserved</value>
        </value-table>
      </bit>
      <bit number="3" state="reserved" />
      <bit number="4">Ignore document origin</bit>
      <bit number="5">Return in OS units (otherwise bounding box will
      be returned in draw units</bit>
+     <bit number="6-31" state="reserved" />
    </bitfield-table>
  </register-use>
  <register-use number="1">Filetype</register-use>
@@ -614,10 +622,12 @@ operation.</p>
          <value number="0">Render to fit</value>
          <value number="1">Render scaled</value>
          <value number="2">Render transformed</value>
+         <value number="3-7">Reserved</value>
        </value-table>
      </bit>
      <bit number="3" state="reserved" />
      <bit number="4">Ignore document origin</bit>
+     <bit number="5-31" state="reserved" />
    </bitfield-table>
  </register-use>
  <register-use number="1">Filetype</register-use>
@@ -627,7 +637,7 @@ operation.</p>
  <register-use number="5">Image sequence number</register-use>
  <register-use number="6">Pointer to transformation data</register-use>
  <register-use number="7">Pointer to output transformation block to fill in</register-use>
- 
+
 </entry>
 <exit>
 </exit>
@@ -698,9 +708,9 @@ the fonts your document uses' in the chapter on Printing for more details.
  <register-use number="6">Query type:
    <value-table>
      <value number="&hex;00000000">Base details</value>
-     <value number="&hex;00000001-&hex;0000FFFF">Reserved for system
+     <value number="&hex;00000001-&hex;00000FFF">Reserved for system
 use</value>
-     <value number="&hex;00001000-&hex;00FFFFFF">Reserved for developers</value>
+     <value number="&hex;00001000-&hex;0000FFFF">Reserved for developers</value>
      <value number="&hex;00FF0000-&hex;00FFFFFF">Reserved for private
 use</value>
 
@@ -755,8 +765,8 @@ the background colour.</bit>
   </offset-table>
 </p>
 
-<p>The base query is used to get generic information on an image in the file 
-which was not necessary for the rendering of the file. This call is most 
+<p>The base query is used to get generic information on an image in the file
+which was not necessary for the rendering of the file. This call is most
 commonly used to find the sequence number of the default and last logical image
 within a file. The sequence number may be set to &hex;FFFFFFFF to indicate that
 the sequence number is not known. This might be the case if the format
@@ -821,7 +831,9 @@ drawing a background behind the image is neccessary or not.</p>
      <offset number="4"><reference type="category" name="Renderer flags" /></offset>
      <offset number="8">Filetype</offset>
      <offset number="12">Magic value, or 0 if none</offset>
-     <offset number="16">Pointer to name</offset>
+     <offset number="16">Pointer to name to be copied, in the format:
+        <code type='format'>&lt;name&gt;&lt;tab&gt;&lt;version x.xx&gt;&lt;tab&gt;&lt;author&gt;</code>
+     </offset>
      <offset number="20">Workspace value for R12</offset>
      <offset number="24">Pointer to start entry point (<reference type="entry" name="IFR_Start" />)</offset>
      <offset number="28">Pointer to stop entry point (<reference type="entry" name="IFR_Stop" />)</offset>
@@ -1074,7 +1086,7 @@ named in the extension data.</p>
      <offset number="0">Pointer to data to render</offset>
      <offset number="4">Length of data</offset>
      <offset number="8">Pointer to extension data, or 0 if no data</offset>
-     <offset number="12">Image sequence number</offset>     
+     <offset number="12">Image sequence number</offset>
      <offset number="16">Private image data, 0 initially</offset>
    </offset-table>
  </register-use>
@@ -1119,7 +1131,7 @@ to some workspace specific to this image.</p>
      <offset number="0">Pointer to data to render</offset>
      <offset number="4">Length of data</offset>
      <offset number="8">Pointer to extension data, or 0 if no data</offset>
-     <offset number="12">Image sequence number</offset>     
+     <offset number="12">Image sequence number</offset>
      <offset number="16">Private image data</offset>
    </offset-table>
  </register-use>
@@ -1161,7 +1173,7 @@ error block in R0.</p>
      <offset number="0">Pointer to data to render</offset>
      <offset number="4">Length of data</offset>
      <offset number="8">Pointer to extension data, or 0 if no data</offset>
-     <offset number="12">Image sequence number</offset>     
+     <offset number="12">Image sequence number</offset>
      <offset number="16">Private image data</offset>
    </offset-table>
  </register-use>
@@ -1172,7 +1184,7 @@ error block in R0.</p>
          <bit number="0-2" state="reserved" />
          <bit number="3">Colour mapping function supplied</bit>
          <bit number="4-5" state="reserved" />
-         <bit number="6-8">Quality to render at:
+         <bit number="6-9">Quality to render at:
            <value-table>
              <value number="0">Use default quality</value>
              <value number="1">Lowest quality</value>
@@ -1180,7 +1192,7 @@ error block in R0.</p>
              <value number="15">Highest quality</value>
            </value-table>
          </bit>
-         <bit number="9-31" state="reserved" />
+         <bit number="10-31" state="reserved" />
        </bitfield-table>
        </offset>
      <offset number="4-24">Transformation matrix to apply (standard format)</offset>
@@ -1426,7 +1438,7 @@ line.</p>
 <use>
 <p><command>*ImageFileViewer</command> is used to register a command which
 can be used to view files known to ImageFileRender. The
-<sysvar>Alias$@RunType_XXX</sysvar> variables will be set for filetypes 
+<sysvar>Alias$@RunType_XXX</sysvar> variables will be set for filetypes
 known to ImageFileRender which have not already been set. If no parameter is
 passed to the command, the default viewer wil be cleared and all the
 variables will be unset.</p>
@@ -1453,23 +1465,21 @@ to be run, passing the filename of the file run as the first parameter.</p>
 <!-- MetaData -->
 <meta>
  <maintainer>
-  <email name="Andrew Hill" address="drew.hill@tesco.net" />
-  <email address="developer@riscos.com" />
+  <email name="Gerph" address="gerph@gerph.org" />
  </maintainer>
  <disclaimer>
-  <import document="http://www.riscos.com/prm/prm-disclaimer.xml" path="root/*" />
   <import document="http://www.riscos.com/prm/amh-disclaimer.xml" path="root/*" />
  </disclaimer>
 
  <history>
   <revision number="pre-1" author="AMH" title="Pre-release">
    <change>Converted from original text to XML</change>
-  </revision>         
+  </revision>
   <revision number="pre-2" author="AMH" title="Pre-release">
    <change>Modified ImageFileRender_BBox to add sequence number.</change>
    <change>Modified service call names to Render rather than Renderer.</change>
    <change>Updated the base details query.</change>
-  </revision>         
+  </revision>
   <revision number="pre-3" date="20 Nov 2002" author="ROL" title="Validated">
    <change>XML validated.</change>
    <change>Corrected sections which were undefined (IRQ, FIQ, Reentrancy).</change>
@@ -1497,6 +1507,12 @@ to be run, passing the filename of the file run as the first parameter.</p>
   </revision>
   <revision number="pre-8" date="01 May 2004" author="ROL" title="Table correction">
    <change>ImageFileRender_Render's R8 table has been clarified.</change>
+  </revision>
+  <revision number="1" date="17 Oct 2020" author="Gerph" title="Backported text file changes">
+   <change>Backported changes from the text version.</change>
+   <change>Bitfields for the quality were incorrectly specified one bit short (should be bits 6-9)</change>
+   <change>Range for query types didn't actually match up consistently.</change>
+   <change>Renderer name wasn't specified in the documentation, although it was expected for presentation.</change>
   </revision>
  </history>
 </meta>
