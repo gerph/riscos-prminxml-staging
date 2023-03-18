@@ -83,6 +83,9 @@
         <page href="dhcpclient">DHCPClient</page>
         <page href="zeroconf">ZeroConf</page>
     </section>
+    <section title="Graphics" dir="graphics">
+        <page href="imagefilerender">Image file renderer</page>
+    </section>
 </section>
 
 </index>
