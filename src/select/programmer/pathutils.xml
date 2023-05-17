@@ -1,0 +1,254 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="PathUtils">
+<section title="Introduction">
+<p>
+The PathUtils module provides an interface to manipulate system variables
+used as path variables by FileSwitch. That is, variables ending '$Path'
+which are used as references to multiple paths in filenames.
+</p>
+</section>
+
+
+
+<section title="SWI calls">
+<swi-definition name="PathUtils_EnumeratePath"
+                number="53B80"
+                description="Enumerate the components of a path variable"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0"><p>Flags:</p>
+  <bitfield-table>
+   <bit number="0" state='set'>Return all components of the path recursively</bit>
+   <bit number="0" state='clear'>Return only leaf components of the path</bit>
+   <bit number="1-31">Reserved, must be 0</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">Pointer to path to process</register-use>
+ <register-use number="2">Pointer to output buffer</register-use>
+ <register-use number="3">Maximum length of the buffer, or 0 to request length</register-use>
+ <register-use number="4">Opaque context value, or 0 for the first call</register-use>
+</entry>
+<exit>
+ <register-use number="0-2" state='preserved'/>
+ <register-use number="3">Number of spare bytes in the buffer</register-use>
+ <register-use number="4">Context value, or -1 if complete (and the other registers are invalid)</register-use>
+ <register-use number="5">Variable type that the value was expanded from</register-use>
+ <register-use number="6">Depth the value was expanded from</register-use>
+</exit>
+
+<use>
+<p>This SWI is used to enumerate the components of a path variables. The path variable
+    is expanded recursively. If R0 bit 0 is set, each path component will be returned
+    in the results, even it is not terminal itself.</p>
+</use>
+
+<related>
+<!-- <reference type="vector" name="BingleV" /> -->
+</related>
+
+</swi-definition>
+
+
+
+<swi-definition name="PathUtils_JoinPath"
+                number="53B81"
+                description="Join a new path to a path variable"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0"><p>Flags:</p>
+  <bitfield-table>
+   <bit number="0" state='set'>Append the supplied path</bit>
+   <bit number="0" state='clear'>Prepend the supplied path</bit>
+   <bit number="1-31">Reserved, must be 0</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">Pointer to variable name to modify</register-use>
+ <register-use number="2">Pointer to path component to join</register-use>
+</entry>
+<exit>
+ <register-use number="0-2" state='preserved'/>
+</exit>
+
+<use>
+<p>This SWI is used to join a path to an existing path variable. If the component already exists in the path variable, it will not be added.</p>
+</use>
+
+<related>
+    <reference type="command" name="AppPath" />
+    <reference type="command" name="PrepPath" />
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="PathUtils_RemovePath"
+                number="53B82"
+                description="Remove a path from a path variable"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0"><p>Flags:</p>
+  <bitfield-table>
+   <bit number="0-31">Reserved, must be 0</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">Pointer to variable name to modify</register-use>
+ <register-use number="2">Pointer to path component to remove</register-use>
+</entry>
+<exit>
+ <register-use number="0-2" state='preserved'/>
+</exit>
+
+<use>
+<p>This SWI is used to remove a path from an existing path variable. If the component is not present, the variable will not be modified.</p>
+</use>
+
+<related>
+    <reference type="command" name="RemPath" />
+</related>
+
+</swi-definition>
+</section>
+
+
+<section title="*Commands">
+<command-definition name="AppPath"
+                    description="Append a path component to a path variable">
+
+<syntax>
+  <userreplace>path-variable</userreplace>
+  <userreplace>path-component</userreplace>
+</syntax>
+
+<parameter name="path-variable">
+ name of the path variable to append to
+</parameter>
+
+<parameter name="path-component">
+ name of the path to append to the variable
+</parameter>
+
+<use>
+<p>This command appends a given path component to a path variable. If the path is already present, it has no effect.</p>
+</use>
+
+<example>
+<command>*AppPath Run$Path $.Library.</command>
+</example>
+
+
+<related>
+    <reference type="command" name="PrepPath" />
+    <reference type="swi" name="PathUtils_JoinPath" />
+</related>
+
+</command-definition>
+
+
+
+<command-definition name="PrepPath"
+                    description="Prepend a path component to a path variable">
+
+<syntax>
+  <userreplace>path-variable</userreplace>
+  <userreplace>path-component</userreplace>
+</syntax>
+
+<parameter name="path-variable">
+ name of the path variable to append to
+</parameter>
+
+<parameter name="path-component">
+ name of the path to insert at the start of the path variable
+</parameter>
+
+<use>
+<p>This command prepends a given path component to a path variable, inserting the path at the start of the variable's value. If the path is already present, it has no effect.</p>
+</use>
+
+<example>
+<command>*PrepPath Run$Path $.Library.</command>
+</example>
+
+
+<related>
+    <reference type="command" name="AppPath" />
+    <reference type="swi" name="PathUtils_JoinPath" />
+</related>
+
+</command-definition>
+
+
+
+<command-definition name="RemPath"
+                    description="Remove a path component from a path variable">
+
+<syntax>
+  <userreplace>path-variable</userreplace>
+  <userreplace>path-component</userreplace>
+</syntax>
+
+<parameter name="path-variable">
+ name of the path variable to change
+</parameter>
+
+<parameter name="path-component">
+ name of the path to remove from the path variable
+</parameter>
+
+<use>
+<p>This command removes a given path component from a path variable. If the variable is not present, the variable is not changed.</p>
+</use>
+
+<example>
+<command>*RemPath Run$Path $.Library.</command>
+</example>
+
+
+<related>
+    <reference type="swi" name="PathUtils_RemovePath" />
+</related>
+
+</command-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="Gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2023.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="6 Oct 2006" title="Initial version">
+    <change>Original documentation.</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 May 2023" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>

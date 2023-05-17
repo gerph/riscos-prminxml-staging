@@ -60,6 +60,11 @@
 </section>
 
 <section title="RISC OS Select" dir="select">
+    <section title="Kernel" dir="kernel">
+        <section title="I/O" dir="io">
+            <page href="pointer-supplement">Pointer devices</page>
+        </section>
+    </section>
     <section title="Desktop" dir="desktop">
         <page href="iconbarfiledrags">Icon bar file drags</page>
         <page href="filters-iconborders">Icon border filters</page>
@@ -85,6 +90,10 @@
     </section>
     <section title="Graphics" dir="graphics">
         <page href="imagefilerender">Image file renderer</page>
+        <page href="videov">Video drivers</page>
+    </section>
+    <section title="Programmer" dir="programmer">
+        <page href="pathutils">PathUtils</page>
     </section>
 </section>
 

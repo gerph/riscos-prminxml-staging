@@ -1,0 +1,414 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Pointer devices (supplement for Pyromaniac)">
+<section title="Introduction and overview">
+<p>
+Pointer devices (usually mice) have been extended to provide additional
+functionality found in more modern devices such as additional buttons and
+an alternate positioning device (usually provided as a single or dual
+'scroll wheel'). Similarly, devices which provide absolute positioning
+such as tablets and touchscreens are now capable of being serviced by the
+pointer system. In order to provide these extra functions, a revised form
+of the PointerV interface has been used.
+</p>
+
+<p>
+This builds upon the interface declared in PRM 5a, but moves some functions
+away from the driver.
+</p>
+
+<p>
+The OSPointer module controls pointer movement and will handle these
+extended functions. Previously the Kernel provided management of the
+pointer. These functions are now provided entirely by the OSPointer module.
+</p>
+
+<p>
+The operation is split into two major parts:
+</p>
+
+<p>
+<list>
+    <item>How drivers provide information to the OSPointer module about the
+    new features</item>
+    <item>How programmers access this information</item>
+</list>
+</p>
+
+<p>
+In addition, a separate document details the operation of the WindowScroll
+module which provides functionality for desktop tasks.
+</p>
+</section>
+
+
+<section title="Technical details">
+<subsection title="PointerV">
+    <p>
+        PointerV has been extended with a new reason codes -
+        <reference type='vector' name="PointerV" reason='4'/> -
+        in RISC OS Select to support
+        the use of alternative pointing device values.
+        Specifically this allows for the scroll wheel provided by modern mice,
+        and for tablet or touch screen devices.
+    </p>
+</subsection>
+
+<subsection title="Driver updates in RISC OS Select">
+    <subsubsection title="Quadrature mouse driver">
+<p>
+    The quadrature mouse driver ('Mouse' module) has been updated to provide
+an additional device type for Stuart Tyrrell's PS2 mouse interface. This
+interface functions in 'driver' mode to provide alternate device support for
+single axis devices (primarily vertical scroll wheels).
+</p>
+<p>
+Dual axis movement is presently not supported.
+</p>
+</subsubsection>
+
+    <subsubsection title="PS 2 mouse driver">
+
+<p>
+The PS 2 mouse driver ('PS2Driver' module) has been updated to provide
+support for 'Intellimouse' and 'Intellimouse Pro' devices. These are
+more commonly known as 'scroll mice' or '5 button mice' respectively.
+</p>
+<p>
+Dual axis movement is presently not supported.
+</p>
+</subsubsection>
+
+    <subsubsection title="Touch screen or tablet drivers">
+        <p>
+No touch screen or tablet driver is supplied with the current version of
+RISC OS. Developers wishing to implement such a driver should contact
+their supplier.
+</p>
+</subsubsection>
+</subsection>
+
+<subsection title="OSPointer handling of extended requests">
+<p>
+The OSPointer module will issue the 
+<reference type='vector' name="PointerV" reason='4'>Extended request</reference>
+for versions of
+the OS which support these new features (RISC OS 4.32 and later). If the
+call returns unclaimed (R0 having not been set to -1 or 5), the module will
+issue PointerV 1 (Request) and defer button handling to the driver.
+</p>
+
+<p>
+If the call is claimed, the OSPointer module will issue KeyV events for the buttons
+which have been pressed and apply the change or absolute position to the
+pointer.
+</p>
+
+<p>
+The absolute positioning interface is available from version 0.25 of the
+OSPointer module.
+</p>
+</subsection>
+
+<subsection title="Additional buttons">
+
+<p>
+In addition to the base 3 buttons up to 8 buttons are supported by the
+OSPointer module. 5 button mice are common and the PS 2 driver has been
+updated to support such devices.
+</p>
+
+<p>
+The additional buttons are reported through the extended KeyV interface for
+mouse buttons. These buttons are detected by the OSPointer module and
+returned as useful values through the standard interfaces.
+</p>
+</subsection>
+
+<subsection title="Programmers interface">
+
+<p>
+In order obtain position details for the alternate scrolling device, a
+new reason has been added, <reference type="swi" name="OS_Pointer" reason="2"/>.
+</p>
+</subsection>
+
+
+</section>
+
+
+<section title="SWI calls">
+
+<swi-definition name="OS_Mouse"
+                number="1C"
+                description="Read current mouse state"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+</entry>
+<exit>
+    <register-use number="0">X position of the pointer</register-use>
+    <register-use number="1">Y position of the pointer</register-use>
+    <register-use number="2"><p>mouse buttons:</p>
+        <p>
+        <bitfield-table>
+            <bit number="0">right button</bit>
+            <bit number="1">middle button</bit>
+            <bit number="2">left button</bit>
+            <bit number="3">fourth button</bit>
+            <bit number="4">fifth button</bit>
+            <bit number="5">sixth button</bit>
+            <bit number="6">seventh button</bit>
+            <bit number="7">eigth button</bit>
+            <bit number="8-31" state="reserved"/>
+        </bitfield-table>
+        </p>
+    </register-use>
+    <register-use number="3">time of button chan</register-use>
+</exit>
+
+<use>
+<p>
+This SWI returns the pointer position from the mouse buffer if events are
+buffered or the current position if the buffer is empty. It has been
+extended from the interface described in PRM 1-699 by adding additional
+buttons.
+</p>
+</use>
+
+<related>
+    <reference type="swi" name="Pointer" reason='2' />
+    <reference type="vector" name="PointerV" reason='4'/>
+</related>
+
+</swi-definition>
+
+
+<swi-definition name="OS_Pointer"
+                number="64"
+                reason="2"
+                reasonname="ReadAltPosition"
+                description="Read alternate position"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">2 (reason code)</register-use>
+ <register-use number="1">Register details</register-use>
+</entry>
+<exit>
+    <register-use number="0">signed 32bit X position of the alternate device</register-use>
+    <register-use number="1">signed 32bit Y position of the alternate device</register-use>
+</exit>
+
+<use>
+<p>
+This SWI returns the position of the alternate positioning device. The
+device position is unbounded and thus may wrap when the limits of the
+32bit representation are reached. Should the device position wrap past
+a limit, it will be reset to zero. Thus, should the position exceed
+either &hex;7FFFFFFF or -&hex;80000000 it will be reset. Clients should be aware
+of this and handle such conditions appropriately.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge='Select 3' supplier="RISCOS Ltd" state='supported'/>
+    <version riscos-ge='7.48' supplier="RISC OS Pyromaniac" state='supported'/>
+</compatibility>
+
+<related>
+    <reference type="swi" name="Mouse" />
+    <reference type="vector" name="PointerV" reason='4'/>
+    <reference type="vector" name="EventV" reason='21,4'/>
+</related>
+
+</swi-definition>
+</section>
+
+
+<section title="Software vectors">
+
+<vector-definition name="EventV"
+                   number="10"
+                   reason="21,4"
+                   reasonname="ExpansionMouseScroll"
+                   description="Scroll event has been triggered by the user"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+
+<entry>
+    <register-use number="0">reason code (21)</register-use>
+    <register-use number="1">subreason code (4)</register-use>
+    <register-use number="2">signed 32bit change in X position</register-use>
+    <register-use number="3">signed 32bit change in Y position</register-use>
+</entry>
+
+<exit>
+</exit>
+
+<use>
+<p>
+    This event is generated by the OSPointer module when a scroll event is
+triggered by the user. Clients which track mouse movements should monitor
+this event. This allows clients to monitor either changes or the absolute
+position should they wish to do so. If clients wish to cause the scroll
+event to be ignored they should claim the event.</p>
+</use>
+
+<compatibility>
+    <version riscos-ge='Select 3' supplier="RISCOS Ltd" state='supported'/>
+    <version riscos-ge='7.48' supplier="RISC OS Pyromaniac" state='supported'/>
+</compatibility>
+
+<related>
+    <reference type="swi" name="Mouse" />
+    <reference type="swi" name="Pointer" reason="2"/>
+    <reference type="vector" name="PointerV" reason='4'/>
+</related>
+</vector-definition>
+
+<vector-definition name="PointerV"
+                   number="38"
+                   reason="4"
+                   reasonname="ExtendedRequest"
+                   description="Request information about the current pointing device position"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+
+<entry>
+<register-use number="0">reason code (4)</register-use>
+<register-use number="1">pointer type</register-use>
+</entry>
+
+<exit>
+<register-use number="0"><p>Request state:</p>
+<p>
+    <value-table>
+        <value number="-1">Extended request claimed for this pointer type, for relative positioning device</value>
+        <value number="4">Extended request not understood</value>
+        <value number="5">Extended request claimed for this pointer type, for absolute positioning device</value>
+    </value-table>
+</p>
+</register-use>
+<register-use number="1" state='preserved'/>
+<register-use number="2"><p>relative device: signed 32 bit change in X position</p>
+                         <p>absolute device: fractional 16 bit X position</p>
+</register-use>
+<register-use number="3"><p>relative device: signed 32 bit change in Y position</p>
+                         <p>absolute device: fractional 16 bit Y position</p>
+</register-use>
+<register-use number="4"><p>relative device: signed 32 bit change in X position of alternate device</p>
+                         <p>absolute device: must be 0</p>
+</register-use>
+<register-use number="5"><p>relative device: signed 32 bit change in Y position of alternate device</p>
+                         <p>absolute device: must be 0</p>
+</register-use>
+<register-use number="6"><p>Mouse buttons:</p>
+<p>
+    <bitfield-table>
+        <bit number="0">Right button</bit>
+        <bit number="1">Middle button</bit>
+        <bit number="2">Left button</bit>
+        <bit number="3-7">May be provided at the discretion of driver</bit>
+        <bit number="8-31">Must be 0</bit>
+    </bitfield-table>
+</p>
+</register-use>
+</exit>
+
+<use>
+<p>
+    This vector reason is called by the OSPointer module to determine the
+position of the pointing device in a similar manner to that of PointerV 1
+(Request). Drivers should check the pointer type and if it matches the
+device being provided details should be returned and the vector claimed. If
+the pointer type does not match the vector should be passed on.
+</p>
+
+<p>
+Unlike PointerV 1 (Request), drivers should not issue KeyV requests for the
+mouse buttons that they provide. This task will be performed by the
+OSPointer module  based on the button state returned. Drivers wishing to
+support both the old and new protocol may share code between PointerV 1
+(Request) and PointerV 2 (Result) but they must ensure that registers are
+not corrupted unduly and that the different mouse button processing is
+performed based on the request type.
+</p>
+
+<p>
+Relative devices and absolute devices respond to the same request but
+provide slightly different responses. The value returned in R0 is used to
+determine the type of response made.
+</p>
+
+<p>
+Absolute devices return a 16 bit value (0-65535) which determines the
+position of the event. The driver may determine how the event is to be
+processed and indicate an equivalent button state for the event. This allows
+devices to provide positioning within the absolute device as distinct from
+button click events. For absolute devices the meaning of R4 and R5 is
+undefined and the registers must be returned as 0 for future compatibility.
+Internally, the absolute position request is scaled by the screen size and
+converted into a relative position which is applied to the mouse position
+with an equivalent of a mouse step of 1.
+</p>
+
+<p>
+For scroll wheel-like alternate devices the +ve Y direction should be that
+for pushing the wheel 'away' from the user.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge='Select 3' supplier="RISCOS Ltd" state='supported'/>
+</compatibility>
+
+<related>
+    <reference type="swi" name="Mouse" />
+    <reference type="swi" name="Pointer" reason="2"/>
+    <reference type="vector" name="EventV" reason='21,4'/>
+</related>
+</vector-definition>
+
+
+</section>
+
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2023.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Gerph" date="17 May 2023" title="Initial version">
+    <change>Created from Select technical documentation.</change>
+  </revision>
+ </history>
+
+ <related>
+    <reference type='link' href="http://www.riscos.com/support/developers/riscos6/input/pointerdevices.html" />
+ </related>
+</meta>
+</riscos-prm>

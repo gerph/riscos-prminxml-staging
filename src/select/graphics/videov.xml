@@ -1,0 +1,3191 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Video drivers (supplement for RISC OS Pyromaniac)">
+<section title="Introduction and Overview">
+
+<p>
+    The video system was traditionally been part of the RISC OS Kernel.
+    However, this overly complicated the assembler portion of the Kernel,
+    made new hardware harder to support, and meant that providing more
+    flexible and faster rendering was significantly impeded. In RISC OS
+    Select 3, the video system was moved out of the Kernel and became
+    a set of regular modules.
+</p>
+
+<p>
+    There are a number of parts of the video system which were handled
+    by the RISC OS Kernel, and which have been made available through
+    a standard RISC OS vector. These parts are, from lowest level to
+    highest level:
+</p>
+
+<p>
+    <list>
+        <item>Mode and frame buffer initialisation. These are handled
+            by a hardware driver such as VideoHWVIDC, VideoHWVF or
+            VideoHWPL110.</item>
+        <item>Pointer operations. These are usually handled by the
+            hardware driver.</item>
+        <item>VDU 4 text. These are, by default, handled by the
+            software driver, VideoSW, but may be accelerated.</item>
+        <item>Graphics operations. These are also handled by the
+            software driver.</item>
+        <item>Sprite operations. These are still handled by the
+            Kernel, but are already vectored through SpriteV.</item>
+        <item>Teletext operations. These are handled by the
+            VideoTTX module.</item>
+    </list>
+</p>
+
+<p>
+    This separation makes the maintenance of the video system much
+    easier, and allows runtime modifications to its behaviour. In
+    additioon, the video system has been extended to allow for multiple
+    displays by allowing a separate driver to take over the graphics
+    system. Although in RISC OS Select this was a limited operation,
+    allowing only a single active display at any time, the framework
+    provided allows for greater flexibility in the future.
+</p>
+
+</section>
+
+
+<section title="Technical details">
+<p>The graphics system has been split up in modern versions of RISC OS. The
+intention of the division of the system is to allow for accelerated graphics
+drivers. Graphics operations will be passed to drivers using the new
+<reference type='vector' name='VideoV'/>
+vector (&hex;2C). The operation to be performed is passed in a fixed
+register to the vector.</p>
+
+<p>
+The reason codes for the vector are grouped into the major regions that
+they cover:
+</p>
+
+<p>
+<list>
+    <item>&hex;000 - &hex;00F - Text (VDU 4) operations</item>
+    <item>&hex;010 - &hex;1FF - Graphics (OS_Plot and similar) operations</item>
+    <item>&hex;200 - &hex;2FF - Pointer operations</item>
+    <item>&hex;300 - &hex;3FF - Mode and display driver operations</item>
+    <item>&hex;400 - &hex;4FF - Teletext operations</item>
+</list>
+</p>
+
+<p>
+Text and graphics operations are provided by the VideoSW module on the
+VideoV vector. Should there be no accelerated handler earlier on the vector
+the VideoSW driver will provide the operation.
+</p>
+
+<subsection title="Text operations">
+    <p>Text operations may be accelerated by the driver, or if no implementation
+is provided they will be provided by the VideoSW module. Drivers should pay
+attention to the current display start as set with
+<reference type='vector' name='VideoV' reason='18'/>
+in order to know whether their display, or a
+sprite output has been selected.
+</p>
+</subsection>
+
+<subsection title="Graphics operations">
+<p>
+    Graphics operations may be accelerated by the driver, or if no
+implementation is provided they will be provided by the VideoSW module.
+Drivers should pay attention to the current display start as set with
+<reference type='vector' name='VideoV' reason='18'/>
+in order to know whether their display, or a
+sprite output has been selected.
+</p>
+
+<subsubsection title="Coordinates">
+<p>
+    All coordinates passed to the functions have taken account of the
+eigen-factors for the output. They describe the pixels from the bottom
+left corner of the output. Many interfaces will require that these
+coordinates be inverted by subtracting them from the screen height to get
+the offset from the top of the screen. Coordinates are signed.
+</p>
+</subsubsection>
+
+<subsubsection title="Colour operation">
+<p>
+    The graphic operations may use a special values in R6 to indicate the type
+of colour operation being performed. Whilst these may be a fixed 'OR-EOR'
+pattern (see <reference type='vector' name='VideoV' reason='16'/> and
+<reference type='vector' name='VideoV' reason='17'/> for more details),
+they may
+also take one of 4 special values. Clients may use these values as a short
+hand notation to remove the need to check on every graphic operation the
+whether the operation can be accelerated or not. The values are :
+</p>
+
+<p>
+    <value-table>
+        <value number="0">No effect - the operation can just return</value>
+        <value number="1">Use the last set Colour 1</value>
+        <value number="2">Use the last set Colour 2</value>
+        <value number="3">Invert destination</value>
+    </value-table>
+</p>
+
+<p>
+Any value other than these special values is a pointer to an ECF. If either
+of bit 0 or 1 is set on these pointers it should be ignored by the driver.
+This allows for future expansion.
+</p>
+</subsubsection>
+
+<subsubsection title="Graphics context">
+<p>
+    The graphics operations may use a block in R7 to determine the current
+graphics context. This contains a number of values which may vary between
+calls. Clients should check these against each operation.
+</p>
+
+<p>
+    <offset-table>
+        <offset number="0">Graphics clipping window x-min (inclusive)</offset>
+        <offset number="4">Graphics clipping window y-min (inclusive)</offset>
+        <offset number="8">Graphics clipping window x-max (exclusive)</offset>
+        <offset number="12">Graphics clipping window y-max (exclusive)</offset>
+        <offset number="16">Function to call to render a <reference type='entry' name="VideoV_Context_HLine">bounded horizontal line</reference></offset>
+        <offset number="20">Function to call to render a <reference type='entry' name="VideoV_Context_HLine">unbounded horizontal line</reference></offset>
+        <offset number="24">Function to call to render a <reference type='entry' name="VideoV_Context_Point">bounded point</reference></offset>
+        <offset number="28">Function to call to render a <reference type='entry' name="VideoV_Context_HLine">unbounded point</reference></offset>
+    </offset-table>
+</p>
+
+<p>
+    The functions for bounded and unbounded point rendering have the same interface, but
+    the bounded entry points should clip the rendering to the supplied clipping window.
+</p>
+</subsubsection>
+</subsection>
+
+<subsection title="Pointer operations">
+
+<p>
+Pointer operations are generated by the OSPointer module. The hardware
+driver should provide an implementation which does not affect the screen
+buffer (for example, by hardware overlay).
+</p>
+</subsection>
+
+<subsection title="Mode operations">
+
+<p>
+The mode operations are generally only handled by hardware drivers. Each
+driver will usually decide whether to handle the operation based on the
+display number. The only exception to this is <reference type='vector'
+name='VideoV' reason='778'>the display selection entry
+point</reference> which must be handled by all clients in order to determine
+whether the display is selected.
+</p>
+
+</subsection>
+
+<subsection title="Teletext operations">
+<p>
+Teletext operations are provided as a software supported device driver. Once
+a teletext mode has been selected, the teletext operations will be passed
+through the vector in place of the standard text operations. A few of the
+operations have been modified in order to provide more specialised
+operations in the teletext modes. Only a single teletext mode is ever in use
+at any time. Sprite redirection does not allow for teletext within sprite
+images.
+</p>
+</subsection>
+
+
+<subsection title="Display device registration">
+<p>
+Display devices should register themselves with the Operating System using
+OS_ScreenMode 255, and deregister when they have been terminated with
+OS_ScreenMode 254.
+</p>
+
+<p>
+The order of operations for a display driver on initialisation should be
+along the lines of:
+</p>
+
+<p>
+<list>
+    <item>Set private display number variable to -1.</item>
+    <item>Initialise any video hardware to a functioning, but disabled state.
+    This may include setting up a display buffer.</item>
+    <item>Claim VideoV vector.</item>
+    <item>Construct a display device descriptor for the hardware.</item>
+    <item>Call OS_ScreenMode 255 to register the display.</item>
+    <item>If an error was returned, release all resources and exit with the
+   error.</item>
+    <item>Set private display number variable to the value returned.</item>
+    <item>Store the VSync dispatcher and its workspace pointer for use later</item>
+    <item>If R3 was set to 1, issue OS_ScreenMode 11 to select the display
+   number supplied.</item>
+    <item>If an error was returned from the display selection, attempt to
+   select a known supported mode with OS_ScreenMode 0.
+   If a further error is returned, release all resources and exit
+   with the error.</item>
+    <item>Complete initialisation and return with no error.</item>
+</list>
+</p>
+
+<p>
+During finalisation it is important that the device shut itself down
+safely. The following sequence is recommended:
+</p>
+
+<p>
+<list>
+    <item>Set the private display number variable to -1, such that no vector
+   calls will be interpreted and that VSyncs will no longer be
+   triggered by the driver.</item>
+    <item>Release the VideoV vector to prevent any other calls being serviced.</item>
+    <item>Disable VSyncs for the hardware.</item>
+    <item>Call OS_ScreenMode 254 to deregister the display.</item>
+    <item>Release other hardware resources, shutting the hardware down to its
+   most quiescent state.</item>
+    <item>Release any other claimed resources.</item>
+    <item>Complete finalisation and return with no error.</item>
+</list>
+</p>
+
+<p>
+During the reset sequence, Service_PreReset will be issued. As with other
+hardware drivers, the hardware should be placed into a quiescent state, and
+interrupts disabled where necessary. The driver should place itself in a
+state similar to that of finalisation, except that the VideoV vector may be
+called and operations on the display buffer may still be performed by other
+components. Hardware may not have any reset lines asserted or similar within
+the system and it must be possible for the initialisation sequence to
+successfully start the hardware from the state which Service_PreReset placed
+it.
+</p>
+
+<p>
+Details of OS_ScreenMode 255, 254 and the display device descriptor can be
+found in the OSScreenMode documentation.
+</p>
+</subsection>
+
+</section>
+
+
+<section title="Software vectors">
+
+<vector-definition name="VideoV"
+                   number="2C"
+                   description="Graphics operation abstraction"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+
+    <register-use number="0-6">Dependant on reason code</register-use>
+    <register-use number="7">Display number (where relevant)</register-use>
+    <register-use number="8"><p>Reason code</p>
+<p>
+<value-table>
+        <value number="0"><reference type='vector' name='VideoV' reason='0' use-description='yes'/></value>
+        <value number="1"><reference type='vector' name='VideoV' reason='1' use-description='yes'/></value>
+        <value number="2"><reference type='vector' name='VideoV' reason='2' use-description='yes'/></value>
+        <value number="3"><reference type='vector' name='VideoV' reason='3' use-description='yes'/></value>
+        <value number="4"><reference type='vector' name='VideoV' reason='4' use-description='yes'/></value>
+        <value number="5"><reference type='vector' name='VideoV' reason='5' use-description='yes'/></value>
+        <value number="16"><reference type='vector' name='VideoV' reason='16' use-description='yes'/></value>
+        <value number="17"><reference type='vector' name='VideoV' reason='17' use-description='yes'/></value>
+        <value number="18"><reference type='vector' name='VideoV' reason='18' use-description='yes'/></value>
+        <value number="19"><reference type='vector' name='VideoV' reason='19' use-description='yes'/></value>
+        <value number="20"><reference type='vector' name='VideoV' reason='20' use-description='yes'/></value>
+        <value number="21"><reference type='vector' name='VideoV' reason='21' use-description='yes'/></value>
+        <value number="22"><reference type='vector' name='VideoV' reason='22' use-description='yes'/></value>
+        <value number="23"><reference type='vector' name='VideoV' reason='23' use-description='yes'/></value>
+        <value number="24"><reference type='vector' name='VideoV' reason='24' use-description='yes'/></value>
+        <value number="25"><reference type='vector' name='VideoV' reason='25' use-description='yes'/></value>
+        <value number="26"><reference type='vector' name='VideoV' reason='26' use-description='yes'/></value>
+        <value number="27"><reference type='vector' name='VideoV' reason='27' use-description='yes'/></value>
+        <value number="28"><reference type='vector' name='VideoV' reason='28' use-description='yes'/></value>
+        <value number="29"><reference type='vector' name='VideoV' reason='29' use-description='yes'/></value>
+        <value number="30"><reference type='vector' name='VideoV' reason='30' use-description='yes'/></value>
+        <value number="31"><reference type='vector' name='VideoV' reason='31' use-description='yes'/></value>
+        <value number="32"><reference type='vector' name='VideoV' reason='32' use-description='yes'/></value>
+        <value number="33"><reference type='vector' name='VideoV' reason='33' use-description='yes'/></value>
+        <value number="34"><reference type='vector' name='VideoV' reason='34' use-description='yes'/></value>
+        <value number="35"><reference type='vector' name='VideoV' reason='35' use-description='yes'/></value>
+        <value number="512"><reference type='vector' name='VideoV' reason='512' use-description='yes'/></value>
+        <value number="513"><reference type='vector' name='VideoV' reason='513' use-description='yes'/></value>
+        <value number="514"><reference type='vector' name='VideoV' reason='514' use-description='yes'/></value>
+        <value number="515"><reference type='vector' name='VideoV' reason='515' use-description='yes'/></value>
+        <value number="516"><reference type='vector' name='VideoV' reason='516' use-description='yes'/></value>
+        <value number="768"><reference type='vector' name='VideoV' reason='768' use-description='yes'/></value>
+        <value number="769"><reference type='vector' name='VideoV' reason='769' use-description='yes'/></value>
+        <value number="770"><reference type='vector' name='VideoV' reason='770' use-description='yes'/></value>
+        <value number="771"><reference type='vector' name='VideoV' reason='771' use-description='yes'/></value>
+        <value number="772"><reference type='vector' name='VideoV' reason='772' use-description='yes'/></value>
+        <value number="773"><reference type='vector' name='VideoV' reason='773' use-description='yes'/></value>
+        <value number="774"><reference type='vector' name='VideoV' reason='774' use-description='yes'/></value>
+        <value number="775"><reference type='vector' name='VideoV' reason='775' use-description='yes'/></value>
+        <value number="776"><reference type='vector' name='VideoV' reason='776' use-description='yes'/></value>
+        <value number="777"><reference type='vector' name='VideoV' reason='777' use-description='yes'/></value>
+        <value number="778"><reference type='vector' name='VideoV' reason='778' use-description='yes'/></value>
+        <value number="800"><reference type='vector' name='VideoV' reason='800' use-description='yes'/></value>
+        <value number="801"><reference type='vector' name='VideoV' reason='801' use-description='yes'/></value>
+        <value number="802"><reference type='vector' name='VideoV' reason='802' use-description='yes'/></value>
+        <value number="803"><reference type='vector' name='VideoV' reason='803' use-description='yes'/></value>
+        <value number="1024"><reference type='vector' name='VideoV' reason='1024' use-description='yes'/></value>
+        <value number="1025"><reference type='vector' name='VideoV' reason='1025' use-description='yes'/></value>
+        <value number="1026"><reference type='vector' name='VideoV' reason='1026' use-description='yes'/></value>
+        <value number="1027"><reference type='vector' name='VideoV' reason='1027' use-description='yes'/></value>
+        <value number="1028"><reference type='vector' name='VideoV' reason='1028' use-description='yes'/></value>
+        <value number="1029"><reference type='vector' name='VideoV' reason='1029' use-description='yes'/></value>
+        <value number="1030"><reference type='vector' name='VideoV' reason='1030' use-description='yes'/></value>
+        <value number="1031"><reference type='vector' name='VideoV' reason='1031' use-description='yes'/></value>
+        <value number="1032"><reference type='vector' name='VideoV' reason='1032' use-description='yes'/></value>
+        <value number="1033"><reference type='vector' name='VideoV' reason='1033' use-description='yes'/></value>
+
+</value-table>
+</p>
+</register-use>
+</entry>
+
+<exit>
+<register-use number="0-7">Dependant on reason code</register-use>
+</exit>
+
+<use>
+<p>The vector should be claimed when it is handled entirely within the driver.</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+    <version riscos-ge="7.47" supplier="RISC OS Pyromaniac">Only teletext calls are issued by the graphics system.</version>
+</compatibility>
+
+<related>
+<!-- <reference type="vector" name="BingleV" /> -->
+</related>
+</vector-definition>
+
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="0"
+                   reasonname="Text_ChangeDestination"
+                   description="Notifies the text system when redirection occurs"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">pointer to the base of the destination (DisplayStart)</register-use>
+<register-use number="1">line length for this destination (LineLength)</register-use>
+<register-use number="2">maximum height in text lines (ScrBRow)</register-use>
+<register-use number="3">destination log2bpp depth (Log2BPP)</register-use>
+<register-use number="4">mode flags for destination (ModeFlags)</register-use>
+<register-use number="8">0 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called a new destination has been selected for output. In
+particular, it will be called on mode change and sprite redirection. Clients
+should initialise any variables which are necessary for their operation.
+Clients wishing to handle the entire Text interface may claim this call
+point, but it is strongly recommended that the call be passed on.
+</p>
+
+<p>
+The mode flags will indicate any special features which are present in the
+mode specified. In particular:
+</p>
+
+<p>
+    <bitfield-table>
+        <bit number="2">
+           <p>'Gap mode', indicating that characters will be spaced 9 rows
+           apart, rather than 8 - leaving a single line which will not be
+           written to.</p>
+           <p>
+           This flag is deprecated and support is not required of any
+           clients.
+           </p>
+        </bit>
+
+        <bit number="3"><p>'BBC gap mode', should be treated as identical to Bit 2.</p>
+           <p>
+           This flag is deprecated and support is not required of any
+           clients.
+           </p>
+        </bit>
+
+        <bit number="5"><p>Double height-VDU characters, indicating that characters should
+           be written 16 units high, rather than 8</p>
+           <p>
+           This flag is deprecated and support is not required of any
+           clients.
+           </p>
+        </bit>
+    </bitfield-table>
+</p>
+
+<p>
+This vector should never be claimed.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="1"
+                   reasonname="Text_DefineChar"
+                   description="Defines the bitmap of a text character"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">the character to define (32-255)</register-use>
+<register-use number="0">pointer to word aligned 8 bytes to use as the character</register-use>
+<register-use number="8">1 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to define a character. Clients should normally make
+a note of the changes and pass this call on.</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="2"
+                   reasonname="Text_SetTextColour"
+                   description="Change the colour used for rendering text"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">foreground screen colour</register-use>
+<register-use number="1">background screen colour</register-use>
+<register-use number="2">BPP of the current mode</register-use>
+<register-use number="8">2 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called whenever the text colour has been changed and text
+output is about to be performed. It is expected that clients initialise any
+cached data they require in order to render characters in the new colours.
+The colours supplied are values to be written to the screen for that pixel,
+for example, in 2 BPP modes, a foreground colour of 3 would be used to
+indicate that all pixels set for that character would use the value 3 in
+memory. Clients may need to replicate these bits across a word in order to
+perform operations more rapidly, however implementation details are left to
+the client's discretion.</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+    <reference type="vector" name="VideoV" reason="3"/>
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="3"
+                   reasonname="Text_WriteTextChar"
+                   description="Render a character on the screen"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">character to write (32-255)</register-use>
+<register-use number="1">pointer to address of top left pixel to write (word aligned) on the screen</register-use>
+<register-use number="2">character x (origin top left)</register-use>
+<register-use number="3">character y (origin top left)</register-use>
+<register-use number="8">3 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-8" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to render a character on the screen at a text position.
+Characters are 8x8 pixels in all modes and should be rendered in the colours
+specified by  <reference type='vector' name='VideoV' reason='2'/>.
+Unset pixel data for the
+character should use the background colour, and set pixel data for the
+character should use the foreground colour. Registers R2 and R3 are provided
+for clients which require the actual pixel position to render the character.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="4"
+                   reasonname="Text_TextCursor"
+                   description="Render a cursor on the screen"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">composite cursor position (&hex;SS0000EE)</register-use>
+<register-use number="1">pointer to address of top left pixel for the character (word aligned) on the screen</register-use>
+<register-use number="2">character x (origin top left)</register-use>
+<register-use number="3">character y (origin top left)</register-use>
+<register-use number="4">offset of start of the cursor, from R1</register-use>
+<register-use number="5">offset of line after the end of the cursor, from R1</register-use>
+<register-use number="8">4 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-8" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to render a 'cursor' at a text position. This should
+be an inverted rectangle which spans the lines of the character requested by
+R0, or R4 and R5. The composite cursor mask is provided for clients which
+use the pixel position of the character to render the shape. The cursor
+should be rendered at the character specified by inverting the current
+contents of that location. The vector will be called repeatedly in order to
+'flash' the cursor. In 'split' editing mode, the vector will be called to
+render whichever cursor requires redrawing.</p>
+
+<p>
+The composite cursor position indicates the start and end lines of the
+cursor by the SS and EE values. The EE value is the last line that should
+be drawn. Thus, SS=6, EE=7 would invert lines 6 and 7 within the character.
+Similarly, SS=8, EE=9 would invert lines 8 and 9 within the character.
+Line 8 and 9 are only applicable to gap-modes.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="5"
+                   reasonname="Text_ClearBox"
+                   description="Clear a region of the screen for text"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>pointer to box description</p>
+<p>
+    <offset-table>
+          <offset number="0">left char x</offset>
+          <offset number="4">bottom char y</offset>
+          <offset number="12">right char x</offset>
+          <offset number="16">top char y</offset>
+          <offset number="20">top left address to start at (might be byte aligned)</offset>
+          <offset number="24">number of bytes to fill per line (might be byte aligned; usually will be the same as LineLength)</offset>
+          <offset number="28">number of lines to fill</offset>
+          <offset number="32">character line size (8, 10, 16, 20)</offset>
+          <offset number="36">fill word for first 8/16 lines of each character</offset>
+          <offset number="40">fill word for subsequent lines (gap fill)</offset>
+    </offset-table>
+</p>
+</register-use>
+<register-use number="8">5 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-8" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to clear a region of the text window. The supplied
+description block gives the character positions, and the memory positions
+which require clearing. The clear operation should be performed using the
+fill words given in +36 and +40. These words will be the same unless the
+user is in a BBC-style gap mode. Such modes are not expected to be used by
+clients in the future and support may be omitted from accelerated modules.
+The software implementation provides support for all combinations.</p>
+
+<p>
+As with other text operations, the character positions are specified with
+their origin at the top left.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="16"
+                   reasonname="Graf_SetColour1"
+                   description="Selects a colour to use as the primary drawing colour"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">action type, for information purposes</register-use>
+<register-use number="1"><p>pointer to OR-EOR pattern to use</p>
+<p>
+    <offset-table>
+        <offset number="0">Value to OR in word for line 0</offset>
+        <offset number="4">Value to EOR in word for line 0</offset>
+        <offset number="8">Value to OR in word for line 1</offset>
+        <offset number="12">Value to EOR in word for line 1</offset>
+        <offset number="16">Value to OR in word for line 2</offset>
+        <offset number="20">Value to EOR in word for line 2</offset>
+        <offset number="24">Value to OR in word for line 3</offset>
+        <offset number="28">Value to EOR in word for line 3</offset>
+        <offset number="32">Value to OR in word for line 4</offset>
+        <offset number="36">Value to EOR in word for line 4</offset>
+        <offset number="40">Value to OR in word for line 5</offset>
+        <offset number="44">Value to EOR in word for line 5</offset>
+        <offset number="48">Value to OR in word for line 6</offset>
+        <offset number="52">Value to EOR in word for line 6</offset>
+        <offset number="56">Value to OR in word for line 7</offset>
+        <offset number="60">Value to EOR in word for line 7</offset>
+    </offset-table>
+</p>
+</register-use>
+<register-use number="8">&hex;10 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to set the primary colours to use for
+plotting graphics operations. Clients should record the details. They
+may pre-cache the values after determining whether they can handle the
+operation type.
+</p>
+    <p>Lines are measured from the top left of the screen and should be ANDed
+with 7. Consult the example VideoSW code for more details (s/GrafPoint
+gives an obvious use).</p>
+
+<p>
+Whilst many store and invert operations will be simple to accelerate within
+drivers, the more complex operations may be deferred to the software driver
+where necessary. In particular, drivers should be aware that the operation
+pattern may not correspond directly to any PLOT reason code. Users may
+manually select different colour operations for different bit regions or
+lines.</p>
+
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+    <reference type='vector' name='VideoV' reason='16'/>
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="17"
+                   reasonname="Graf_SetColour2"
+                   description="Selects a colour to use as the secondary drawing colour (background)"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">action type, for information purposes</register-use>
+<register-use number="1">pointer to OR-EOR pattern to use, as for <reference type='vector' name='VideoV' reason='16'/></register-use>
+<register-use number="8">&hex;11 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to set the secondary colour used for graphics operations. This is commonly called the 'background colour'. The operation is identical to that of
+    <reference type='vector' name='VideoV' reason='16'/>.
+</p>
+
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+    <reference type='vector' name='VideoV' reason='16'/>
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="18"
+                   reasonname="Graf_ChangeDestination"
+                   description="Notifies the graphics system when redirection occurs"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>pointer to context information</p>
+<p>
+    <offset-table>
+        <offset number="0">Mode flags</offset>
+        <offset number="4">Text screen width-1</offset>
+        <offset number="8">Text screen height-1</offset>
+        <offset number="12">Number of colours</offset>
+        <offset number="16">X-eigen factor</offset>
+        <offset number="20">Y-eigen factor</offset>
+        <offset number="24">Line length</offset>
+        <offset number="28">Total output size</offset>
+        <offset number="32">Base of the output buffer</offset>
+        <offset number="36">Log2 Bits Per Pixel</offset>
+        <offset number="40">Log2 Bits Per Addressable Pixel (hang-over from double-width pixel modes)</offset>
+        <offset number="44">Graphics screen width-1</offset>
+        <offset number="48">Graphics screen height-2</offset>
+    </offset-table>
+</p>
+</register-use>
+<register-use number="1">0 if the destination is the screen, otherwise the destination is a sprite</register-use>
+<register-use number="8">&hex;12 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called whenever the output changes destination, usually due
+to a mode change or sprite redirection. Drivers should cache the context
+information for use within other calls. This vector should never be claimed.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="19"
+                   reasonname="Graf_ChangeBase"
+                   description="Notifies the graphics system that the destination base has changed"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">pointer to base of the buffer</register-use>
+<register-use number="8">&hex;13 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called when the output destination base address has changed.
+It may be called under a number of circumstances, including sprite deletion,
+mask changes and hardware scrolling. Drivers should make a note of the new
+address and base all their calculations from it.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="20"
+                   reasonname="Graf_ReadPrimitives"
+                   description="Read primitive operations to use for the current output"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">pointer to where to store HLine handler (r12, function)</register-use>
+<register-use number="1">pointer to where to store Point handler (r12, function)</register-use>
+<register-use number="2">pointer to where to store VLine handler (r12, function)</register-use>
+<register-use number="8">&hex;14 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0">new pointer to where to store HLine details at</register-use>
+<register-use number="1">new pointer to where to store Point details at</register-use>
+<register-use number="2">new pointer to where to store VLine details at</register-use>
+<register-use number="3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to read the primitive operations which can be used to
+render a horizontal line, a point and a vertical line. Since these
+operations are expected to be called regularly it is important that they
+be fast. Rather than using the vector dispatch for every line or point to
+be rendered, a single function dispatch can be used - obviating the need
+for a SWI call, and subsequent vector dispatch. Consult the
+Graf_ReadPrimitives source for more details of the operation.</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="21"
+                   reasonname="Graf_Rectangle"
+                   description="Render a rectangle"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>pointer to coordinate block:</p>
+<p>
+    <offset-table>
+        <offset number="0">x-min (inclusive)</offset>
+        <offset number="4">y-min (inclusive)</offset>
+        <offset number="8">x-max (exclusive)</offset>
+        <offset number="12">y-max (exclusive)</offset>
+    </offset-table>
+</p>
+</register-use>
+<register-use number="6"><reference type='subsubsection' name='Colour operation'/></register-use>
+<register-use number="7">pointer to <reference type='subsubsection' name='Graphics context'/></register-use>
+<register-use number="8">&hex;15 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to fill a rectangle. Clients should bound the
+coordinates if necessary and then plot the rectangle.</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="22"
+                   reasonname="Graf_Triangle"
+                   description="Render a triangle"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>pointer to coordinate block:</p>
+<p>
+    <offset-table>
+        <offset number="0">x0</offset>
+        <offset number="4">y0</offset>
+        <offset number="8">x1</offset>
+        <offset number="12">y1</offset>
+        <offset number="16">x2</offset>
+        <offset number="20">y2</offset>
+    </offset-table>
+</p>
+</register-use>
+<register-use number="6"><reference type='subsubsection' name='Colour operation'/></register-use>
+<register-use number="7">pointer to <reference type='subsubsection' name='Graphics context'/></register-use>
+<register-use number="8">&hex;16 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to fill a triangle. Clients should plot the triangle,
+bounded by the coordinates given.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="23"
+                   reasonname="Graf_Parallelogram"
+                   description="Render a parallelogram"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>pointer to coordinate block:</p>
+<p>
+    <offset-table>
+        <offset number="0">x0</offset>
+        <offset number="4">y0</offset>
+        <offset number="8">x1</offset>
+        <offset number="12">y1</offset>
+        <offset number="16">x2</offset>
+        <offset number="20">y2</offset>
+    </offset-table>
+</p>
+</register-use>
+<register-use number="6"><reference type='subsubsection' name='Colour operation'/></register-use>
+<register-use number="7">pointer to <reference type='subsubsection' name='Graphics context'/></register-use>
+<register-use number="8">&hex;17 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to fill a parallelogram. Clients should plot the
+parallelogram, bounded by the coordinates given. The coordinates given are
+in no particular order. The fourth verex can be calculated from the other
+three.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="24"
+                   reasonname="Graf_BlockCopy"
+                   description="Copy a rectangle"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>pointer to coordinate block:</p>
+<p>
+    <offset-table>
+        <offset number="0">source x0</offset>
+        <offset number="4">source y0</offset>
+        <offset number="8">source x1</offset>
+        <offset number="12">source y1</offset>
+        <offset number="16">destination x0</offset>
+        <offset number="20">destination y0</offset>
+        <offset number="24">destination x1</offset>
+        <offset number="28">destination y1</offset>
+    </offset-table>
+</p>
+</register-use>
+<register-use number="6"><reference type='subsubsection' name='Colour operation'/></register-use>
+<register-use number="7">pointer to <reference type='subsubsection' name='Graphics context'/></register-use>
+<register-use number="8">&hex;18 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to copy a rectangle from part of the display
+elsewhere. No context or colour operation is provided. The region
+has already been bounded to the screen and graphics window (both the source
+and destination are guarenteed to be within the buffer). The source data,
+where not overwritten, should be unaffected by the copy operation.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="25"
+                   reasonname="Graf_CircleOutline"
+                   description="Render the outline of a circle"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>pointer to coordinate block:</p>
+<p>
+    <offset-table>
+        <offset number="0">x centre</offset>
+        <offset number="4">y centre</offset>
+        <offset number="8">x edge</offset>
+        <offset number="12">y edge</offset>
+    </offset-table>
+</p>
+</register-use>
+<register-use number="6"><reference type='subsubsection' name='Colour operation'/></register-use>
+<register-use number="7">pointer to <reference type='subsubsection' name='Graphics context'/></register-use>
+<register-use number="8">&hex;19 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="26"
+                   reasonname="Graf_CircleFill"
+                   description="Render a filled circle"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>pointer to coordinate block:</p>
+<p>
+    <offset-table>
+        <offset number="0">x centre</offset>
+        <offset number="4">y centre</offset>
+        <offset number="8">x edge</offset>
+        <offset number="12">y edge</offset>
+    </offset-table>
+</p>
+</register-use>
+<register-use number="6"><reference type='subsubsection' name='Colour operation'/></register-use>
+<register-use number="7">pointer to <reference type='subsubsection' name='Graphics context'/></register-use>
+<register-use number="8">&hex;1A (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to fill a circle. Clients should plot the circle,
+bounded by the coordinates supplied if necessary.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="27"
+                   reasonname="Graf_CircleArc"
+                   description="Render the outline of an circle arc"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>pointer to coordinate block:</p>
+<p>
+    <offset-table>
+        <offset number="0">x centre</offset>
+        <offset number="4">y centre</offset>
+        <offset number="8">x start</offset>
+        <offset number="12">y start</offset>
+        <offset number="16">x end</offset>
+        <offset number="20">y end</offset>
+    </offset-table>
+</p>
+</register-use>
+<register-use number="6"><reference type='subsubsection' name='Colour operation'/></register-use>
+<register-use number="7">pointer to <reference type='subsubsection' name='Graphics context'/></register-use>
+<register-use number="8">&hex;1B (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to draw an arc. Clients should plot the arc,
+bounded by the coordinates supplied if necessary. The coordinate order
+and meaning is identical to that used by the PLOT arc operation. That is,
+first coordinate pair indicates the centre of the circle, the second pair
+provides the start position on the edge of the circle, and the final pair
+provides the end position as a point on a line that intersects the circle.
+The arc should be drawn anti-clockwise.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="28"
+                   reasonname="Graf_CircleSegment"
+                   description="Render a filled segment of a circle"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>pointer to coordinate block:</p>
+<p>
+    <offset-table>
+        <offset number="0">x centre</offset>
+        <offset number="4">y centre</offset>
+        <offset number="8">x start</offset>
+        <offset number="12">y start</offset>
+        <offset number="16">x end</offset>
+        <offset number="20">y end</offset>
+    </offset-table>
+</p>
+</register-use>
+<register-use number="6"><reference type='subsubsection' name='Colour operation'/></register-use>
+<register-use number="7">pointer to <reference type='subsubsection' name='Graphics context'/></register-use>
+<register-use number="8">&hex;1C (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to draw a segment. Clients should plot the segment,
+bounded by the coordinates supplied if necessary. The coordinate order
+is the same as <reference type='vector' name='VideoV' reason='27'/>.
+A segment fills the arc shape, closing
+it with a line from the start position to the intersection of the end
+position line and the circle.</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="29"
+                   reasonname="Graf_CircleSector"
+                   description="Render a filled sector of a circle"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>pointer to coordinate block:</p>
+<p>
+    <offset-table>
+        <offset number="0">x centre</offset>
+        <offset number="4">y centre</offset>
+        <offset number="8">x start</offset>
+        <offset number="12">y start</offset>
+        <offset number="16">x end</offset>
+        <offset number="20">y end</offset>
+    </offset-table>
+</p>
+</register-use>
+<register-use number="6"><reference type='subsubsection' name='Colour operation'/></register-use>
+<register-use number="7">pointer to <reference type='subsubsection' name='Graphics context'/></register-use>
+<register-use number="8">&hex;1D (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to draw a sector. Clients should plot the sector,
+bounded by the coordinates supplied if necessary. The coordinate order
+is the same as <reference type='vector' name='VideoV' reason='27'/>.
+A segment fills the arc shape, closing
+it with a pair of lines from the start position to the centre of the circle,
+and from the intersection of the end position line and the circle to the
+centre of the circle. The shape is often known as a 'pie' from the common
+shape produced by removing sections from pies.</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="30"
+                   reasonname="Graf_EllipseOutline"
+                   description="Render the outline of an ellipse"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>pointer to coordinate block:</p>
+<p>
+    <offset-table>
+        <offset number="0">x centre</offset>
+        <offset number="4">y centre</offset>
+        <offset number="8">x width</offset>
+        <offset number="12">ignored</offset>
+        <offset number="16">x limit point</offset>
+        <offset number="20">y limit point</offset>
+    </offset-table>
+</p>
+</register-use>
+<register-use number="6"><reference type='subsubsection' name='Colour operation'/></register-use>
+<register-use number="7">pointer to <reference type='subsubsection' name='Graphics context'/></register-use>
+<register-use number="8">&hex;1E (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to draw an ellipse. Clients should plot the ellipse,
+outline bounded by the coordinates supplied if necessary. The coordinate
+order is the same as the equivilent PLOT ellipse operation. That is, the
+first pair gives the centre position of the ellipse, the second pair gives
+the width of the ellipse at centre line (the y coordinate is ignored), and
+the final pair gives the position of the top-most, or bottom-most limit of
+the ellipse.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="31"
+                   reasonname="Graf_EllipseFill"
+                   description="Render a filled ellipse"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>pointer to coordinate block:</p>
+<p>
+    <offset-table>
+        <offset number="0">x centre</offset>
+        <offset number="4">y centre</offset>
+        <offset number="8">x width</offset>
+        <offset number="12">ignored</offset>
+        <offset number="16">x limit point</offset>
+        <offset number="20">y limit point</offset>
+    </offset-table>
+</p>
+</register-use>
+<register-use number="6"><reference type='subsubsection' name='Colour operation'/></register-use>
+<register-use number="7">pointer to <reference type='subsubsection' name='Graphics context'/></register-use>
+<register-use number="8">&hex;1F (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to draw an ellipse. Clients should plot the solid
+ellipse, bounded by the coordinates supplied if necessary. The coordinate
+order is as for the <reference type='vector' name='VideoV' reason='30'/>
+operation.
+
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="32"
+                   reasonname="Graf_FillRight"
+                   description="Fill a line right from a position"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">x start</register-use>
+<register-use number="1">y start</register-use>
+<register-use number="2">delimiting colour</register-use>
+<register-use number="3"><p>delimiting condition:</p>
+<p>
+    <value-table>
+        <value number="0">fill to delimiting colour</value>
+        <value number="&hex;80000000">fill to non-delimiting colour</value>
+    </value-table>
+</p>
+</register-use>
+<register-use number="6"><reference type='subsubsection' name='Colour operation'/></register-use>
+<register-use number="7">pointer to <reference type='subsubsection' name='Graphics context'/></register-use>
+<register-use number="8">&hex;20 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0" state='corrupted'/>
+<register-use number="1">right x position where fill ended</register-use>
+<register-use number="2" state='corrupted'></register-use>
+<register-use number="3">1 if anything was filled, 0 if nothing was filled</register-use>
+</exit>
+
+<use>
+    <p>This vector is called to fill a line right until a given
+condition is met (denoted by R2 and R3).
+
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="33"
+                   reasonname="Graf_FillLeftAndRight"
+                   description="Fill a line left and right from a position"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">x start</register-use>
+<register-use number="1">y start</register-use>
+<register-use number="2">delimiting colour</register-use>
+<register-use number="3"><p>delimiting condition:</p>
+<p>
+    <value-table>
+        <value number="0">fill to delimiting colour</value>
+        <value number="&hex;80000000">fill to non-delimiting colour</value>
+    </value-table>
+</p>
+</register-use>
+<register-use number="6"><reference type='subsubsection' name='Colour operation'/></register-use>
+<register-use number="7">pointer to <reference type='subsubsection' name='Graphics context'/></register-use>
+<register-use number="8">&hex;21 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0">left x position where fill ended</register-use>
+<register-use number="1">right x position where fill ended</register-use>
+<register-use number="2" state='corrupted'></register-use>
+<register-use number="3">1 if anything was filled, 0 if nothing was filled</register-use>
+</exit>
+
+<use>
+    <p>This vector is called to fill a line left and right until a given
+condition is met (denoted by R2 and R3).</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="34"
+                   reasonname="Graf_FillFlood"
+                   description="Flood fill a region"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">x start</register-use>
+<register-use number="1">y start</register-use>
+<register-use number="2">delimiting colour</register-use>
+<register-use number="3"><p>delimiting condition:</p>
+<p>
+    <value-table>
+        <value number="0">fill to delimiting colour</value>
+        <value number="&hex;80000000">fill to non-delimiting colour</value>
+    </value-table>
+</p>
+</register-use>
+<register-use number="6"><reference type='subsubsection' name='Colour operation'/></register-use>
+<register-use number="7">pointer to <reference type='subsubsection' name='Graphics context'/></register-use>
+<register-use number="8">&hex;22 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to perform a flood fill operation, stopping at a given condition (denoted by R2 and R3).</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="35"
+                   reasonname="Graf_PolyHLine"
+                   description="Fill multiple horizontal lines"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>pointer to buffer of horizontal line segments:</p>
+<p>
+    <offset-table>
+        <offset number="0">number of horizontal lines to draw</offset>
+        <offset number="4">1st horizontal line segment: x left position</offset>
+        <offset number="8">1st horizontal line segment: y position</offset>
+        <offset number="12">1st horizontal line segment: x right position</offset>
+        <offset number="16...">Subsequent horizontal line segments</offset>
+    </offset-table>
+</p>
+</register-use>
+<register-use number="6"><reference type='subsubsection' name='Colour operation'/></register-use>
+<register-use number="7">pointer to <reference type='subsubsection' name='Graphics context'/></register-use>
+<register-use number="8">&hex;23 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to perform many horizontal line fill operations as a
+single step. The block supplied must be copied if the driver is intending
+to buffer these operations. Because this call is always issued through the
+vector, clients should try to ensure that it is worthwhile calling using
+this interface rather than the direct HLine interface (see
+OS_ReadVduVariables).
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="512"
+                   reasonname="Pointer_Define"
+                   description="Define a pointer shape"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">width</register-use>
+<register-use number="1">pointer to pointer data</register-use>
+<register-use number="2">height</register-use>
+<register-use number="6">pointer number to define (0-3)</register-use>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;200 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to define one of the 4 pointer shapes. Pointer shapes
+are pre-compensated for the 'active' position.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="513"
+                   reasonname="Pointer_Select"
+                   description="Select a pointer for use"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">pointer number</register-use>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;201 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to select one of the pointers for use. Only one pointer
+is ever displayed at a time.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="514"
+                   reasonname="Pointer_Update"
+                   description="Updates the location of the pointer on the screen"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">height of the pointer</register-use>
+<register-use number="1">y coordinate</register-use>
+<register-use number="2">x coordinate</register-use>
+<register-use number="3">screen height</register-use>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;202 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to update the location of the pointer on the screen.</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="515"
+                   reasonname="Pointer_Remove"
+                   description="Removes the pointer from the screen"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="3">screen height</register-use>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;203 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to remove the pointer from the screen.</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="516"
+                   reasonname="Pointer_SetPalette"
+                   description="Set a colour used by the pointer"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">colour number to update</register-use>
+<register-use number="1">colour number in form &hex;00BBGGRR</register-use>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;204 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to set the colour of the pointer.</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="768"
+                   reasonname="Mode_VetMode"
+                   description="Check the validity of a mode"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">pointer to a VIDC type 3 table</register-use>
+<register-use number="1">memory required for the mode</register-use>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;300 (reason code)</register-use>
+</entry>
+
+<exit>
+    <processor-flag name="V"><p>If set, indicates an error. The usual error pointer may be supplied in R0, or if R0 is set to 0 this indicates that a generic error will be returned.</p>
+        <p>If clear, indicates the mode is acceptable.</p>
+    </processor-flag>
+    <register-use number="7">-1 if handled</register-use>
+</exit>
+
+<use>
+    <p>This vector is called to check the validity of a mode prior to selecting it.
+Drivers should reject modes which they are incapable of displaying.</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="769"
+                   reasonname="Mode_SetMode"
+                   description="Select a screen mode for use"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">pointer to a VIDC type 3 table</register-use>
+<register-use number="1">memory required for the mode</register-use>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;301 (reason code)</register-use>
+</entry>
+
+<exit>
+    <register-use number="0">Pointer to base of screen area</register-use>
+    <register-use number="7">-1 if handled</register-use>
+</exit>
+
+<use>
+    <p>This vector is called to select a screen mode for use. It has already passed the vetting procedure above so should be able to be selected.</p>
+
+<p>Drivers should perform the following actions on a mode change:</p>
+
+<p>
+    <list>
+        <item>Default to the first screen bank for display and driver</item>
+        <item>Release any claimed memory for alternate screen banks</item>
+        <item>Clear the palette to black</item>
+    </list>
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="770"
+                   reasonname="Mode_Scroll"
+                   description="Hardware scroll of the display"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">number of scanlines to move down by (may be negative to scroll up)</register-use>
+<register-use number="1">number of bytes to which this equates</register-use>
+<register-use number="2">background colour (word) to fill lines with</register-use>
+<register-use number="3">background colour (word) to fill 'gaps' with</register-use>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;302 (reason code)</register-use>
+</entry>
+
+<exit>
+    <register-use number="0">address of screen base, or 0 if hardware scroll is not supported.
+        The address may be the same as the current base if the operation can
+        be performed with acceleration (ie a 'move' operation).
+        The address should be in the lower mapping of the screen buffer if a
+        doubly mapped area is in use.</register-use>
+    <register-use number="1"><p>State of exposed region:</p>
+        <p>
+            <value-table>
+                <value number="1">the exposed region has been cleared to the requested background</value>
+                <value number="0">the exposed region has not been cleared and must be cleared by the OS</value>
+            </value-table>
+        </p>
+    </register-use>
+    <register-use number="2-3" state='corrupted'></register-use>
+    <register-use number="7">-1 if handled</register-use>
+</exit>
+
+<use>
+    <p>This vector is called to request a hardware scroll of the device. The scroll
+may be a change of the base of the area, as used by the VIDC driver, or an
+accelerated copy operation. Drivers can just ignore this operation, or return
+0 for both R0 and R1 to indicate that the hardware scroll is not supported.
+The Kernel can perform the necessary operations if they are not supported by
+the driver.</p>
+
+<p>
+Note: (R0 AND NOT 7) lines should be filled with R2.<br/>
+      (R0 AND 7) lines should be filled with R3.
+</p>
+<p>
+This allows the system to provide gap modes in the same manner as the BBC did.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="771"
+                   reasonname="Mode_SetPalette"
+                   description="Change displayed colours in paletted modes"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>0-255 for regular palette entries<br/>
+    256 for 'border'</p></register-use>
+<register-use number="1">colour in form &hex;0sBBGGRR, where 's' indicates a supremacy nibble which may be used for hardware masking operations. Its default
+        will be 0.</register-use>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;303 (reason code)</register-use>
+</entry>
+
+<exit>
+    <register-use number="0-3" state='corrupted'></register-use>
+    <register-use number="7">-1 if handled</register-use>
+</exit>
+
+<use>
+    <p>
+This vector is called to change the displayed colours. The operation of
+regular palette entries is defined within paletted modes only. Drivers or
+hardware not supporting the screen 'border' colour should ignore the
+operation. Drivers which cannot provide the full 24bit colour specification
+should make best effort to match the colours requested. The colours should
+be transformed by any RGB tables specified in a separate call if the
+hardware does not support any specific transformation configuration.</p>
+<p>
+Where RGB tables are not supported by the hardware, it will be necessary to
+take a copy of the palette entries.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="772"
+                   reasonname="Mode_Enable"
+                   description="Enable display hardware"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;304 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+    <register-use number="7">-1 if handled</register-use>
+</exit>
+
+<use>
+    <p>This vector is called to enable the display hardware. This
+operation is intended to allow components to restart the display hardware
+for client defined reasons. The Portable module may use this to control
+the power to the hardware when requested.</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="773"
+                   reasonname="Mode_Disable"
+                   description="Disable display hardware"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;305 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-3" state='corrupted'></register-use>
+    <register-use number="7">-1 if handled</register-use>
+</exit>
+
+<use>
+    <p>This vector is called to disable the display hardware. This
+operation is intended to allow components to shut down and restart the display hardware
+for client defined reasons. The Portable module may use this to control
+the power to the hardware when requested.</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="774"
+                   reasonname="Mode_PowerSave"
+                   description="Select a power saving mode for the display"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>power saving state:</p>
+<p>
+    <value-table>
+        <value number="-1">D0 DPMS state - Normal operation, display enabled</value>
+        <value number="0">D0 DPMS state - No DPMS but display disabled if possible (rest of the system will blank palette in this state; VIDC will disable disable refresh and DMA in this state)</value>
+        <value number="1">D1 DPMS state - 'Standby'</value>
+        <value number="2">D2 DPMS state - 'Suspend'</value>
+        <value number="3">D3 DPMS state - 'Active off'</value>
+        <value number="4">DPMS state supplied in modes VIDC type 3 table (ie 'default')</value>
+        <value number="other">will not be used</value>
+    </value-table>
+</p>
+</register-use>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;306 (reason code)</register-use>
+</entry>
+
+<exit>
+    <register-use number="0-3" state='corrupted'></register-use>
+    <register-use number="7">-1 if handled</register-use>
+</exit>
+
+<use>
+    <p>This vector is called to select an immediate power-save mode should be
+entered. Regardless of whether this call is handled or not, the palette
+will be set to black. Drivers should expect to get palette operations whilst
+blanked. They may wish to ignore these.
+</p>
+<p>
+        The state values (with the exception of -1) are directly modelled
+        after the DPMS states. -1 can be treated as equivilent to 0 for
+        the purposes of H/V sync control.
+</p>
+<p>
+        If mapping directly to HSync and VSync lines, these values are:
+</p>
+<p>
+        <value-table>
+            <value number="0">HSync On, VSync On</value>
+            <value number="1">HSync Off, VSync On</value>
+            <value number="2">HSync On, VSync Off</value>
+            <value number="3">HSync Off, VSync Off</value>
+        </value-table>
+</p>
+<p>
+        Hardware may promote or demote these settings as it sees fit, but
+        this should be documented in hardware documentation as appropriate.
+</p>
+
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="775"
+                   reasonname="Mode_SetRGBTable"
+                   description="Modify RGB mapping tables (gamma tables)"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>pointer to 768 byte table of R, G, B mappings</p>
+</register-use>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;307 (reason code)</register-use>
+</entry>
+
+<exit>
+    <register-use number="0-3" state='corrupted'></register-use>
+    <register-use number="7">-1 if handled</register-use>
+</exit>
+
+<use>
+    <p>This vector is called to modify the RGB mapping tables, through which the
+palette entries will be transformed. The palette should be affected
+immediately. Where the hardware does not support RGB mapping tables it will
+be necessary to translate all palette operations through the tables. It is
+expected that unpaletted modes (16bpp, 32bpp) support this operation, even
+though they do not use palette entries.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="776"
+                   reasonname="Mode_AccelConfigure"
+                   description="Configure acceleration options"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>configuration flags, or -1 to read current state:</p>
+<p>
+    <bitfield-table>
+        <bit number="0">suspend cached screen until mode change</bit>
+        <bit number="1">suspend automatic screen cleaning until mode change</bit>
+        <bit number="2">disable all hardware acceleration</bit>
+        <bit number="3-30">reserved, must be 0</bit>
+        <bit number="31">must be set</bit>
+    </bitfield-table>
+</p>
+</register-use>
+<register-use number="1">automatic screen cleaning level, 1-3 or -1 to read current state</register-use>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;308 (reason code)</register-use>
+</entry>
+
+<exit>
+    <register-use number="0">new or current flags, modified to acceptable values</register-use>
+    <register-use number="1">new or current automatic cleaning level</register-use>
+</exit>
+
+<use>
+    <p>This vector is called to control the generic acceleration options provided
+by the video driver. The core acceleration options are to provide a CPU
+cached screen. One effect of CPU cached screen is an undesirable delay on
+data being written to the physical screen memory from the processor. This
+data should be flushed by the driver regularly, if it detects that data has
+been written to the screen. It is usual to use abort trapping, domain mapped
+dynamic areas to manage this process (consult the example VIDC driver).
+</p>
+
+<p>
+Bit 0 and 1 can be used to suspend this operation until the next mode change.
+Clients will probably use this for specialised tasks to ensure that their
+output is immediately visible, such as within games or high responsiveness
+applications.
+</p>
+
+<p>
+Bit 2 is intended to allow clients to disable all hardware acceleration.
+Whilst this is generally not desirable, it may be useful to clients who
+either believe there to be faults within the hardware acceleration or who
+wish to determine the difference made by hardware acceleration. Hardware
+acceleration is should not be re-enabled by a mode change as the client may
+wish to examine mode change timings, or it may be believed that mode change
+acceleration is faulty.
+</p>
+
+<p>
+This vector call is triggered by OS_ScreenMode 4.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="777"
+                   reasonname="Mode_AccelControl"
+                   description="Immediate control operations for acceleration"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0"><p>operation:</p>
+<p>
+    <value-table>
+        <value number="0">clean cache immediately, if necessary and not suspended</value>
+        <value number="1">clean cache immediately, if necessary</value>
+        <value number="other">reserved</value>
+    </value-table>
+</p>
+</register-use>
+<register-use number="1-6">dependant on reason code</register-use>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;309 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="1-6">dependant on reason code</register-use>
+<register-use number="7">display number</register-use>
+</exit>
+
+<use>
+    <p>This vector is called to cause the screen to be made up to date if necessary
+such that the data written to it is visible to the user. It is likely that
+these operations will be used by games. The WindowManager will use this call
+at the end of a series of redraw operations.
+</p>
+
+<p>
+This vector call is triggered by OS_ScreenMode 5 and 6 at present.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="778"
+                   reasonname="Mode_DisplaySelect"
+                   description="Select a display for use"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;30A (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="7">display number</register-use>
+</exit>
+
+<use>
+    <p>This vector is called to inform display device drivers of a device
+selection. Drivers should claim VSync interrupts when they are enabled and
+begin generating VSyncs through the VSync dispatch entry point returned when
+they registered with OS_ScreenMode 255. Drivers should release the VSync
+interrupts when another device is selected.</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="800"
+                   reasonname="Mode_BankCount"
+                   description="Read number of supported screen banks"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">size of current mode, in bytes</register-use>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;320 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0">number of banks available (1 if only a single bank available)</register-use>
+<register-use number="1-3" state='corrupted'></register-use>
+<register-use number="7">-1 if handled</register-use>
+</exit>
+
+<use>
+    <p>This vector is called to request the number of screen banks that can be
+supported by the current configuration of the display. The driver should
+return the maximum number of banks that may be supported at the instant
+that the request was made. Subsequent driver operations may cause this
+value to change.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="801"
+                   reasonname="Mode_BankDisplay"
+                   description="Change the displayed screen bank"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">bank to display (0 .. max-1)</register-use>
+<register-use number="1">size of current mode, in bytes</register-use>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;321 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0">bank we are displaying</register-use>
+<register-use number="1">pointer to address of bank</register-use>
+<register-use number="7">-1 if handled</register-use>
+</exit>
+
+<use>
+    <p>This vector is called to request a change of display bank. The
+display bank is presented to the user. Both display and driver banks should be available in memory
+simultaneously once selected and may both be written to directly. They may
+be coincident. Once requested (and the request honoured), the Driver should
+maintain the memory allocated for that bank until the next mode change.
+Drivers are not required to page all available, or used, banks into logical
+memory at any time. At the drivers discretion it may remove mappings a bank
+which is not the driver or display from logical memory. Clients are not
+expected to access banks which are not selected. Drivers are not expected to
+support hardware scrolling of any bank but the display bank. Selection of
+a pre-existing bank should not clear its contents.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="802"
+                   reasonname="Mode_BankDriver"
+                   description="Change the screen bank used by VDU drivers"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">bank to update through VDU drivers (0 .. max-1)</register-use>
+<register-use number="1">size of current mode, in bytes</register-use>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;322 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0">bank we are displaying</register-use>
+<register-use number="1">pointer to address of bank</register-use>
+<register-use number="7">-1 if handled</register-use>
+</exit>
+
+<use>
+    <p>This vector is called to request a change of driver bank. The driver bank is presented to the
+video drivers for writing to. Both display and driver banks should be available in memory
+simultaneously once selected and may both be written to directly. They may
+be coincident. Once requested (and the request honoured), the Driver should
+maintain the memory allocated for that bank until the next mode change.
+Drivers are not required to page all available, or used, banks into logical
+memory at any time. At the drivers discretion it may remove mappings a bank
+which is not the driver or display from logical memory. Clients are not
+expected to access banks which are not selected. Drivers are not expected to
+support hardware scrolling of any bank but the display bank. Selection of
+a pre-existing bank should not clear its contents.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="803"
+                   reasonname="Mode_BankCopy"
+                   description="Copy a screen bank"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">source bank number (0..max-1)</register-use>
+<register-use number="1">destination bank number (0..max-1)</register-use>
+<register-use number="2">size of current mode, in bytes</register-use>
+<register-use number="7">display number</register-use>
+<register-use number="8">&hex;323 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="2-3" state='corrupted'></register-use>
+<register-use number="7">-1 if handled</register-use>
+</exit>
+
+<use>
+    <p>This vector is called when a client requests a copy of a screen bank be
+made. If the destination bank has not yet been allocated it should be
+allocated. The banks requested need not be paged in to logical memory.
+Drivers which require the banks to be paged in to logical memory for the
+copy to take place should take the necessary steps to achieve this. This
+operation must not affect any other bank by the destination. Clients are
+expected to perform a bank switch to update the display bank, rather than
+a bank copy.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="1024"
+                   reasonname="TTX_Init"
+                   description="Initialise teletext mode"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+    <register-use number="0">requested maximum text columns (ScrRCol)</register-use>
+    <register-use number="1">requested maximum text rows (ScrBRow)</register-use>
+    <register-use number="2">maximum horizontal pixel coordinate (XWindLimit)</register-use>
+    <register-use number="3">maximum vertical pixel coordinate (YWindLimit)</register-use>
+    <register-use number="4">x eigen factor</register-use>
+    <register-use number="5">y eigen factor</register-use>
+    <register-use number="7">display number</register-use>
+    <register-use number="8">&hex;400 (reason code)</register-use>
+</entry>
+
+<exit>
+    <register-use number="0">acceptable text columns</register-use>
+    <register-use number="1">acceptable text rows</register-use>
+    <register-use number="2-8" state='preserved'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to initialise teletext mode. The values supplied in R0
+and R1 are the requested number of columns and rows for the mode. The driver
+should either fit those values within the graphics limitations of the mode,
+or modify the values to be acceptable before return. The frame buffer does
+not need to be initialised.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+    <version riscos-ge="7.47" supplier="RISC OS Pyromaniac" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="1025"
+                   reasonname="TTX_ClearBox"
+                   description="Clear a region of the display"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+    <register-use number="0">left char x</register-use>
+    <register-use number="1">bottom char y</register-use>
+    <register-use number="2">right char x</register-use>
+    <register-use number="3">top char y</register-use>
+    <register-use number="7">display number</register-use>
+    <register-use number="8">&hex;401 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-8" state='preserved'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to clear a region of the display. It is used after
+mode selection and for CLS operations. The frame buffer does not need to be
+updated.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+    <version riscos-ge="7.47" supplier="RISC OS Pyromaniac" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="1026"
+                   reasonname="TTX_Update"
+                   description="Update the frame buffer with teletext changes"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+    <register-use number="7">display number</register-use>
+    <register-use number="8">&hex;402 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-8" state='preserved'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to update the frame buffer with the previously applied
+changes. This is the primary point at which the frame buffer should be
+modified.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+    <version riscos-ge="7.47" supplier="RISC OS Pyromaniac" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="1027"
+                   reasonname="TTX_WriteChar"
+                   description="Write a character to the teletext screen"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+    <register-use number="0">character</register-use>
+    <register-use number="1">x position</register-use>
+    <register-use number="2">y position</register-use>
+    <register-use number="7">display number</register-use>
+    <register-use number="8">&hex;403 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-8" state='preserved'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to change the character at a given position. The frame
+buffer does not need to be updated. The change of the character may change
+not only the representation of the character at that position, but also
+all subsequent character on that line and (potentially) the characters on
+the line below.
+
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+    <version riscos-ge="7.47" supplier="RISC OS Pyromaniac" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="1028"
+                   reasonname="TTX_Scroll"
+                   description="Scroll a region of the teletext buffer"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+    <register-use number="0">left char x</register-use>
+    <register-use number="1">bottom char y</register-use>
+    <register-use number="2">right char x</register-use>
+    <register-use number="3">top char y</register-use>
+    <register-use number="4">change in x position (negative = left, positive = right)</register-use>
+    <register-use number="5">change in y position (negative = up, positive = down)</register-use>
+    <register-use number="7">display number</register-use>
+    <register-use number="8">&hex;404 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-8" state='preserved'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to scroll a region of the teletext buffer. The frame
+buffer does not need to be updated. The change of the region may also result
+in surrounding characters being changed in their representation.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+    <version riscos-ge="7.47" supplier="RISC OS Pyromaniac" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="1029"
+                   reasonname="TTX_FlashState"
+                   description="Change the flash state of the teletext buffer"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+    <register-use number="0"><p>Flags:</p>
+    <p>
+        <bitfield-table>
+            <bit number='0'>Flash characters visible</bit>
+            <bit number='1-31' state='reserved'/>
+        </bitfield-table>
+    </p>
+    </register-use>
+    <register-use number="7">display number</register-use>
+    <register-use number="8">&hex;405 (reason code)</register-use>
+</entry>
+
+<exit>
+<register-use number="0-8" state='preserved'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to update the state of the display with respect to
+flashing characters. The frame buffer does not need to be updated. This
+entry point may be called under interrupts.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+    <version riscos-ge="7.47" supplier="RISC OS Pyromaniac" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="1030"
+                   reasonname="TTX_ReadChar"
+                   description="Read a character from the teletext buffer"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+    <register-use number="0">x position</register-use>
+    <register-use number="1">y position</register-use>
+    <register-use number="7">display number</register-use>
+    <register-use number="8">&hex;406 (reason code)</register-use>
+</entry>
+
+<exit>
+    <register-use number="0">character read</register-use>
+    <register-use number="1-8" state='preserved'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to read a character from the display at a position. It
+is used during the character copying routines, via the OS_Byte mechanisms.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+    <version riscos-ge="7.47" supplier="RISC OS Pyromaniac" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="1031"
+                   reasonname="TTX_TextCursor"
+                   description="Invert the text cursor in the teletext screen"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+    <register-use number="0">composite cursor position (&hex;SS0000EE)</register-use>
+    <register-use number="2">x position (origin top left)</register-use>
+    <register-use number="3">y position (origin top left)</register-use>
+    <register-use number="7">display number</register-use>
+    <register-use number="8">&hex;407 (reason code)</register-use>
+</entry>
+
+<exit>
+    <register-use number="0-8" state='preserved'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called to invert a cursor on the screen. It is used to flash
+the cursor whilst updating the display. It may be called under interrupts.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+    <version riscos-ge="7.47" supplier="RISC OS Pyromaniac" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="1032"
+                   reasonname="TTX_SetQuality"
+                   description="Change the quality of teletext rendering"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+    <register-use number="0"><p>Flags:</p>
+    <p>
+        <bitfield-table>
+            <bit number='0'>High quality requested</bit>
+            <bit number='1-31' state='reserved'/>
+        </bitfield-table>
+    </p>
+    </register-use>
+    <register-use number="7">display number</register-use>
+    <register-use number="8">&hex;408 (reason code)</register-use>
+</entry>
+
+<exit>
+    <register-use number="0-8" state='preserved'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called in response to VDU23,18,16,flags| to set the quality
+of the display. Display drivers may use it to provide a higher quality (and
+potentially slower) implementation.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+    <version riscos-ge="7.47" supplier="RISC OS Pyromaniac" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+
+<!-- -->
+<vector-definition name="VideoV"
+                   number="2C"
+                   reason="1033"
+                   reasonname="TTX_RevealState"
+                   description="Change the reveal state for hidden characters"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+    <register-use number="0"><p>Flags:</p>
+    <p>
+        <bitfield-table>
+            <bit number='0'>Concealed characters visible</bit>
+            <bit number='1-31' state='reserved'/>
+        </bitfield-table>
+    </p>
+    </register-use>
+    <register-use number="7">display number</register-use>
+    <register-use number="8">&hex;409 (reason code)</register-use>
+</entry>
+
+<exit>
+    <register-use number="0-8" state='preserved'></register-use>
+</exit>
+
+<use>
+    <p>This vector is called in response to VDU23,18,2,flags| to change the reveal
+state. Display drivers may update the hidden characters to be visible
+immediately or defer this until an update.
+</p>
+</use>
+
+<compatibility>
+    <version riscos-ge="Select 3" supplier="RISCOS Ltd" state="supported"/>
+    <version riscos-ge="7.47" supplier="RISC OS Pyromaniac" state="supported"/>
+</compatibility>
+
+<related>
+    <reference type="vector" name="VideoV" />
+</related>
+</vector-definition>
+
+</section>
+
+
+<section title="Entry points">
+
+<entry-definition name="VideoV_Context_HLine"
+                  description="Draw horizontal line"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="0">X left coordinate</register-use>
+ <register-use number="1">Y coordinate</register-use>
+ <register-use number="2">X right coordinate</register-use>
+ <register-use number="3"><reference type='subsubsection' name='Colour operation'/></register-use>
+ <register-use number="7">pointer to <reference type='subsubsection' name='Graphics context'/></register-use>
+</entry>
+
+<exit>
+ <register-use number="0-7" state="preserved" />
+</exit>
+
+<use>
+<p>This entry point is provided as part of the graphics context.
+It may be used by any of the operations called by VideoV to
+effect a horizontal line. This allows a VideoV claimant who has been
+requested to draw a shape to render without knowing the specifics
+of how to access the screen.</p>
+
+<p>The VideoV system will pass the request to draw the line to the
+   registered drivers as a primitive rendering operation.</p>
+
+<p>
+    The functions for bounded and unbounded line rendering have the same interface, but
+    the bounded entry points should clip the rendering to the supplied clipping window.
+</p>
+
+</use>
+
+<related>
+    <reference type="entry" name="VideoV_Context_Point" />
+    <reference type="subsection" name="Graphics context" />
+</related>
+</entry-definition>
+
+
+<entry-definition name="VideoV_Context_Point"
+                  description="Plot a point"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="0">X coordinate</register-use>
+ <register-use number="1">Y coordinate</register-use>
+ <register-use number="2"><reference type='subsubsection' name='Colour operation'/></register-use>
+ <register-use number="7">pointer to <reference type='subsubsection' name='Graphics context'/></register-use>
+</entry>
+
+<exit>
+ <register-use number="0-7" state="preserved" />
+</exit>
+
+<use>
+<p>This entry point is provided as part of the graphics context.
+It may be used by any of the operations called by VideoV to
+effect a single point. This allows a VideoV claimant who has been
+requested to draw a shape to render without knowing the specifics
+of how to access the screen.</p>
+
+<p>The VideoV system will pass the request to plot the point to the
+   registered drivers as a primitive rendering operation.</p>
+
+<p>
+    The functions for bounded and unbounded point rendering have the same interface, but
+    the bounded entry points should clip the rendering to the supplied clipping window.
+</p>
+</use>
+
+<related>
+    <reference type="entry" name="VideoV_Context_HLine" />
+    <reference type="subsection" name="Graphics context" />
+</related>
+</entry-definition>
+
+</section>
+
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2023.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Gerph" date="28 Oct 2006" title="Initial version">
+    <change>Released as part of the Video SDK</change>
+  </revision>
+  <revision number="2" author="Gerph" date="30 Mar 2023" title="Updated for PRM-in-XML">
+    <change>Transferred content to PRM-in-XML format</change>
+  </revision>
+  <revision number="3" author="Gerph" date="17 May 2023" title="Updated for RISC OS Pyromaniac">
+    <change>Updated with details of compatibility</change>
+    <change>Fixed some validity problems</change>
+  </revision>
+ </history>
+</meta>
+</riscos-prm>
