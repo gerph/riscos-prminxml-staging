@@ -1,0 +1,350 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Graphics Mode Specification">
+<section title="Introduction and Overview">
+
+<p>
+Graphics modes can be specified in a number of ways, which have been added to
+with each iteration of the Operating System. Originally only mode numbers were
+allowed, but hardware improved and more flexibility was required, so the mode
+specification was extended.
+</p>
+
+<p>
+Graphics modes may be supplied to a number of interfaces, most of which will
+eventually come down to a call to OS_ReadModeVariable. Some of the interfaces that you may find using mode specifications are:
+</p>
+
+<p>
+<value-table head-number="Interface" head-value="Usage">
+    <value number="OS_ReadModeVariable">Read values for a given mode.</value>
+    <value number="OS_CheckModeValid">Return whether the mode specified can be selected.</value>
+    <value number="OS_ScreenMode">Operations on the graphics mode</value>
+    <value number="ColourTrans_*ForMode">Colour operations for a given mode</value>
+    <value number="OS_SpriteOp">Sprite creation operations may be supplied modes</value>
+    <value number="Sprite Header">Defines the type of data within a sprite</value>
+    <value number="Wimp_SetMode">Selects the mode used by the Window Manager</value>
+</value-table>
+</p>
+
+</section>
+
+
+<section title="Technical details">
+
+
+
+<subsection title="Mode specifiers">
+
+<p>
+Mode specification is always through a single 32bit word value known as a mode
+specifier. This allows it to be supplied in many of the places that a mode number
+was used in earlier interfaces. This mode specifier can represent a number of
+ways of describing a mode. The following mode specifier formats are defined:
+</p>
+
+<p>
+<list>
+    <item>Mode number</item>
+    <item>Sprite mode word</item>
+    <item>Sprite pointer</item>
+    <item>Mode selector</item>
+</list>
+</p>
+
+<p>
+These can be distinguished by the following algorithm:
+</p>
+
+<p>
+<list>
+    <item>If the mode specifier is &lt; 256:
+        <list>
+            <item>This is a mode number, and shadow bank selection.</item>
+            <item>The mode number is in the low 7 bits, and shadow bank selection is
+                  given in bit 7.</item>
+            <item>If the mode number is not recognised Service_ModeExtension is issued
+                  to determine the mode's parameters.</item>
+            <item>Modes up to 7 are supported from the BBC onwards.</item>
+            <item>Shadow modes are supported from the Master onwards (although they are
+                  less reliable from RISC OS 3.6 onwards)</item>
+        </list>
+    </item>
+
+    <item>If the mode specifier has bit 0 set, this is a sprite mode word:
+        <list>
+            <item>Sprite mode words are given in the sprite header, but may also be
+                  supplied to many of the mode functions (except for display selection).</item>
+            <item>They only contain the DPI (and thus eigenfactors), and type of data
+                  within the sprite. No resolution information is available.</item>
+            <item>Sprite mode words are supported from RISC OS 3.5 onwards.</item>
+        </list>
+    </item>
+
+    <item>If the mode specifier has bit 0 and 1 clear, this is a pointer to data,
+      whose meaning is differentiated by the value of the first word.
+        <list>
+            <item>If the first word has bit 0 clear, the data is a sprite (the mode specifier
+              is a sprite pointer):
+                <list>
+                    <item>Sprite pointers allow information about the width and height to be
+                          included in the information, and allow the use of palette data as
+                          well. These types of mode specification are usually only used with
+                          ColourTrans_*operations.</item>
+                    <item>Sprite pointers are supported from RISC OS 3 onwards.</item>
+                </list>
+            </item>
+
+            <item>If the first word has bit 0 set, the data is a mode selector:
+                <list>
+                    <item>Mode selectors expose the base specifications for the mode and
+                          modifications to mode variables.</item>
+                    <item>Mode selectors allow for extended formats, but only a single
+                          format is currently defined.</item>
+                    <item>Mode selectors are supported from RISC OS 3.5 onwards.</item>
+                </list>
+            </item>
+        </list>
+    </item>
+
+    <item>If the value has bit 0 clear and bit 1 set, this is an invalid mode
+          specification.</item>
+</list>
+</p>
+
+</subsection>
+
+<subsection title="Mode numbers">
+
+<p>
+Mode numbers may be extended through the Service_ModeExtension interface. This
+allows new numbered modes to be defined, either completely or based on other
+modes.
+</p>
+</subsection>
+
+<subsection title="Sprite mode words">
+
+<p>
+Sprite mode words allow some of the parameters of the mode to be determined, but
+because they do not include resolution information they cannot be selected.
+Sprite mode words are only supported from RISC OS 3.5 onwards.
+</p>
+
+<p>
+The sprite mode word format has undergone a few revisions. The current definition
+of the sprite mode word is:
+</p>
+
+<p>
+<bitfield-table>
+    <bit number="0">Set (indicator that this is a new format sprite, together with set bits in bits 27-31)</bit>
+    <bit number="1-13">Horizontal dots per inch, should be 180, 90, 45, 23/22, 11</bit>
+    <bit number="14-26">Vertical dots per inch, should be 180, 90, 45, 23/22, 11</bit>
+    <bit number="27-30"><p>Sprite type :
+        <value-table>
+            <value number="0">Old format mode word (mode is a standard number)</value>
+            <value number="1">1 bpp</value>
+            <value number="2">2 bpp</value>
+            <value number="3">4 bpp</value>
+            <value number="4">8 bpp</value>
+            <value number="5">15 bpp in 16bit values</value>
+            <value number="6">24 bpp in 32bit values</value>
+            <value number="7">CMYK</value>
+            <value number="8">24 bpp compact format (allocated but not used)</value>
+            <value number="9">JPEG data (allocated but not used)</value>
+            <value number="10-15">Reserved</value>
+        </value-table>
+        </p>
+     </bit>
+    <bit number="31" state="set">Alpha channel data present. May not be set for type 0 sprites</bit>
+    <bit number="31" state="clear">Binary mask data present</bit>
+</bitfield-table>
+</p>
+
+<p>
+For sprite types 1-4, the palette is only supported from RISC OS 3.6 onwards.
+</p>
+
+<p>
+Although the DPI value should be the values defined above, values outside
+these may be supported. Certain interfaces, such as PlotSpriteTransformed,
+may use this information to render the sprites to the correct size for the
+display. Other interfaces, such as OS_ReadModeVariable and PlotSpriteScaled,
+may quantise these DPI values to the closest eigenfactor.
+</p>
+
+<p>
+CMYK format sprites are supported from Select 2 onwards.
+JPEG data has been supported by third party extensions.
+</p>
+
+<p>
+<compatibility>
+    <version riscos-lt='3.5'>Does not support sprite mode words.</version>
+    <version riscos-ge='3.5'>Sprite types 0 to 6 supported, but does not support palettes on types 1-4.</version>
+    <version riscos-ge='3.6'>Supports palettes on sprite types 1-4.</version>
+    <version riscos-ge='Select 2' supplier='RISCOS Ltd'>Sprite types 0-6 and 7 (CMHK) supported.</version>
+    <version riscos-ge='Select 3' supplier='RISCOS Ltd'>Supports alpha channel data in addition to the types supported by Select 2.</version>
+    <version riscos-ge='7.19' supplier='RISC OS Pyromaniac'>Sprite types 0-6 supported.</version>
+    <version module-name='JPEGSprites' supplier='Gerph'>Adds support for sprite type 9 (JPEG) to those supported by RISC OS 3.5.</version>
+</compatibility>
+</p>
+</subsection>
+
+<subsection title="Mode selectors">
+
+<p>
+A mode selector is a word-aligned structure that defines the properties of a
+mode. This includes its resolution, numbers of colours, frame rate and other
+mode variables.
+</p>
+
+<p>
+A mode selector has the following format:
+</p>
+
+<p>
+<offset-table>
+    <offset number="0"><p>mode selector flags:</p>
+        <bitfield-table>
+            <bit number="0">1 (this differentiates it from a sprite pointer)</bit>
+            <bit number="1-7">mode specifier format (0 for this format)</bit>
+            <bit number="8-31">other flags (reserved - must be zero)</bit>
+        </bitfield-table>
+    </offset>
+    <offset number="4">x-resolution (in pixels)</offset>
+    <offset number="8">y-resolution (in pixels)</offset>
+    <offset number="12">colour data format and depth:
+        <value-table>
+            <value number="0">1 bpp</value>
+            <value number="1">2 bpp</value>
+            <value number="2">4 bpp</value>
+            <value number="3">8 bpp</value>
+            <value number="4">15 bpp in 16 bit values</value>
+            <value number="5">24 bpp in 32 bit values</value>
+        </value-table>
+    </offset>
+    <offset number="16">frame rate (in Hz); -1 => use highest rate available</offset>
+    <offset number="20">pairs of [mode variable index, value] words; there may be any number of these, including zero</offset>
+    <offset number="n">-1 (terminator)</offset>
+</offset-table>
+</p>
+
+<p>
+Mode variables may be given in any order, although it is recommended that they
+be supplied in ascending order. Repeating a variable definition has undefined
+behaviour.
+</p>
+
+<p>
+<compatibility>
+    <version riscos-lt='3.5'>Does not support mode selectors.</version>
+    <version riscos-ge='3.5'>Supports mode selectors as described.</version>
+    <version riscos-ge='7.19' supplier='RISC OS Pyromaniac'>Supports mode selectors as described.</version>
+</compatibility>
+</p>
+
+</subsection>
+
+<subsection title="Mode strings">
+
+<p>
+To allow modes to be described within a string specification, a mode string
+is able to be supplied to various interfaces. Mode strings must be converted
+to a mode specifier before they can be used with many interfaces. OS_ScreenMode
+allows these mode strings to be converted to and from mode specifiers.
+</p>
+
+<p>
+The mode string takes the form of a space or comma separated list of parameters.
+Each parameter is a sequence of alphabetic characters defining the parmeter,
+followed by a number sequence and possible qualifiers.
+</p>
+
+<p>
+The mode string parameters have the following format:
+</p>
+
+<p>
+<value-table head-number="Parameter">
+<value number="X#">X resolution in pixels</value>
+<value number="Y#">Y resolution in pixels</value>
+<value number="C#">Number of colours (# = 2, 4, 16, 64, 256, 32T, 32K, 16M)</value>
+<value number="G#">Number of greys (# = 4, 16, 256)</value>
+<value number="T#">Teletext mode, with specified number of colours (# as C)</value>
+<value number="EX#">X eigen factor (# = 0, 1, 2, 3)</value>
+<value number="EY#">Y eigen factor (# = 0, 1, 2, 3)</value>
+<value number="F#">Frame rate in Hz</value>
+<value number="TX#">Teletext display width in characters</value>
+<value number="TY#">Teletext display height in characters</value>
+</value-table>
+</p>
+
+<p>
+Up to RISC OS Select 3, the X and Y resolution must be values from 100-9999.
+From Select 3 inwards, any value other than 0 may be supplied, although
+support for resolutions above 16384 may not be reliable.
+</p>
+
+<p>
+Teletext mode selection and character width/height is supported from RISC
+OS Select 3 onwards.
+</p>
+
+<p>
+Selection of modes with 64 colours results in an old-style VIDC 1 mode
+selection of a 256 colour mode with 192 derived colours. Prior to Select 3,
+selection of 'C256' would result in a the old-style VIDC 1 mode being
+selected.
+</p>
+
+<p>
+The OS_ScreenMode interface for converting and selecting mode strings is
+supported from RISC OS Select 3 onwards.
+</p>
+
+<p>
+*WimpMode supports selecting mode strings from RISC OS 3.5 onwards.
+</p>
+
+<p>
+<compatibility>
+    <version riscos-ge='3.5'>Supports mode string specifications X, Y, C, G, EX, EY and F, but only through '*WimpMode'.</version>
+    <version riscos-ge='Select 3' supplier="RISCOS Ltd">Supports specifications for T, TX and TY in addition to those supported by RISC OS 3.5. C256 will select a full 256 colour palette, whilst C64 will support a VIDC 1 palette. OS_ScreenMode mode string processing supported.</version>
+    <version riscos-ge='7.19' supplier="RISC OS Pyromaniac">Supports specifications for T, TX and TY in line with RISC OS Select 3. C64 will emulate old VIDC 1 palettes. OS_ScreenMode mode string processing supported.</version>
+</compatibility>
+</p>
+
+</subsection>
+</section>
+
+</chapter>
+
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2020-2023.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Gerph" date="22 Nov 2020" title="Initial version">
+    <change>Created from PRM and Select technical documentation.</change>
+  </revision>
+
+  <revision number="2" author="Gerph" date="19 May 2023" title="Compatibility with Pyromaniac">
+    <change>Added details about the compatibility of the interfaces with RISC OS Pyromaniac and RISC OS Select.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>

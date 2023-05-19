@@ -89,6 +89,7 @@
         <page href="zeroconf">ZeroConf</page>
     </section>
     <section title="Graphics" dir="graphics">
+        <page href="modes">Graphics modes specification</page>
         <page href="imagefilerender">Image file renderer</page>
         <page href="videov">Video drivers</page>
     </section>
