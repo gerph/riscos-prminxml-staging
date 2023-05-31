@@ -74,6 +74,7 @@
     </section>
     <section title="Hardware" dir="hardware">
         <page href='timermanager'>Hardware timer device driver (TimerManager)</page>
+        <page href='nvramv'>NVRAM vector</page>
     </section>
     <section title="Time" dir="time">
         <page href="rtc">Real Time Clock</page>

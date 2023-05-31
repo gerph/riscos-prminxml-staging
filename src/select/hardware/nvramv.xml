@@ -1,0 +1,212 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="NVRAM vector">
+<section title="Introduction">
+<p>
+    The RISC OS system uses memory which is preserved whilst the power
+    is off to store configuration information. This allows the system
+    to start with the correct settings such as hardware configuration
+    and user preferences. Examples of hardware configuration are settings
+    such as the filing system to boot from and which drive should be
+    used. User preferences include the type and volume of system beep.
+</p>
+</section>
+
+
+<section title="Technical details">
+<p>
+Under earlier versions of the operating system the non-volatile RAM
+('NVRAM', also referred to as CMOS RAM, or battery backed RAM) was handled
+entirely by the Kernel. From Kernel 9.48, the handling of NVRAM is delegated
+to hardware support modules. The Kernel communicates with these modules
+through the vector NVRAMV.
+</p>
+
+<p>
+    Driver modules which provide the NVRAMV vector should be initialised
+    with the early initialisation flag (module flags bit 1) set. This allows
+    the modules to be started before the configuration for unplugged modules
+    is required.
+</p>
+
+<category title="Terminology">
+<p>The configuration data handled by NVRAMV has generally been termed
+    'CMOS' or 'CMOS data'. Historically, the configuration information was
+    used CMOS technology to store the contents of the memory, but this is
+    not required. The name 'non-volative RAM' is a more general term which
+    does not imply the use of a particular technology, so is used to
+    describe the mecanishm for storing the configuration data.
+</p>
+</category>
+</section>
+
+
+<section title="Software vectors">
+
+<vector-definition name="NVRAMV"
+                   number="3E"
+                   description="Operations on non-volatile memory used for configuration"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+
+<entry>
+<register-use number="0">reason code:
+<p>
+<value-table>
+ <value number="0"><reference type="vector" name="NVRAMV" reason="0" use-description="yes" /></value>
+ <value number="1"><reference type="vector" name="NVRAMV" reason="1" use-description="yes" /></value>
+ <value number="2"><reference type="vector" name="NVRAMV" reason="2" use-description="yes" /></value>
+</value-table>
+</p>
+</register-use>
+</entry>
+
+<exit>
+    <register-use number="0">-1 if handled, preserved if not handled</register-use>
+    <register-use number="1-9">dependant on reason code</register-use>
+</exit>
+
+<use>
+<p>This vector is called by the Kernel to control the configuration data stored
+in the NVRAM.
+</p>
+</use>
+
+<related>
+    <reference type="swi" name="OS_Byte" reason="161" href="?" />
+    <reference type="swi" name="OS_Byte" reason="162" href="?" />
+</related>
+</vector-definition>
+
+<vector-definition name="NVRAMV"
+                   number="3E"
+                   reason="0"
+                   reasonname="FillCache"
+                   description="Populate the cache with NVRAM data"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">0 (reason code)</register-use>
+<register-use number="1">pointer to cache block to fill</register-use>
+<register-use number="2">number of bytes to fill</register-use>
+</entry>
+
+<exit>
+<register-use number="0">-1 (operation complete)</register-use>
+<register-use number="1" state="preserved"/>
+<register-use number="2">number of bytes populated</register-use>
+</exit>
+
+<use>
+    <p>This vector is called by the Kernel to fill in its cache of NVRAM values.
+A cache is provided in order to reduce the impact of repeated reading of
+configuration data by clients. Clients should write 0 to the cache for
+unsupported values. The number of bytes to fill may take any value. The
+total amount of NVRAM should be returned, not the amount of NVRAM filled.
+Only the first 240 bytes of NVRAM will be used by the Kernel initially.
+</p>
+</use>
+
+<related>
+</related>
+</vector-definition>
+
+
+<vector-definition name="NVRAMV"
+                   number="3E"
+                   reason="1"
+                   reasonname="ReadByte"
+                   description="Read a single value from NVRAM"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">1 (reason code)</register-use>
+<register-use number="1">byte to read</register-use>
+</entry>
+
+<exit>
+<register-use number="0">-1 (operation complete)</register-use>
+<register-use number="1">value read, or 0 if byte is out of range</register-use>
+</exit>
+
+<use>
+    <p>This vector is called by the Kernel to read a single value. It will usually
+only be used before the NVRAM cache has been populated during system
+initialisation.
+</p>
+</use>
+
+<related>
+    <reference type="swi" name="OS_Byte" reason="161" href="?" />
+</related>
+</vector-definition>
+
+
+<vector-definition name="NVRAMV"
+                   number="3E"
+                   reason="2"
+                   reasonname="WriteByte"
+                   description="Write a single value to NVRAM"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no"
+                   >
+<entry>
+<register-use number="0">2 (reason code)</register-use>
+<register-use number="1">byte to read</register-use>
+</entry>
+
+<exit>
+<register-use number="0">-1 (operation complete)</register-use>
+<register-use number="1">value read, or 0 if byte is out of range</register-use>
+</exit>
+
+<use>
+    <p>This vector is called by the Kernel to write a single value to the NVRAM.</p>
+</use>
+
+<related>
+    <reference type="swi" name="OS_Byte" reason="162" href="?" />
+</related>
+</vector-definition>
+
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2023.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Gerph" date="31 May 2023" title="Initial version">
+    <change>Created from Select technical documentation.</change>
+  </revision>
+ </history>
+
+ <related>
+    <reference type='link' href="http://www.riscos.com/support/developers/riscos6/hardware/nvramv.html" />
+ </related>
+</meta>
+</riscos-prm>
