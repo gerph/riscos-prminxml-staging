@@ -91,7 +91,7 @@ jobs:
         with:
           prerelease: false
           draft: true
-          artifacts: "PRMinXML-Staging-${{ steps.get_version.outputs.VERSION }}.zip,PRMinXML-Staging/prm/RISCOS_PRM_Staging.pdf"
+          artifacts: "PRMinXML-Staging-${{ steps.get_version.outputs.VERSION }}.zip,PRMinXML-Staging/prm/RISC_OS_PRM_Staging.pdf"
           artifactContentType: application/zip
 
   publish:
