@@ -1,0 +1,968 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="AcornSSL">
+
+<section title="Introduction and Overview">
+<p>
+AcornSSL provides a BSD-like socket interface for communication through the
+TCP/IP protocol stack to resources that require a secure connection. It uses
+the mbedTLS library for the majority of its implementation; the module
+itself calls the corresponding mbedTLS functions and wraps them into a set
+of SWIs that mirror the equivalent calls provided by the Internet module's
+BSD sockets interface.
+</p>
+<p>
+At the time of writing, AcornSSL supports all current TLS standards:
+</p>
+<p>
+<list type="unordered">
+ <item>TLS version 1.0</item>
+ <item>TLS version 1.1</item>
+ <item>TLS version 1.2</item>
+</list>
+</p>
+<p>
+The earlier SSL version 2 and 3 standards are considered too insecure and
+are not supported at all, and TLS version 1.0 is likely to be withdrawn in
+future. The client SWI interface offers no mechanism to select which
+protocol version is used; attempting to connect to a server that only
+offers one of the insecure methods will fail.
+</p>
+<p>
+Application authors who need a network resource protected by TLS, most
+commonly for the <userinput>https:</userinput> URL scheme handled by
+AcornHTTP, use AcornSSL either directly through its SWI interface, or
+indirectly through a higher-level fetcher module that already knows how to
+drive it. Because untrusted or unexpected certificates may need to be
+approved by a person before a connection can proceed, AcornSSL also
+provides a desktop user interface: a small Wimp task that displays a
+certificate confirmation dialogue whenever a session's server certificate
+cannot be verified automatically.
+</p>
+</section>
+
+<section title="Technical Details">
+
+<subsection title="Handles and sessions">
+<p>
+Every AcornSSL SWI operates on an <userinput>ssl handle</userinput>, obtained
+from <reference type="swi" name="AcornSSL_Creat"/> or
+<reference type="swi" name="AcornSSL_CreateSession"/>. This handle is
+superficially similar to a socket handle from
+<reference type="swi" name="Socket_Creat"/>, but it is not a socket handle
+and must be treated as an opaque value: it must not be used with the
+Internet module's socket SWIs, and a socket handle must not be used with
+the AcornSSL SWIs.
+</p>
+<p>
+The AcornSSL SWIs are deliberately close analogues of the corresponding
+socket SWIs, so that code already written against a BSD-like sockets API
+can be adapted to use secure connections with minimal change. Which SWIs
+are needed depends on whether an insecure exchange is required before the
+connection becomes secure. Some protocols need an initial plain-text
+exchange to negotiate whether, or how, to proceed to a secure connection;
+others are secure from the first byte:
+</p>
+<p>
+<definition-table head-name="Secure from the start" head-value="Secure after negotiation">
+ <definition name="AcornSSL_Creat">Socket_Creat -- get a handle</definition>
+ <definition name="AcornSSL_Connect">Socket_Connect -- connect to the remote host</definition>
+ <definition name="(secure dialogue)">Socket_Read / Socket_Write -- insecure dialogue</definition>
+ <definition name="">AcornSSL_CreateSession -- associate the handle</definition>
+ <definition name="AcornSSL_Read / AcornSSL_Write">AcornSSL_Read / AcornSSL_Write -- secure dialogue</definition>
+ <definition name="AcornSSL_Close">AcornSSL_Close then Socket_Close</definition>
+</definition-table>
+</p>
+<p>
+<reference type="swi" name="AcornSSL_CreateSession"/> is the SWI used to
+upgrade an existing, already-open socket (typically one obtained from
+<reference type="swi" name="Socket_Creat"/> and already connected) into a
+secure session, without needing to close and reopen the connection.
+</p>
+</subsection>
+
+<subsection title="Blocking versus non-blocking operation">
+<category title="select()">
+<p>
+An application that wants to use <userinput>select()</userinput> semantics
+cannot select directly on an ssl handle. The semantics of
+<userinput>select()</userinput> require a set of bitmaps with bits relating
+to each socket number, but ssl handles are opaque values that do not
+contain small incrementing integers, so the <userinput>FD_SET</userinput>,
+<userinput>FD_CLR</userinput>, and <userinput>FD_ISSET</userinput> macros
+cannot be used with them.
+</p>
+</category>
+<p>
+If an application's structure requires <userinput>select()</userinput>, the
+recommended approach is to create the underlying socket with
+<reference type="swi" name="Socket_Creat"/> and then associate it with an
+ssl handle using <reference type="swi" name="AcornSSL_CreateSession"/>.
+Because <reference type="swi" name="Socket_Creat"/> does return small
+incrementing socket numbers, those can be used with
+<userinput>select()</userinput> as normal.
+</p>
+<p>
+A successful <userinput>select()</userinput> does not necessarily mean
+application data is available. Data that appears ready for reading or
+writing on the underlying socket may in fact be the security library
+handling an alert, or updating a session ticket, so a successful
+<userinput>select()</userinput> can still be followed by
+<reference type="swi" name="AcornSSL_Recv"/> or
+<reference type="swi" name="AcornSSL_Send"/> returning nothing.
+</p>
+<category title="FIONBIO">
+<p>
+<reference type="swi" name="AcornSSL_Ioctl"/> can be used to mark an ssl
+handle as non-blocking, by applying the <userinput>FIONBIO</userinput>
+command with a pointer to an integer value of 1 (to enable non-blocking
+operation) or 0 (to disable it).
+</p>
+</category>
+<p>
+If this is done before connecting, the connect operation also becomes
+non-blocking and returns <userinput>EINPROGRESS</userinput>. Since it is
+not possible to <userinput>select()</userinput> on an ssl handle directly,
+there is no convenient way to discover when such a connection becomes
+ready for writing. The simplest workaround is to leave the connection as
+blocking (the default) until after it has connected, and only then use
+<userinput>FIONBIO</userinput> before performing reads and writes.
+Alternatively, an application may proceed regardless and expect
+<userinput>ENOTCONN</userinput> from any SWI that needs an established
+connection: <reference type="swi" name="AcornSSL_Recv"/>,
+<reference type="swi" name="AcornSSL_Send"/>,
+<reference type="swi" name="AcornSSL_Read"/>,
+<reference type="swi" name="AcornSSL_Write"/>, and
+<reference type="swi" name="AcornSSL_Getpeername"/>.
+</p>
+</subsection>
+
+<subsection title="Extension socket options">
+<p>
+A session can be configured by calling
+<reference type="swi" name="AcornSSL_Getsockopt"/> or
+<reference type="swi" name="AcornSSL_Setsockopt"/> after
+<reference type="swi" name="AcornSSL_Creat"/> or
+<reference type="swi" name="AcornSSL_CreateSession"/>, but before
+<reference type="swi" name="AcornSSL_Connect"/>, to alter parameters
+relating to that specific session. Two extension options are defined, in
+addition to the standard socket options recognised by the Internet module:
+</p>
+<p>
+<value-table head-number="Option" head-value="Meaning">
+ <value number="11E0">
+  <userinput>SO_ACORNSSL_HOSTNAME</userinput> -- associates the expected
+  name of the remote host with the current session. Because name resolution
+  is performed by the client, and a single peer can present several alias
+  names, there would otherwise be no way to cross-check, from the IP
+  address alone, whether the certificate presented by the server was issued
+  to the expected name. The expected host name is also required if the
+  server administrator has enabled SNI (Server Name Identification); without
+  it no name is sent during handshaking, and the connection is likely to be
+  refused. A name pointer of <userinput>NULL</userinput> (the default, if
+  this option is never set) skips checking the peer's name and does not
+  send an expected name while handshaking. To set the option,
+  <userinput>optval</userinput> is a pointer to the expected host name and
+  <userinput>optlen</userinput> is 4 (the size of a string pointer); to read
+  it back, <userinput>optval</userinput> is a pointer to receive the
+  address of the host name, and <userinput>optlen</userinput> is a pointer
+  to an integer holding 4.
+ </value>
+ <value number="11E1">
+  <userinput>SO_ACORNSSL_PROMPTTIME</userinput> -- defines how long, in
+  centiseconds, the certificate confirmation dialogue will wait for a
+  response if a certificate is flagged as bad. A value of zero displays no
+  prompt and fails the connection immediately. To set the option,
+  <userinput>optval</userinput> is a pointer to the value in centiseconds
+  and <userinput>optlen</userinput> is 4 (the size of an integer); to read
+  it back, <userinput>optval</userinput> is a pointer to receive the
+  integer, and <userinput>optlen</userinput> is a pointer to an integer
+  holding 4.
+ </value>
+</value-table>
+</p>
+</subsection>
+
+<subsection title="Loading the module">
+<p>
+Application authors who want to be sure the AcornSSL SWIs are available
+should use <userinput>*RMEnsure</userinput> in the usual manner, for
+example:
+</p>
+<p>
+<extended-example type="shell">
+<userinput>RMEnsure AcornSSL 1.23 RMLoad System:Modules.Network.URL.AcornSSL</userinput><br/>
+<userinput>RMEnsure AcornSSL 1.23 Error Application requires AcornSSL 1.23 or later</userinput>
+</extended-example>
+</p>
+<p>
+A more comprehensive series of <userinput>*RMEnsure</userinput> commands
+would be needed if an earlier AcornSSL is already loaded with active
+clients, because loading a second copy of the module would end those
+sessions. When tracking security enhancements it can be assumed that the
+latest available version is always preferable, even at the expense of
+terminating existing sessions.
+</p>
+<p>
+The <userinput>System:</userinput> path variable should be used, as shown
+above, rather than a reference to a specific RISC OS version's directory
+inside <userinput>!System</userinput>; the module may in future be shipped
+with builds tailored to different RISC OS versions.
+</p>
+</subsection>
+
+</section>
+
+<section title="SWI Calls">
+<p>
+AcornSSL's SWIs occupy the chunk based at <userinput>&amp;50F80</userinput>.
+Except where noted, each SWI is a close analogue of the correspondingly
+named SWI provided by the Internet module for plain BSD sockets, but
+operating on an ssl handle rather than a socket handle.
+</p>
+
+<swi-definition name="AcornSSL_Creat" number="50F80"
+                description="Initialises a secure session with a new socket">
+<entry>
+ <register-use number="0">
+  bits 0-7: domain; bits 8-31: reserved for future use (zero)
+ </register-use>
+ <register-use number="1">type</register-use>
+ <register-use number="2">protocol</register-use>
+</entry>
+<exit>
+ <register-use number="0">ssl handle</register-use>
+</exit>
+<use>
+<p>
+Analogous to <reference type="swi" name="Socket_Creat"/>, this SWI
+initialises a new secure session, returning a handle to use with the other
+AcornSSL SWIs. The handle is not a socket handle and must be treated as
+opaque.
+</p>
+<p>
+If a socket handle from <reference type="swi" name="Socket_Creat"/> has
+already been opened and needs to be upgraded to a secure session, use
+<reference type="swi" name="AcornSSL_CreateSession"/> instead.
+</p>
+</use>
+<related>
+<reference type="swi" name="AcornSSL_CreateSession"/>
+<reference type="swi" name="AcornSSL_Close"/>
+</related>
+</swi-definition>
+
+<swi-definition name="AcornSSL_Ioctl" number="50F81"
+                description="Performs miscellaneous socket input/output control">
+<entry>
+ <register-use number="0">ssl handle</register-use>
+ <register-use number="1">operation</register-use>
+ <register-use number="2">pointer to argument</register-use>
+</entry>
+<exit>
+ <register-use number="0">0 for success</register-use>
+</exit>
+<use>
+<p>
+Analogous to <reference type="swi" name="Socket_Ioctl"/>. In particular, the
+<userinput>FIONBIO</userinput> operation is used to switch an ssl handle
+between blocking and non-blocking operation.
+</p>
+</use>
+</swi-definition>
+
+<swi-definition name="AcornSSL_Connect" number="50F82"
+                description="Connects the secure session to a remote host">
+<entry>
+ <register-use number="0">ssl handle</register-use>
+ <register-use number="1">pointer to address structure</register-use>
+ <register-use number="2">size of address structure</register-use>
+</entry>
+<exit>
+ <register-use number="0">0 for success</register-use>
+</exit>
+<use>
+<p>Analogous to <reference type="swi" name="Socket_Connect"/>.</p>
+</use>
+</swi-definition>
+
+<swi-definition name="AcornSSL_Shutdown" number="50F83"
+                description="Shuts one or both halves of a connection">
+<entry>
+ <register-use number="0">ssl handle</register-use>
+ <register-use number="1">direction of shutdown</register-use>
+</entry>
+<exit>
+ <register-use number="0">0 for success</register-use>
+</exit>
+<use>
+<p>Analogous to <reference type="swi" name="Socket_Shutdown"/>.</p>
+</use>
+</swi-definition>
+
+<swi-definition name="AcornSSL_Close" number="50F84"
+                description="Closes a connection">
+<entry>
+ <register-use number="0">ssl handle</register-use>
+</entry>
+<exit>
+ <register-use number="0">0 for success</register-use>
+</exit>
+<use>
+<p>
+Analogous to <reference type="swi" name="Socket_Close"/>. Closing the
+secure session with this SWI does not close the underlying socket handle
+when the session was created with
+<reference type="swi" name="AcornSSL_CreateSession"/>; the caller remains
+responsible for closing that socket with
+<reference type="swi" name="Socket_Close"/>.
+</p>
+</use>
+</swi-definition>
+
+<swi-definition name="AcornSSL_Getsockopt" number="50F85"
+                description="Gets a socket option">
+<entry>
+ <register-use number="0">ssl handle</register-use>
+ <register-use number="1">option level</register-use>
+ <register-use number="2">option</register-use>
+ <register-use number="3">pointer to buffer for option value</register-use>
+ <register-use number="4">size of option value buffer</register-use>
+</entry>
+<exit>
+ <register-use number="0">0 for success</register-use>
+</exit>
+<use>
+<p>
+Analogous to <reference type="swi" name="Socket_Getsockopt"/>. As well as
+the standard socket options, this SWI recognises the AcornSSL extension
+options described under Technical Details.
+</p>
+</use>
+</swi-definition>
+
+<swi-definition name="AcornSSL_Write" number="50F86"
+                description="Writes data to a secure connection">
+<entry>
+ <register-use number="0">ssl handle</register-use>
+ <register-use number="1">pointer to data to send</register-use>
+ <register-use number="2">amount of data to send</register-use>
+</entry>
+<exit>
+ <register-use number="0">amount of data written</register-use>
+</exit>
+<use>
+<p>
+Analogous to <reference type="swi" name="Socket_Write"/>; equivalent to
+<reference type="swi" name="AcornSSL_Send"/> with flags of 0.
+</p>
+</use>
+<related>
+<reference type="swi" name="AcornSSL_Send"/>
+</related>
+</swi-definition>
+
+<swi-definition name="AcornSSL_Recv" number="50F87"
+                description="Reads data from a secure connection">
+<entry>
+ <register-use number="0">ssl handle</register-use>
+ <register-use number="1">pointer to data to receive</register-use>
+ <register-use number="2">size of data buffer</register-use>
+ <register-use number="3">option flags; only MSG_PEEK is significant</register-use>
+</entry>
+<exit>
+ <register-use number="0">amount of data received</register-use>
+</exit>
+<use>
+<p>Analogous to <reference type="swi" name="Socket_Recv"/>.</p>
+<p>
+While a secure link is being established, and a certificate exchange is
+taking place that may require the user to confirm an untrusted
+certificate, the link's status may be reported as
+<userinput>ENOTCONN</userinput>, so as to match the response the Internet
+module gives before a link is up.
+</p>
+</use>
+<related>
+<reference type="swi" name="AcornSSL_Read"/>
+</related>
+</swi-definition>
+
+<swi-definition name="AcornSSL_CreateSession" number="50F88"
+                description="Initialises a secure session with an existing socket">
+<entry>
+ <register-use number="0">socket handle from Socket_Creat</register-use>
+ <register-use number="1">
+  bits 0-7: reason code; bits 8-31: reserved for future use (zero)
+  <p>
+  <value-table head-number="Reason" head-value="Action">
+   <value number="0"><reference type="swi" name="AcornSSL_CreateSession" reason="0" use-description="yes"/></value>
+   <value number="1"><reference type="swi" name="AcornSSL_CreateSession" reason="1" use-description="yes"/></value>
+  </value-table>
+  </p>
+ </register-use>
+ <register-use number="2-3">dependent on reason code</register-use>
+</entry>
+<exit>
+ <register-use number="0">ssl handle</register-use>
+</exit>
+<use>
+<p>
+This SWI performs a similar function to
+<reference type="swi" name="AcornSSL_Creat"/>, but allows the caller to
+hand over a previously opened socket, so that an insecure exchange over
+that socket can be followed by a switch to a secure session without closing
+the connection.
+</p>
+</use>
+<related>
+<reference type="swi" name="AcornSSL_Creat"/>
+</related>
+</swi-definition>
+
+<swi-definition name="AcornSSL_CreateSession" number="50F88"
+                reason="0" reasonname="New"
+                description="Creates a new secure session over an existing socket">
+<entry>
+ <register-use number="0">socket handle from Socket_Creat</register-use>
+ <register-use number="1">CreateSession_New (0)</register-use>
+</entry>
+<exit>
+ <register-use number="0">ssl handle</register-use>
+</exit>
+<use>
+<p>
+Creates a new secure session that takes over the given socket handle.
+</p>
+</use>
+<related>
+<reference type="swi" name="AcornSSL_CreateSession"/>
+</related>
+</swi-definition>
+
+<swi-definition name="AcornSSL_CreateSession" number="50F88"
+                reason="1" reasonname="ReuseAuth"
+                description="Creates a new secure session, reusing the authentication of another session">
+<entry>
+ <register-use number="0">socket handle from Socket_Creat</register-use>
+ <register-use number="1">CreateSession_ReuseAuth (1)</register-use>
+ <register-use number="2">
+  ssl handle of another secure session already authenticated with the
+  server
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0">ssl handle</register-use>
+</exit>
+<use>
+<p>
+Creates a new secure session that takes over the given socket handle, using
+the authentication already established by another, already-authenticated
+secure session to the same server to complete the connection. This avoids
+the need to re-authenticate, and re-run the certificate confirmation
+process, for a second connection that the caller already knows to be
+trusted.
+</p>
+</use>
+<related>
+<reference type="swi" name="AcornSSL_CreateSession"/>
+</related>
+</swi-definition>
+
+<swi-definition name="AcornSSL_Getpeername" number="50F89"
+                description="Gets details of the remote host's address">
+<entry>
+ <register-use number="0">ssl handle</register-use>
+ <register-use number="1">pointer to address structure</register-use>
+ <register-use number="2">pointer to size of address block</register-use>
+</entry>
+<exit>
+ <register-use number="0">0 for success</register-use>
+</exit>
+<use>
+<p>Analogous to <reference type="swi" name="Socket_Getpeername"/>.</p>
+</use>
+</swi-definition>
+
+<swi-definition name="AcornSSL_Getsockname" number="50F8A"
+                description="Gets details of the local host's address">
+<entry>
+ <register-use number="0">ssl handle</register-use>
+ <register-use number="1">pointer to address structure</register-use>
+ <register-use number="2">pointer to size of address block</register-use>
+</entry>
+<exit>
+ <register-use number="0">0 for success</register-use>
+</exit>
+<use>
+<p>Analogous to <reference type="swi" name="Socket_Getsockname"/>.</p>
+</use>
+</swi-definition>
+
+<swi-definition name="AcornSSL_Setsockopt" number="50F8B"
+                description="Sets a socket option">
+<entry>
+ <register-use number="0">ssl handle</register-use>
+ <register-use number="1">option level</register-use>
+ <register-use number="2">option</register-use>
+ <register-use number="3">pointer to buffer for option value</register-use>
+ <register-use number="4">size of option value buffer</register-use>
+</entry>
+<exit>
+ <register-use number="0">0 for success</register-use>
+</exit>
+<use>
+<p>
+Analogous to <reference type="swi" name="Socket_Setsockopt"/>. As well as
+the standard socket options, this SWI recognises the AcornSSL extension
+options described under Technical Details.
+</p>
+</use>
+</swi-definition>
+
+<swi-definition name="AcornSSL_Stat" number="50F8C"
+                description="Reads status information for a socket">
+<entry>
+ <register-use number="0">ssl handle</register-use>
+ <register-use number="1">pointer to stat structure</register-use>
+</entry>
+<exit>
+ <register-use number="0">0 for success</register-use>
+</exit>
+<use>
+<p>Analogous to <reference type="swi" name="Socket_Stat"/>.</p>
+</use>
+</swi-definition>
+
+<swi-definition name="AcornSSL_Version" number="50F8D"
+                description="Reads the module's version number">
+<entry>
+ <register-use number="0-9" state="preserved"/>
+</entry>
+<exit>
+ <register-use number="0">100 times the module's version number</register-use>
+</exit>
+<use>
+<p>Analogous to <reference type="swi" name="Socket_Version"/>.</p>
+<p>
+If extra features are added to AcornSSL in the future, this version number
+can be read to determine whether the loaded copy of the module is able to
+support those features.
+</p>
+</use>
+</swi-definition>
+
+<swi-definition name="AcornSSL_Read" number="50F8E"
+                description="Reads data from a secure connection">
+<entry>
+ <register-use number="0">ssl handle</register-use>
+ <register-use number="1">pointer to data to receive</register-use>
+ <register-use number="2">size of data buffer</register-use>
+</entry>
+<exit>
+ <register-use number="0">amount of data received</register-use>
+</exit>
+<use>
+<p>
+Analogous to <reference type="swi" name="Socket_Read"/>; equivalent to
+<reference type="swi" name="AcornSSL_Recv"/> with flags of 0.
+</p>
+</use>
+<related>
+<reference type="swi" name="AcornSSL_Recv"/>
+</related>
+</swi-definition>
+
+<swi-definition name="AcornSSL_Send" number="50F8F"
+                description="Writes data to a secure connection">
+<entry>
+ <register-use number="0">ssl handle</register-use>
+ <register-use number="1">pointer to data to send</register-use>
+ <register-use number="2">amount of data to send</register-use>
+ <register-use number="3">option flags; none are currently significant</register-use>
+</entry>
+<exit>
+ <register-use number="0">amount of data written</register-use>
+</exit>
+<use>
+<p>Analogous to <reference type="swi" name="Socket_Send"/>.</p>
+<p>
+While a secure link is being established, and a certificate exchange is
+taking place that may require the user to confirm an untrusted
+certificate, the link's status may be reported as
+<userinput>ENOTCONN</userinput>, so as to match the response the Internet
+module gives before a link is up.
+</p>
+</use>
+<related>
+<reference type="swi" name="AcornSSL_Write"/>
+</related>
+</swi-definition>
+
+</section>
+
+<section title="Service Calls">
+<p>
+AcornSSL issues <reference type="service" name="URLModule"/> to communicate
+important events about its own availability. Client software should not
+claim this service call.
+</p>
+
+<service-definition name="URLModule" number="83E00"
+                    description="Communicates AcornSSL module lifecycle events">
+<entry>
+ <register-use number="0">
+  <p>
+  <value-table head-number="Value" head-value="Meaning">
+   <value number="0">SSL module became available (Service_URLModule_SSL_Started)</value>
+   <value number="1">SSL module no longer available (Service_URLModule_SSL_Dying)</value>
+  </value-table>
+  </p>
+ </register-use>
+ <register-use number="1">&hex;83E02 (Service_URLModule_SSL)</register-use>
+ <register-use number="2">the module's version number multiplied by 100</register-use>
+</entry>
+<exit>
+ <register-use number="0-2" state="preserved"/>
+</exit>
+<use>
+<p>
+AcornSSL issues this service call, with R0 set to 0, when it becomes
+available, and again, with R0 set to 1, when it is about to become
+unavailable (for example when it is being re-loaded, or killed). Recipients
+must preserve all registers and must not claim this service call.
+</p>
+<p>
+AcornHTTP re-announces AcornSSL's presence by generating this service call
+itself if AcornHTTP starts after AcornSSL has already announced itself, so
+that other modules relying on the <userinput>https:</userinput> scheme
+still see the announcement even if their own startup missed the original
+call.
+</p>
+</use>
+<related>
+<reference type="swi" name="AcornSSL_Version"/>
+</related>
+</service-definition>
+
+</section>
+
+<section title="Commands">
+
+<command-definition name="Desktop_AcornSSL"
+                    description="Starts the AcornSSL certificate confirmation desktop task">
+<syntax>
+</syntax>
+<use>
+<p>
+Starts the Wimp task that displays AcornSSL's certificate confirmation
+dialogue. This command takes no parameters, and is issued automatically by
+AcornSSL itself, in response to <reference type="service" name="StartWimp"/>,
+when the desktop starts; it should not normally be issued directly.
+</p>
+<p>
+If the task is already running, the command reports an error rather than
+starting a second copy.
+</p>
+</use>
+<example>
+<command>*Desktop_AcornSSL</command>
+</example>
+</command-definition>
+
+</section>
+
+<section title="Certificate Confirmation Dialogue">
+<p>
+When AcornSSL cannot fully verify a server's certificate chain against its
+trusted root certificates, or the certificate presented fails one of its
+other checks, the connection does not fail outright. Instead, provided the
+desktop is running and
+<userinput>SO_ACORNSSL_PROMPTTIME</userinput> has not been set to zero for
+that session, AcornSSL asks the user whether the connection should be
+allowed to proceed. While this confirmation is pending, and while any
+handshaking that requires it is in progress, calls such as
+<reference type="swi" name="AcornSSL_Recv"/> and
+<reference type="swi" name="AcornSSL_Send"/> report the connection's status
+as <userinput>ENOTCONN</userinput>.
+</p>
+<p>
+The certificate confirmation dialogue is presented by a small Wimp task,
+started automatically as <reference type="command" name="Desktop_AcornSSL"/>
+when the desktop starts. This task is separate from the AcornSSL module
+itself: the module runs the TLS handshake and evaluates the certificate
+chain in the background, and communicates with the task only to display a
+dialogue and collect the user's decision.
+</p>
+
+<subsection title="What the dialogue shows">
+<p>
+The dialogue is shown once for each certificate in the chain that needs the
+user's attention, starting with the certificate presented by the remote
+server (the subject) and, where the user chooses to inspect it, working
+back towards the root of trust (the issuer). Each certificate's dialogue
+shows:
+</p>
+<p>
+<list type="unordered">
+ <item>the certificate's issuer</item>
+ <item>the certificate's subject</item>
+ <item>the period for which the certificate is valid</item>
+ <item>the certificate's serial number</item>
+ <item>the certificate's signature</item>
+</list>
+</p>
+<p>
+Where a check on the certificate has failed, the corresponding field is
+marked to draw attention to the specific problem: an expired, not-yet-valid,
+revoked, or otherwise unacceptable validity period; a signature the module
+could not verify; or an issuer that is not among the trusted roots. The
+final certificate in the chain is the root; it has no further issuer to
+inspect, so its dialogue omits the button used to move up the chain.
+</p>
+</subsection>
+
+<subsection title="Responding to the dialogue">
+<p>
+For the certificate at the top of the chain (the one the server presented),
+the dialogue offers three responses:
+</p>
+<p>
+<list type="unordered">
+ <item><p><actionbutton>Reject</actionbutton> refuses the connection. Rejecting any certificate in the chain rejects the whole chain, and the corresponding SWI call fails.</p></item>
+ <item><p><actionbutton>Accept</actionbutton> allows the connection to proceed this time only; the same certificate will be queried again on a future connection.</p></item>
+ <item><p><actionbutton>Accept always</actionbutton> allows the connection to proceed, and records an exception so that the same certificate is accepted automatically in future without prompting again.</p></item>
+</list>
+</p>
+<p>
+Dialogues for certificates further up the chain (the issuers) only offer
+<actionbutton>Accept</actionbutton> and <actionbutton>Reject</actionbutton>,
+since the decision to trust the chain permanently is made once, at the top
+level, after the intervening issuers have been reviewed.
+</p>
+<p>
+Each certificate's dialogue also offers a
+<actionbutton>View certificate</actionbutton> button, which writes the
+certificate to a pipe file in PEM form and opens it in the user's default
+text viewer, so the certificate's contents can be inspected in detail
+before a decision is made.
+</p>
+</subsection>
+
+<subsection title="Timing out">
+<p>
+<reference type="swi" name="AcornSSL_Setsockopt"/> with
+<userinput>SO_ACORNSSL_PROMPTTIME</userinput> controls how long, in
+centiseconds, a session will wait for the user to respond before the
+connection attempt fails. A value of zero suppresses the dialogue entirely
+for that session and fails the connection as soon as the certificate check
+fails, which is appropriate for background or unattended connections where
+no user is available to respond.
+</p>
+</subsection>
+
+</section>
+
+<section title="Error Messages">
+<p>
+AcornSSL's own errors are allocated the range
+<userinput>&amp;813F20</userinput> to <userinput>&amp;813F3F</userinput>.
+These are used for failures that are specific to the module, or that arise
+from a SWI that has no direct BSD sockets equivalent (such as
+<reference type="swi" name="AcornSSL_CreateSession"/>).
+</p>
+<p>
+Most errors from the socket-like SWIs are instead mapped onto Unix errors
+in the DCI4 error range, for maximum compatibility with the BSD sockets
+API used by the Internet module. The full list of these errors can be found
+in <filename type="riscos">C:TCPIPLibs.sys.h.errno</filename>, and macros to
+recognise and extract them from a RISC OS error are in
+<filename type="riscos">C:TCPIPLibs.sys.h.dcistructs</filename>. Errors
+propagated from a component AcornSSL relies on (for example, a
+&#8216;File not found&#8217; error while reading a certificate file) are
+passed back unchanged.
+</p>
+
+<error-definition name="AcornSSL_BadSession" number="813F20"
+                  description="Bad session handle">
+<use>
+<p>
+An ssl handle passed to a SWI does not refer to a currently open session.
+</p>
+</use>
+</error-definition>
+
+<error-definition name="AcornSSL_BadCtx" number="813F21"
+                  description="Bad context handle">
+<use>
+<p>The session's internal mbedTLS context is not in a usable state.</p>
+</use>
+</error-definition>
+
+<error-definition name="AcornSSL_NoInit" number="813F22"
+                  description="Security libraries unable to initialise (reason %0)">
+<use>
+<p>
+The underlying security library failed to initialise; the substituted
+value gives the mbedTLS reason code.
+</p>
+</use>
+</error-definition>
+
+<error-definition name="AcornSSL_NoVerifyLocations" number="813F23"
+                  description="Unable to initialise certificate verification procedures (reason %0)">
+<use>
+<p>
+The certificate verification machinery could not be set up; the
+substituted value gives the mbedTLS reason code.
+</p>
+</use>
+</error-definition>
+
+<error-definition name="AcornSSL_NoRootCA" number="813F24"
+                  description="Can't locate root certificate store">
+<use>
+<p>
+The store of trusted root certificates could not be found or read.
+</p>
+</use>
+</error-definition>
+
+<error-definition name="AcornSSL_Malloc" number="813F25"
+                  description="Failed to allocate memory">
+<use>
+<p>AcornSSL was unable to allocate memory needed to complete the request.</p>
+</use>
+</error-definition>
+
+<error-definition name="AcornSSL_SocketError" number="813F26"
+                  description="Socket error (code %0)">
+<use>
+<p>
+The underlying socket reported an error that could not be mapped onto a
+Unix error number; the substituted value gives the underlying error code.
+</p>
+</use>
+</error-definition>
+
+<error-definition name="AcornSSL_HandshakeError" number="813F27"
+                  description="Handshake error (state %0)">
+<use>
+<p>
+The TLS handshake failed; the substituted value gives the mbedTLS
+handshake state at the point of failure.
+</p>
+</use>
+</error-definition>
+
+<error-definition name="AcornSSL_ParameterError" number="813F28"
+                  description="Parameter error (code %0)">
+<use>
+<p>
+A parameter passed to a SWI was invalid; the substituted value gives the
+mbedTLS error code that identified the problem.
+</p>
+</use>
+</error-definition>
+
+<error-definition name="AcornSSL_NoExceptions" number="813F29"
+                  description="Can't locate certificate exceptions">
+<use>
+<p>
+The store of certificate exceptions, recorded when the user chooses
+<actionbutton>Accept always</actionbutton> in the certificate confirmation
+dialogue, could not be found or read.
+</p>
+</use>
+</error-definition>
+
+</section>
+
+<section title="Examples">
+
+<subsection title="Connecting with certificate name checking">
+<p>
+This example shows the minimum sequence of calls needed to open a secure
+connection directly, associating an expected host name with the session so
+that the peer's certificate is checked against it, in the same way a web
+browser checks a server's certificate against the name in the URL.
+</p>
+<p>
+<extended-example type="c">
+int ssl, err;
+const char *hostname = "example.com";
+
+/* Get a handle, and check the peer's name during handshaking */
+ssl = <userreplace>call AcornSSL_Creat, get ssl handle</userreplace>;
+<userreplace>call AcornSSL_Setsockopt, SO_ACORNSSL_HOSTNAME, &amp;hostname, 4</userreplace>;
+
+/* Connect; this may trigger the certificate confirmation dialogue */
+err = <userreplace>call AcornSSL_Connect, address, addresslen</userreplace>;
+
+/* Read and write the secure connection as usual */
+<userreplace>call AcornSSL_Write, ...</userreplace>;
+<userreplace>call AcornSSL_Read, ...</userreplace>;
+
+/* Finished */
+<userreplace>call AcornSSL_Close</userreplace>;
+</extended-example>
+</p>
+</subsection>
+
+<subsection title="Upgrading an existing socket">
+<p>
+This example shows a protocol that starts with a plain-text exchange over a
+socket created with <reference type="swi" name="Socket_Creat"/>, and only
+switches to a secure session partway through the conversation, as is
+typical for protocols such as STARTTLS-style negotiations.
+</p>
+<p>
+<extended-example type="c">
+int sock, ssl;
+
+/* Open and connect an ordinary socket, and talk to it in plain text */
+sock = <userreplace>call Socket_Creat, get socket handle</userreplace>;
+<userreplace>call Socket_Connect, address, addresslen</userreplace>;
+<userreplace>negotiate whether to go secure, in plain text</userreplace>;
+
+/* Hand the socket over to AcornSSL and continue securely */
+ssl = <userreplace>call AcornSSL_CreateSession, sock, CreateSession_New</userreplace>;
+<userreplace>call AcornSSL_Write, ...</userreplace>;
+<userreplace>call AcornSSL_Read, ...</userreplace>;
+
+/* Finished; close the secure session, then the underlying socket */
+<userreplace>call AcornSSL_Close</userreplace>;
+<userreplace>call Socket_Close, sock</userreplace>;
+</extended-example>
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org"/>
+ </maintainer>
+ <disclaimer>
+  <p>
+   &copy; RISC OS Open Ltd, 2018-2026.
+  </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Charles Ferguson" date="19 Jul 2026" title="Initial PRM-in-XML conversion">
+   <change>Converted the AcornSSL SWI reference from the plain-text doc.AcornSSL document, and added coverage of the certificate confirmation desktop dialogue, the Desktop_AcornSSL command, and the module's error range, drawn from the module's headers and source.</change>
+  </revision>
+ </history>
+
+ <related>
+  <reference type="swi" name="Socket_Creat"/>
+  <reference type="service" name="StartWimp"/>
+ </related>
+</meta>
+</riscos-prm>

@@ -57,6 +57,7 @@
 
 <section title="RISC OS 5" dir="riscos5">
     <page href="drivehints">Drive Hints</page>
+    <page href="acornssl">AcornSSL module</page>
 </section>
 
 <section title="RISC OS Select" dir="select">
