@@ -1,0 +1,1418 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+<riscos-prm>
+ <chapter title="Configure Plug-ins">
+
+  <section title="Introduction">
+   <p>
+    Configure is the desktop application through which the user alters the
+    configuration of the machine: the choices that are stored in CMOS RAM,
+    the files within the Choices boot structure, and the settings of other
+    components of the system. Each area of configuration is presented in its
+    own window, and each of those windows is provided by a separate
+    <em>plug-in</em> application. Configure itself provides the main window
+    from which the plug-ins are opened, decides whether the machine is in a
+    state where its configuration may be changed, and manages the closing of
+    plug-ins.
+   </p>
+   <p>
+    This chapter describes the interface between Configure and its plug-ins.
+    It is intended for those who write a plug-in for a piece of hardware or
+    software, for those who write a group of related plug-ins which are
+    presented together, and for those who write installation tools which add
+    resources to the boot structure. It defines the user interface that a
+    plug-in must present, the resources that a plug-in supplies, the way in
+    which a plug-in is started and positioned, the Wimp messages exchanged
+    with the plug-in, and the commands which are provided by the Installer
+    module.
+   </p>
+   <p>
+    The content of the individual configuration windows (the choice of
+    options on the Mouse window, for example) belongs to the plug-ins which
+    provide them and is not described here. The use of the Toolbox to build a
+    plug-in's window is likewise outside the scope of this chapter.
+   </p>
+  </section>
+
+  <section title="Overview">
+   <subsection title="Structure">
+    <p>
+     A configuration system is made up of the following parts:
+    </p>
+    <p>
+     <list type="unordered">
+      <item><p>
+       The <em>root</em> (or controlling) application, which displays the
+       main window containing one icon for each top-level plug-in.
+      </p></item>
+      <item><p>
+       <em>Plug-ins</em>, which are applications whose directories are
+       placed within a configuration directory. Each plug-in opens a single
+       window, which is used to alter one aspect of the configuration.
+      </p></item>
+      <item><p>
+       <em>Group plug-ins</em>, which are plug-ins whose window shows a
+       further collection of plug-ins, in the same way that the main window
+       does. The members of a group are second-level plug-ins. Groups may be
+       nested to further levels. A generic shell application, CPIShell,
+       provides the behaviour of a group, so that a group need consist only
+       of the shell, a messages file and a directory of children.
+      </p></item>
+      <item><p>
+       The <em>Installer module</em>, which merges files and entries into the
+       boot structure, keeping backups and logs of what it has done. It is
+       used by the windows which install new resources.
+      </p></item>
+     </list>
+    </p>
+    <p>
+     Plug-ins are separate tasks. They communicate with the root application
+     (or with the group which controls them) through a small number of Wimp
+     messages, described in <reference type="section" name="Wimp Messages"/>.
+     A plug-in which does not know about the protocol can still be used, but
+     will not position its window consistently and cannot object to being
+     closed; see <reference type="subsection" name="Protocol-ignorant applications"/>.
+    </p>
+   </subsection>
+
+   <subsection title="Purpose of plug-ins">
+    <p>
+     Separating the configuration windows into individual applications allows
+     parts of Configure to be added or removed without altering the rest.
+     Third-party hardware, such as a SCSI interface, can supply its own
+     configuration window which appears alongside the standard ones, and each
+     plug-in can be maintained, upgraded and distributed by its own author.
+     A system administrator may remove the plug-ins for areas which users must
+     not alter (the network configuration, for example) without preventing
+     them from changing others, such as the mouse speed.
+    </p>
+   </subsection>
+
+   <subsection title="Groups of plug-ins">
+    <p>
+     Where there are many related configuration windows, they are collected
+     under a single icon in the main window. Opening that icon opens a window
+     which presents the members of the group as icons, in the manner of the
+     main window. The group is the <em>controlling</em> plug-in for its
+     members: it broadcasts the quit messages for them, and it passes on to
+     them the class that identifies the group (see
+     <reference type="subsection" name="Plug-in classes"/>).
+    </p>
+    <p>
+     The members of a group may be hidden or faded according to the
+     configuration of the machine, or the version of the operating system, so
+     that the same group can be shared between several versions of the
+     system. The conditions are described in
+     <reference type="subsection" name="Group shell"/>.
+    </p>
+   </subsection>
+
+   <subsection title="Locking">
+    <p>
+     The root application is responsible for deciding whether the machine is
+     in a state in which it may be configured. That decision depends upon
+     whether the machine was booted locally or remotely, the access
+     permissions of <sysvar>Choices$Write</sysvar>, and the state of FSLock.
+     When configuration is not possible, the icons of the main window are
+     faded, and the plug-ins cannot be started from it. The details are in
+     <reference type="subsection" name="Locking and failed writes"/>.
+    </p>
+   </subsection>
+
+   <subsection title="Protocol-ignorant applications">
+    <p>
+     An existing configuration application which does not implement the
+     protocol can be included as a plug-in. In that case the root application
+     takes the name of the application, without the leading <code type="format">!</code>,
+     as the text of its icon; the name of the application, including the
+     <code type="format">!</code>, as the name of its sprite; and a generic string as its
+     help text. These defaults are a fallback only. An application which is
+     written to be used as a plug-in must supply its own text, sprite and
+     help, as described in <reference type="subsection" name="Plug-in resources"/>.
+    </p>
+    <p>
+     The only message which such an application must handle is
+     <reference type="message" name="Quit"/>. Without the remainder of the
+     protocol the window of the application will not be positioned beside the
+     icon that opened it, and the application will not be reopened at the
+     front of the window stack when its icon is clicked a second time.
+    </p>
+   </subsection>
+  </section>
+
+  <section title="User Interface">
+   <subsection title="General principles">
+    <p>
+     Every configuration window is a dialogue box presented in the standard
+     RISC OS style. All gadgets must comply with the Style Guide. Each window
+     has separate action buttons at the bottom, rather than instant-effect
+     gadgets and a close icon. Because a window has a <em>Cancel</em> button,
+     it has no close icon.
+    </p>
+    <p>
+     The windows normally provide the following action buttons. Where a
+     <em>Default</em> button is present it restores the factory defaults for
+     the system, which may differ from the defaults of the same components
+     when they are soft-loaded on an earlier system.
+    </p>
+    <p>
+     <value-table head-number="Button" head-name="Click" head-value="Action">
+      <value number="Set" name="Select">Configures the current selections and closes the window.</value>
+      <value number="Set" name="Adjust">Configures the current selections, and leaves the window open.</value>
+      <value number="Cancel" name="Select">Closes the window without configuring the selections. The next time that the window is opened it will show the configured values.</value>
+      <value number="Cancel" name="Adjust">Resets the selections to the configured values; that is, to the values when the window was opened or last Adjust-clicked on <em>Set</em>, whichever is more recent.</value>
+      <value number="Default" name="Adjust">Resets the selections to the factory defaults without configuring them.</value>
+      <value number="Default" name="Select">As for Adjust. Selecting the defaults and then closing the window would only duplicate <em>Cancel</em>, so the button does not close the window.</value>
+     </value-table>
+    </p>
+    <p>
+     A window may also provide a <em>Try</em> button, for settings whose
+     effect can be sampled (the system beep, or a screen saver), so that the
+     user can test them without configuring them.
+    </p>
+    <p>
+     A window which is opened gains the input focus, so that Return and
+     Escape can be acted upon. If the window has no writable icons it must
+     place an invisible caret. The <em>Set</em> button, or its equivalent,
+     must always be a default action button (with the 3D border of a cream
+     well), to show that it is the action taken on Return.
+    </p>
+    <p>
+     When the user clicks on the icon of a plug-in whose window is already
+     open, the window is reopened at the front of the window stack in the
+     same position, without changing any of its selections. The root
+     application does this by sending
+     <reference type="message" name="OpenConfigWindow"/>. A click with
+     Adjust does not close the main window.
+    </p>
+    <p>
+     Where a plug-in is used within a group, the group's <em>Cancel</em>
+     closes all of the open windows of its members, and its <em>Set</em>
+     does the same after telling them to save any data which they have
+     modified. Unless Adjust was used, the group's own window then closes as
+     well. A member whose data has been modified, and which has not been told
+     to set it, asks the user whether to discard, cancel or set it; see
+     <reference type="subsection" name="Quit protocol"/>.
+    </p>
+   </subsection>
+
+   <subsection title="Interactive help">
+    <p>
+     Interactive help text is standardised across plug-ins. Only one help
+     message can be given to each gadget (which may consist of several icons
+     and, for a string set, a menu), and gadgets provide no help while they are
+     faded. In the table below, <code type="format">***</code> is replaced by text
+     appropriate to the circumstances, and <code type="format">|M</code> is the sequence
+     which makes the Help application insert a line break. Wherever possible,
+     the help text of a gadget takes one of these forms:
+    </p>
+    <p>
+     <definition-table head-name="Gadget" head-value="Help text">
+      <definition name="Plug-in activation icon (main window)">Click SELECT to open the *** configuration window.</definition>
+      <definition name="Plug-in work area">This window allows you to configure various aspects of the ***.</definition>
+      <definition name="Preceding labels">This is the ***.</definition>
+      <definition name="Numeric range (writable)">You can adjust the *** using either the keyboard or the arrows.</definition>
+      <definition name="Numeric range (display)">You can adjust the *** using the arrows.</definition>
+      <definition name="Writable icons">You can enter the *** here.</definition>
+      <definition name="String sets">You can choose a *** from the menu.</definition>
+      <definition name="Sliders">You can adjust the *** using the slider.</definition>
+      <definition name="Following labels">The *** is measured in ***. The non-abbreviated name of the unit is used, followed by any necessary explanation of the unit, in brackets if that is brief.</definition>
+      <definition name="Option buttons">This indicates if ***.|MClick SELECT to select or deselect this option.</definition>
+      <definition name="Radio buttons">This indicates if ***.|MClick SELECT to select this alternative.</definition>
+      <definition name="Drop zones">You can drop a *** here.</definition>
+      <definition name="Try action buttons">Click SELECT to sample the selected ***.</definition>
+      <definition name="Default action buttons">Click SELECT to reset the selections to the factory defaults.</definition>
+      <definition name="Cancel action buttons">Click SELECT to close this window without configuring the selections.|MClick ADJUST to reset the selections to the configured settings.</definition>
+      <definition name="Set action buttons">Click SELECT to configure the selections and close this window.|MClick ADJUST to configure the selections without closing this window.</definition>
+     </definition-table>
+    </p>
+   </subsection>
+
+   <subsection title="Main window">
+    <p>
+     The main window contains one icon for each plug-in, sorted alphabetically
+     by the descriptive text of the plug-in. The window initially has room for
+     up to five columns and four rows of icons; if there are more, the work
+     area extends beyond the visible area. The window can be resized in the
+     manner of a directory display. The text, sprite and help of each icon
+     come from the plug-in, as described in
+     <reference type="subsection" name="Plug-in resources"/>.
+    </p>
+    <p>
+     The menu of the main window has no <em>Quit</em> item. It contains:
+    </p>
+    <p>
+     <list type="unordered">
+      <item><p><menuoption>Info</menuoption>, which leads to a submenu offering an information box for the application and for each top-level plug-in.</p></item>
+      <item><p><menuoption>Save CMOS</menuoption>, which saves the contents of the CMOS RAM to <filename>&lt;Choices$Write&gt;.CMOS</filename>.</p></item>
+      <item><p><menuoption>Load CMOS</menuoption>, which restores the CMOS RAM from that file.</p></item>
+      <item><p><menuoption>Help...</menuoption>, which starts interactive help.</p></item>
+      <item><p><menuoption>Default CMOS</menuoption>, which loads the CMOS RAM from <filename>Choices:ResetCMOS</filename>.</p></item>
+     </list>
+    </p>
+    <p>
+     The three CMOS items are faded when the reading or writing of the files
+     they use is not possible, for example because FSLock is active. When
+     <sysvar>Choices$Write</sysvar> is on a locked filing system, or when the
+     machine has been booted remotely and <sysvar>Choices$Write</sysvar> is
+     not publicly writable, every icon in the work area is faded. If FSLock is
+     active, the icon of the Lock plug-in is not faded, so that the user can
+     unlock the machine.
+    </p>
+    <p>
+     The help text for the work area of the main window changes with the
+     state of the machine.
+    </p>
+    <p>
+     <definition-table head-name="Item" head-value="Help text">
+      <definition name="Work area">Configure allows you to control various preferences of operation and startup.|MClick SELECT on the icons to open the individual configuration windows.</definition>
+      <definition name="Work area (disc locked)">Configure allows you to control various preferences of operation and startup.|MThe icons are faded because the hard disc is locked.|MClick SELECT on the Lock icon if you wish to unlock the hard disc.</definition>
+      <definition name="Work area (no permission)">Configure allows you to control various preferences of operation and startup.|MThe icons are faded because you do not have permission to save your choices on the remote machine.</definition>
+      <definition name="Info">Move the pointer right to view information about the configuration system.</definition>
+      <definition name="Save CMOS">Click SELECT to save all the CMOS RAM as a file, from where you can restore it later.</definition>
+      <definition name="Save CMOS (locked)">You cannot save the CMOS RAM while FSLock is active.</definition>
+      <definition name="Load CMOS">Click SELECT to load all the CMOS RAM from your saved CMOS file.</definition>
+      <definition name="Load CMOS (no file)">You do not have a CMOS RAM file to load from.</definition>
+      <definition name="Load CMOS (locked)">You cannot load the CMOS RAM while FSLock is active.</definition>
+      <definition name="Help...">Click SELECT to load interactive help, for guidance on the use of Configure.</definition>
+      <definition name="Default CMOS">Click SELECT to restore all the CMOS RAM to the factory default settings.</definition>
+     </definition-table>
+    </p>
+   </subsection>
+
+   <subsection title="Installation windows">
+    <p>
+     Three windows install resources into the boot structure, and share both
+     their user interface and the Installer module that does the work:
+    </p>
+    <p>
+     <list type="unordered">
+      <item><p><em>System</em>, which merges a !System directory into <sysvar>System$Dir</sysvar>.</p></item>
+      <item><p><em>Fonts</em> (the <em>Install fonts...</em> button of the Fonts window), which merges a !Fonts directory into the font directory.</p></item>
+      <item><p><em>Boot</em> (the <em>Install</em> button of the Boot window), which merges a !Boot directory into <sysvar>Boot$Dir</sysvar>.</p></item>
+     </list>
+    </p>
+    <p>
+     The Fonts and Boot windows are second-level plug-ins, opened by their
+     parent through its group. The window of each is dragged to by a
+     directory display; the dropped directory must be named and structured in
+     the same way as the one it is to be merged into. The merge is
+     described in terms of the objects and operations defined in
+     <reference type="subsection" name="Installer module"/>.
+    </p>
+    <p>
+     The window has three states. In the initial state it asks for a
+     directory to be dropped on it; it returns to this state whenever
+     <em>Cancel</em> is clicked with Adjust. When a suitably named directory
+     is dropped (even after a preview has been calculated), the window shows
+     the name of the source and offers <em>Quick merge</em>, which starts the
+     merge at once, and <em>Preview</em>. The preview examines all of the
+     files concerned, determines the necessary operations, and presents them
+     as a list of option buttons. The user may deselect any operation which
+     they do not wish to perform; <em>All</em> and <em>None</em> select and
+     deselect every operation. If an error occurs during the merge the user
+     may cancel or continue; the window stays in the preview state, with the
+     operations that completed successfully deselected.
+    </p>
+    <p>
+     The operations offered are the addition, update or removal of each file,
+     as determined from the state of the destination before and after the
+     operation. A font face is treated as a single item, so that the operations
+     are of the form <em>Update face Homerton.Medium</em>. Paths are shown
+     relative to the destination directory. The System and Boot windows also
+     offer a <em>Synchronise !System</em> operation, generated whenever the
+     contents of <sysvar>System$Dir</sysvar> are altered, which runs
+     <reference type="command" name="Install_CheckSystem"/>.
+    </p>
+    <p>
+     Directories of load and execution address &hex;DEADDEAD (known as
+     <em>corpses</em>) are requests for the object at the equivalent position
+     of the destination to be removed. An empty directory is created at the
+     destination with <code type="format">*CDir</code>.
+    </p>
+    <p>
+     <definition-table head-name="Window" head-extra="Destination" head-value="Differences">
+      <definition name="System" extra="System$Dir">Looks for modules, corpses, empty directories and miscellaneous files. The search starts from any subdirectory, whether or not it is an application, except Backup. Backups and the log are kept in the Backup and Log objects of System$Dir. Synchronises !System at the end.</definition>
+      <definition name="Fonts" extra="The third-last directory on Font$Path">Looks for fonts and corpses. The search starts from any subdirectory excluding applications. Backups and the log are kept in the Backup and Log objects of Boot$Dir. Runs *FontInstall at the end.</definition>
+      <definition name="Boot" extra="Boot$Dir">Looks for any file or font, together with corpses and empty directories. The search starts from the source directory itself, excluding Backup and Log. Backups and the log are kept in Boot$Dir, unless the destination is within System$Dir, when the System locations are used. Synchronises !System only if the contents of System$Dir were changed. The Boot.PreDesktop and Boot.Desktop files in Choices$Write are merged with *Install_Merge rather than updated.</definition>
+     </definition-table>
+    </p>
+    <p>
+     The interactive help for the merge windows follows the standard forms.
+     For the System window:
+    </p>
+    <p>
+     <definition-table head-name="Gadget" head-value="Help text">
+      <definition name="Merge">Click SELECT to close the dialogue box and start the merging process.|MClick ADJUST to do the same, but keep the dialogue box open.</definition>
+      <definition name="Cancel">Click SELECT to cancel this dialogue box.|MClick ADJUST to forget about the !System directory that has been dropped on to this window.</definition>
+      <definition name="Agenda">Click SELECT to view a list of all the operations that will be performed during the merge.</definition>
+      <definition name="All">Click SELECT to select all the operations.</definition>
+      <definition name="None">Click SELECT to deselect all the operations.</definition>
+      <definition name="Pane icons">This is one of the operations that will be performed as part of the merge process.|MClick SELECT to disable or re-enable the operation.</definition>
+     </definition-table>
+    </p>
+   </subsection>
+
+   <subsection title="Lists of boot items">
+    <p>
+     Plug-ins which edit an ordered list of files, such as the items to be run
+     or booted at startup, present the list in a scrolling pane. The list
+     contains leafnames; a directory refers to the objects within it, to which
+     the action is applied in turn. The list accepts files, applications and
+     directories dropped on to it, drags within it (with autoscrolling) to
+     change the order, and the <em>Remove</em>, <em>Select all</em> and
+     <em>Clear selection</em> buttons. Entries in the file which were not
+     written by the plug-in are shown faded; they cannot be selected or
+     edited, and new items cannot be placed before or between the faded
+     entries which come first, or after the faded entries which come last.
+     Items which can be edited are shown with fully canonicalised names, and
+     are stored relative to <filename>Boot:</filename> or
+     <filename>Boot:^</filename> where that is possible. The entries are
+     written to the boot files with
+     <reference type="command" name="Install_Merge"/>; see
+     <reference type="subsection" name="Merging obeyfiles"/>.
+    </p>
+    <p>
+     <definition-table head-name="Gadget" head-value="Help text">
+      <definition name="Remove selection">Click SELECT to remove all the selected files, applications and directories from this window.</definition>
+      <definition name="Select all">Click SELECT to select all the files, applications and directories.</definition>
+      <definition name="Clear selection">Click SELECT to deselect all the selected files, applications and directories.</definition>
+      <definition name="Pane work area">Drag files, applications and directories to this window to add them to the list.</definition>
+      <definition name="Un-faded items in pane">Drag this around within the window to change its position within the sequence.|MDrag other files, applications and directories to this window to add them to the list.</definition>
+     </definition-table>
+    </p>
+   </subsection>
+  </section>
+
+  <section title="Technical Details">
+   <subsection title="Plug-in resources">
+    <p>
+     A plug-in is an application directory located within a configuration
+     directory. For the root application this is
+     <filename>BootResources:Configure</filename>; for a group it is the
+     directory given by the <switch name="dir"/> option of the shell (see
+     <reference type="command" name="CPIShell"/>). The root application
+     scans its directory when it starts. The information about each plug-in
+     is read from the <filename>Messages</filename> file in the plug-in's
+     application directory, using the following tokens.
+    </p>
+    <p>
+     <definition-table head-name="Token" head-value="Meaning">
+      <definition name="_ConfigText">The brief text of the icon in the window of the controlling application, and the key by which the icons are sorted. Defaults to the name of the application without the leading !.</definition>
+      <definition name="_ConfigHelp">The interactive help text of the icon. It should follow the form given in <reference type="subsection" name="Interactive help"/>. A generic string is used if the token is absent.</definition>
+      <definition name="_ConfigSprite">The name of the sprite for the icon. The sprite is taken from the Wimp sprite pool. Defaults to the name of the application including the !.</definition>
+     </definition-table>
+    </p>
+    <p>
+     To make the sprite available, the controlling application runs
+     <code type="format">*IconSprites</code> on the file <filename>CoSprite</filename> within the
+     plug-in (or <filename>CoSprite22</filename> and so on, following the
+     usual conventions for sprite files). To avoid clashes with other sprites
+     in the pool, the names of sprites within these files begin with the three
+     characters <code type="format">co_</code>.
+    </p>
+    <p>
+     A plug-in will normally also have a <filename>!Sprites</filename> (or
+     <filename>!Sprites22</filename> and so on) file and, optionally, a
+     <filename>!Boot</filename> file, for the case where it is used as a
+     stand-alone application. Plug-ins are not normally booted by the Filer
+     unless a directory display is opened for the configuration directory,
+     which saves time and space in the sprite pool. The sprite for the
+     application in <filename>!Sprites</filename> should differ from that in
+     <filename>CoSprite</filename>, as the latter is not constrained to
+     68&times;68 OS units. If no better sprite is available the
+     <code type="format">!configure</code> sprite can be used.
+    </p>
+    <p>
+     A plug-in which is a group controlled by CPIShell may also use the
+     tokens described in <reference type="subsection" name="Group shell"/>.
+    </p>
+   </subsection>
+
+   <subsection title="Starting a plug-in">
+    <p>
+     The controlling application starts a plug-in with
+     <code type="format">Wimp_StartTask</code>, passing the command line described by
+     <reference type="command" name="ConfigurePlugIn"/>. The
+     <switch name="openat"/> option gives the preferred position of the
+     top-left corner of the window, in decimal OS units, relative to the
+     screen; a typical command ends
+     <code type="format">!InetSetup -openat 120 844</code>. A plug-in which is started
+     without that option (for example, because its application was
+     double-clicked in a directory display) must centre its window on the
+     screen. A plug-in which was started without <switch name="openat"/>
+     must also ignore <reference type="message" name="PlugInQuit"/>, as it
+     will not subsequently receive a <reference type="message" name="Quit"/>.
+    </p>
+    <p>
+     When the user clicks on the icon of a plug-in which is still running,
+     the controlling application sends it
+     <reference type="message" name="OpenConfigWindow"/> instead of starting
+     it again. The plug-in must reopen its window at the front of the window
+     stack, in the same position, and must make no other change, equivalent
+     to an Adjust-click on <em>Cancel</em> that leaves its state alone.
+    </p>
+    <p>
+     A plug-in is launched on behalf of a group with
+     <switch name="class"/> naming the plug-in class of the group that
+     controls it; see <reference type="subsection" name="Plug-in classes"/>.
+    </p>
+    <p>
+     Opening a particular plug-in directly, rather than the group as a whole,
+     is done by starting the group's shell with <switch name="openwith"/>.
+     If the shell is already running, the same information is passed to it in
+     <reference type="message" name="OpenConfigWindow"/>, as described there.
+    </p>
+   </subsection>
+
+   <subsection title="Plug-in classes">
+    <p>
+     Each plug-in system is identified by a <em>plug-in system descriptor</em>,
+     a 32-bit number. The descriptor identifies the group of plug-ins to which
+     the messages in <reference type="subsection" name="Quit protocol"/>
+     apply, so that a message intended for the plug-ins of one group is
+     ignored by the plug-ins of another.
+    </p>
+    <p>
+     A plug-in has a <em>class</em>, the descriptor of the group of which it
+     is a member, which it receives with the <switch name="class"/> option. A
+     group, in addition, has a <em>control class</em>, the descriptor of the
+     plug-ins which it controls, which it receives with the
+     <switch name="control"/> option. The group sends the control class in the
+     messages that it broadcasts for its members, and passes it to each of
+     them as their class. The root application is the controller of the main
+     plug-in system, and uses the descriptor &hex;50DBF as its control class.
+    </p>
+    <p>
+     Descriptors are allocated within the same chunk of numbers as the Wimp
+     messages of the protocol, which starts at &hex;50D80. The values in use are:
+    </p>
+    <p>
+     <value-table head-number="Descriptor" head-value="Plug-in system">
+      <value number="&hex;50DBF">The main Configure plug-in system (the root application)</value>
+      <value number="&hex;50DBE">Boot configuration</value>
+      <value number="&hex;50DBD">Fonts configuration, and the font merge dialogue</value>
+      <value number="&hex;50DBC">Network configuration</value>
+      <value number="&hex;50DBB">Sound configuration</value>
+      <value number="&hex;50DBA">Disc configuration</value>
+      <value number="&hex;50DB9">Display configuration</value>
+      <value number="&hex;50DB7">Extension configuration</value>
+      <value number="&hex;50DB5">Window configuration</value>
+      <value number="&hex;50DB4">User configuration</value>
+      <value number="&hex;50DB3">Input configuration</value>
+     </value-table>
+    </p>
+    <p>
+     Other values may be used for new groups, but must be kept within the
+     range of numbers allocated for Configure. The same descriptor field is
+     used in the messages so that the quit messages may be used by tasks which
+     are not plug-ins of Configure: a task which does not recognise the
+     descriptor must ignore the message.
+    </p>
+   </subsection>
+
+   <subsection title="Locking and failed writes">
+    <p>
+     Only the root application tests whether the machine is in a state which
+     allows its configuration to be changed. A plug-in does not repeat that
+     test. Since plug-ins are normally reached only through the root
+     application, which will not start them if the machine cannot be
+     configured, this is sufficient.
+    </p>
+    <p>
+     A plug-in can also be started directly, by double-clicking its
+     application. For that case a plug-in must not report an error if it
+     fails to write to disc or to CMOS RAM. It must, however, still apply the
+     settings for the current session. This allows a knowledgeable user to
+     alter the operation of a locked machine, for example the mouse speed or
+     the filename width of the Filer, when no other interface is available.
+    </p>
+    <p>
+     The Lock plug-in cooperates with the root application to change the
+     state of FSLock, using the messages described in
+     <reference type="subsection" name="Lock protocol"/>.
+    </p>
+   </subsection>
+
+   <subsection title="Quit protocol">
+    <p>
+     The root application must close its plug-ins when its main window is
+     closed, or when FSLock is activated. A plug-in whose selections would be
+     difficult or time-consuming to repeat, such as an editor for the boot
+     sequence, should be able to object. The existing
+     <reference type="message" name="PreQuit"/> mechanism cannot be used to
+     warn these plug-ins, because it can only close a single task or the
+     entire desktop and cannot restart the closing process if the user
+     decides to proceed. The quit protocol is used instead, and is also used
+     between a group and its members.
+    </p>
+    <p>
+     The sequence is as follows.
+    </p>
+    <p>
+     <list type="ordered">
+      <item><p>The controller receives a request to close its window, a
+      <reference type="message" name="PlugInQuitContinue"/> from a plug-in that
+      has finished its confirmation, or (for the root application) a
+      <reference type="message" name="FSLockStateChangeRequest"/> for lock
+      status 2. It broadcasts <reference type="message" name="PlugInQuit"/>,
+      using event type 18 (recorded delivery), with its control class in the
+      plug-in system descriptor.</p></item>
+      <item><p>A plug-in which has the same class, has modified data and has
+      not yet been told to proceed, claims the message so that it is not
+      returned to the sender, and asks the user whether to discard, cancel or
+      set the data. This may take several calls to <code type="format">Wimp_Poll</code>.</p></item>
+      <item><p>If the user chooses to discard or to set, the plug-in sends
+      <reference type="message" name="PlugInQuitContinue"/> to the task which
+      sent <reference type="message" name="PlugInQuit"/>, and will no longer
+      object. The controller then repeats step 1, so that other plug-ins have
+      their turn.</p></item>
+      <item><p>If the user chooses to cancel, the plug-in broadcasts
+      <reference type="message" name="PlugInQuitAbort"/>. Every plug-in which
+      receives the message with a matching descriptor sets its objection
+      state ready for the next time. The quit process stops.</p></item>
+      <item><p>If no plug-in claims the message, the Wimp returns it to the
+      controller. The controller then sends
+      <reference type="message" name="Quit"/> to each of its plug-ins
+      individually. The Lock plug-in is not sent the message when the closure
+      was the result of locking.</p></item>
+     </list>
+    </p>
+    <p>
+     When the closure was caused by a group, rather than the root application,
+     the process is the same, except that the group sends
+     <reference type="message" name="PlugInQuit"/> with a flags word, which
+     says whether the user clicked <em>Set</em> or <em>Cancel</em>. A plug-in
+     told that <em>Set</em> was clicked can assume that the user wants its
+     data set, and so does not need to display the dialogue box asking
+     whether to discard, cancel or set it. A group which has been
+     asked to close, and which has members that object, is responsible for
+     itself objecting in the same manner, and for forwarding the quit to its
+     members once they have no further objection.
+    </p>
+    <p>
+     A plug-in which wishes to be able to object must, in addition to handling
+     <reference type="message" name="PreQuit"/> in the usual way, behave as
+     shown in <reference type="subsection" name="Handling the quit protocol"/>.
+    </p>
+    <p>
+     When a plug-in is closed with <reference type="message" name="PreQuit"/>
+     and flag bit 0 is set (a closure of the single task, for example from the
+     Task Manager), a group which has members still open claims the message
+     and tells its members to quit as if <em>Cancel</em> had been clicked. The
+     group's own closure is then the result of the
+     <reference type="message" name="Quit"/> which follows. A closure of the
+     entire desktop is not intercepted.
+    </p>
+   </subsection>
+
+   <subsection title="Lock protocol">
+    <p>
+     The Lock plug-in and the root application have a private protocol, used
+     to change the state of FSLock; other tasks must ignore these messages.
+     The Lock plug-in broadcasts
+     <reference type="message" name="FSLockStateChangeRequest"/> with the new
+     lock status (0, 1 or 2). If the new status is 2, the root application
+     quits all of the other plug-ins, using the quit protocol, and fades their
+     icons in the main window. If none of them objects, the root application
+     broadcasts <reference type="message" name="FSLockStateChangeConfirm"/>
+     to the Lock plug-in, which then applies the new status. The confirmation
+     is never sent if one of the plug-ins objected to being closed. The Lock
+     plug-in announces the completed change to every instance of itself with
+     <reference type="message" name="FSLockStateChanged"/>, so that their
+     windows can be updated.
+    </p>
+    <p>
+     The status values are 0 (permanently unlocked), 1 (temporarily unlocked)
+     and 2 (locked).
+    </p>
+   </subsection>
+
+   <subsection title="Handling the quit protocol">
+    <p>
+     A plug-in which can object to being quit maintains two flags: a
+     <em>complain</em> flag, which is set when the plug-in is initialised, and
+     a <em>modified</em> flag, which is set when its selections differ from
+     the configured values. It responds to the messages as follows.
+    </p>
+    <p>
+     <extended-example type="pseudo">
+      When <reference type="message" name="PlugInQuit"/> is received with a descriptor equal to our class:<br/>
+      &nbsp;&nbsp;If complain and modified are both set:<br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;Acknowledge the message, so that it is not returned to the sender<br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;Ask the user whether to Discard, Cancel or Set the data<br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;If Discard or Set was chosen:<br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Clear complain<br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Send <reference type="message" name="PlugInQuitContinue"/> to the sender of <reference type="message" name="PlugInQuit"/><br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;Otherwise (Cancel was chosen):<br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Broadcast <reference type="message" name="PlugInQuitAbort"/><br/>
+      <br/>
+      When <reference type="message" name="PlugInQuitAbort"/> is received with a descriptor equal to our class:<br/>
+      &nbsp;&nbsp;Set complain, ready for the next time
+     </extended-example>
+    </p>
+    <p>
+     The message is acknowledged by sending it back to the task which sent it
+     as a Wimp user message acknowledgement (event type 19), with the
+     <code type="format">your_ref</code> field set to the <code type="format">my_ref</code> of the message.
+     A plug-in which is told that the user clicked <em>Set</em>, in the flags
+     word, sets its data without displaying the dialogue box, and objects
+     only if it cannot do so; it reports that error itself. If the plug-in was
+     started without <switch name="openat"/> it ignores the message.
+    </p>
+   </subsection>
+
+   <subsection title="Group shell">
+    <p>
+     CPIShell is the application which implements a group of plug-ins. A group
+     consists of the shell and a directory containing the application
+     directories of its members. The shell displays the members in a window
+     in the manner of the main window, starts them in the way that the root
+     application does and takes part in the quit protocol on their behalf. It
+     is started with the command line described in
+     <reference type="command" name="CPIShell"/>.
+    </p>
+    <p>
+     The messages file of the application which uses the shell (the directory
+     named by <switch name="msgdir"/>) may supply the following tokens.
+    </p>
+    <p>
+     <definition-table head-name="Token" head-value="Meaning">
+      <definition name="_ConfigWindowTitle">The title of the window of the group.</definition>
+      <definition name="_ConfigSetMessage">A message which is displayed when the <em>Set</em> button is clicked. It may be used to give a warning about the details that have been configured.</definition>
+     </definition-table>
+    </p>
+    <p>
+     In addition to the tokens in
+     <reference type="subsection" name="Plug-in resources"/>, the messages
+     file of a member may supply the following tokens.
+    </p>
+    <p>
+     <definition-table head-name="Token" head-value="Meaning">
+      <definition name="_FadeIfVariable">The plug-in is faded depending on the state of a system variable. The value is a name preceded by + (fade if the variable is set) or - (fade if the variable is not set).</definition>
+      <definition name="_FadeIfModule">As for _FadeIfVariable, but the plug-in is faded depending on whether a module is present (+) or absent (-).</definition>
+      <definition name="_FadeIfPodule">As for _FadeIfVariable, but the value is the product type of a podule, and the plug-in is faded if the podule is present (+) or absent (-).</definition>
+      <definition name="_FadeIfFile">As for _FadeIfVariable, but the plug-in is faded depending on whether a file is present (+) or absent (-).</definition>
+      <definition name="_ConfigHelpFaded">The help message of the icon of a plug-in which has been faded.</definition>
+      <definition name="_ConfigHidden">If the token is present, with any value, the plug-in is not included in the list. A hidden plug-in is not shown at all, unlike a faded plug-in. It is only useful to hide configuration which would otherwise conflict with a later version of the operating system.</definition>
+      <definition name="_ConfigMaxOSVersion">A three-digit version of the operating system. If the version given by <sysvar>Boot$OSVersion</sysvar> exceeds this value, the plug-in is hidden. The final digit of the system variable is always zero, so a component which applies to RISC OS 4.00 only has the value 400.</definition>
+      <definition name="_ConfigOSVersion">The three-digit operating system version to which a plug-in applies. It determines the directory into which the plug-in is installed; see <reference type="subsection" name="Installing a plug-in"/>.</definition>
+     </definition-table>
+    </p>
+    <p>
+     The values of _FadeIfVariable and _FadeIfModule may combine several
+     conditions with the conjunctions <code type="format">&amp;</code> (logical AND) and
+     <code type="format">|</code> (logical OR). The conjunctions must be separated from the
+     conditions by spaces, and cannot be nested. For example,
+    </p>
+    <p>
+     <extended-example type="format">_FadeIfModule:-SCSI &amp; -SCSIFS</extended-example>
+    </p>
+    <p>
+     fades the plug-in if neither the SCSI module nor the SCSIFS module is
+     present.
+    </p>
+   </subsection>
+
+   <subsection title="Installing a plug-in">
+    <p>
+     A new plug-in can be added to a group by dragging its application
+     directory to the window of the group. An application is accepted as a
+     plug-in only if its messages file contains a <code type="format">_ConfigSprite</code>
+     token. If it does not, the user is told that the application cannot be
+     installed, or is warned that installation may have undefined results.
+    </p>
+    <p>
+     The destination within the configuration structure depends upon the
+     <code type="format">_ConfigOSVersion</code> token in the messages file of the plug-in.
+     If the token is absent the plug-in is installed into the
+     <filename>RO400Hook</filename> directory, for compatibility with earlier
+     versions of the operating system. Most commonly the value is 420 or 400.
+    </p>
+   </subsection>
+
+   <subsection title="Installer module">
+    <p>
+     The Installer module provides the operations used to install files into
+     the boot structure, through a number of star commands, so that they can
+     be used in an Obey file as an installation script. The module ensures
+     that backups and logs are kept for every change, that modules are compared
+     correctly, that the font messages files are updated, and that the version
+     directories of !System are maintained.
+    </p>
+    <p>
+     The module recognises the following kinds of object. It installs one
+     object at a time; it does not install an entire directory in a single
+     command.
+    </p>
+    <p>
+     <definition-table head-name="Object" head-value="Meaning">
+      <definition name="Font">A compound object, consisting of all the files (of any file type) in one directory, one of which has a name beginning <code type="format">IntMet</code>. The font is referred to by the directory, for example <filename>Resources:$.Fonts.Homerton.Medium</filename>.</definition>
+      <definition name="Module">A file of type &hex;FFA.</definition>
+      <definition name="Obeyfile">A file of type &hex;FEB (Obey), &hex;FD7 (TaskObey) or &hex;FEA (Desktop).</definition>
+      <definition name="Datafile">Any other file, typed or untyped.</definition>
+     </definition-table>
+    </p>
+
+    <p>
+     <em>Backups and logs.</em> The commands which replace or remove a file
+     first copy it to a backup directory, and then append a record of the
+     operation to a log file. Both are held below the directory selected with
+     <reference type="command" name="Install_LogDir"/>: the log file is called
+     <filename>Log</filename>, and a file which has the path
+     <code type="format">path</code> relative to the log directory is backed up at
+     <code type="format">path</code> relative to its <filename>Backup</filename> directory.
+     The log directory must therefore be higher in the hierarchy than any
+     file to be installed, or the file cannot be backed up. When no log
+     directory is defined the log data is written to the screen. For a module,
+     the version number multiplied by 100 is appended to the name of the file
+     in the backup directory, and the version is given in the log.
+    </p>
+
+    <p>
+     <em>Newness.</em> <reference type="command" name="Install_Update"/>
+     replaces a file only if the source is newer than the destination. If both
+     files are modules, the version numbers are compared, and if they are
+     equal, the datestamps of the files. Otherwise the datestamps of the files
+     are compared, with the following special cases: an untyped file has the
+     datestamp of the beginning of time; a font has the most recent datestamp
+     of the files in its directory (not recursively); a directory has the most
+     recent datestamp of the files within it (recursively); and where there
+     is nothing at the destination, but it is located below a file rather than
+     a directory, the datestamp of that file is used.
+    </p>
+    <p>
+     When fonts are installed or removed, the messages files in the first
+     <filename>!Fonts</filename> directory above the destination are updated.
+     For each new font family a default face is selected, in order of
+     preference: none (regular), Medium, Book, Light, Demi, Bold, Heavy and
+     Black, followed by the Oblique and then the Italic versions of the same.
+    </p>
+    <p>
+     When files in the Encodings directory of a fonts directory are changed
+     the messages files are not updated, as the module cannot know that the
+     files are within a fonts directory. To rebuild them, the caller should
+     wipe <filename>!Fonts.Messages#</filename> and then install a font, which
+     causes a new messages file for the current territory to be built, including
+     the encodings. Aliases in the messages file of a source font are not copied
+     to the destination file. When a complete !Fonts directory is removed, the
+     backup copies of the messages files may be incomplete, because the file
+     is updated as each font is removed.
+     A font face which has been removed as a font directory is no longer
+     recognised as a font by a later request to remove it, which then removes
+     the hierarchy below it as well.
+    </p>
+
+    <p>
+     <em>Obeyfile entries.</em> An obeyfile which can be merged is made up
+     of entries, each of which has the form:
+    </p>
+    <p>
+     <extended-example type="format">
+      |Start company application version section<br/>
+      ...assorted * commands...<br/>
+      |End
+     </extended-example>
+    </p>
+    <p>
+     Only the first word of the section name is significant. The company,
+     application and section are matched without regard to case. A non-empty
+     entry must always have a version number of at least 0.01. The comment
+     <code type="format">|Variable</code>, within an entry, causes an existing entry of the
+     same version to be overwritten.
+    </p>
+   </subsection>
+
+   <subsection title="Merging obeyfiles">
+    <p>
+     <reference type="command" name="Install_Merge"/> combines the entries of
+     a <em>base</em> obeyfile and a <em>changes</em> obeyfile into a
+     destination file. The entries of the changes file are merged into the
+     base file one by one:
+    </p>
+    <p>
+     <list type="ordered">
+      <item><p>The base file is scanned for the first entry with the same
+      section. If there is none, the first applicable rule is used to decide
+      where the new section is placed. If no rule applies, the default
+      rule <code type="format">*&gt;*</code> is used.</p></item>
+      <item><p>The consecutive entries with that section are scanned for the first with the same company, and if none is found the rules are used in the same way.</p></item>
+      <item><p>The consecutive entries with that section and company are
+      scanned for one with the same application. If none is found, the rules
+      are used again. If there is one, the version numbers are compared: if the
+      new entry has a matching or earlier version, the entry of the base file
+      is kept, and otherwise the entry from the changes file is used.</p></item>
+     </list>
+    </p>
+    <p>
+     The changes file may contain positioning rules. A rule is a one-line
+     entry beginning with <code type="format">|Section</code>, <code type="format">|Company</code> or
+     <code type="format">|App</code>, with the form
+    </p>
+    <p>
+     <extended-example type="format">|[Section|Company|App] rule [rule [rule ...]]</extended-example>
+    </p>
+    <p>
+     where each <em>rule</em> is either <code type="format">specifier&gt;specifier</code>,
+     meaning that the item on the left is created after the item on the
+     right, or <code type="format">specifier&lt;specifier</code>, meaning that it is created
+     before it. There must be no spaces within a rule. A <em>specifier</em>
+     is a single word naming a section, company or application, without regard
+     to case, or <code type="format">*</code>. On the left, <code type="format">*</code> means any
+     specifier, and on the right it means all of them. The rules are applied
+     from the first appropriate line of the file to the last, and from left to
+     right within each line.
+    </p>
+    <p>
+     <reference type="command" name="Install_DeMerge"/> performs the reverse
+     operation, removing entries from the base file.
+    </p>
+   </subsection>
+  </section>
+
+  <section title="Wimp Messages">
+   <p>
+    The messages of the protocol have numbers in the chunk starting at
+    &hex;50D80. In every message the plug-in system descriptor is a number
+    identifying the plug-in system for which the message is intended; see
+    <reference type="subsection" name="Plug-in classes"/>. A task which
+    receives a message and does not recognise the descriptor must ignore
+    the message.
+   </p>
+
+   <message-definition name="PlugInQuit" number="50D80"
+                       description="Warn the plug-ins of a system that they are about to be quit"
+                       broadcast="must" recorded="must">
+    <message-table>
+     <message offset="0" data-size="4" name="size">24, or more to indicate that further data is present</message>
+     <message offset="12" data-size="4" name="your_ref">0</message>
+     <message offset="16" data-size="4" name="action">&hex;50D80</message>
+     <message offset="20" data-size="4" name="descriptor">plug-in system descriptor of the plug-ins which are to be quit</message>
+     <message offset="24" data-size="4" name="flags">flags (present if the message size is more than 24; the message is sent in a form which does not include the flags if the sender does not distinguish Set from Cancel)
+      <bitfield-table>
+       <bit number="0" name="Set" state="clear">the user clicked Cancel, or the quit was not initiated by a click</bit>
+       <bit number="0" name="Set" state="set">the user clicked Set</bit>
+       <bit number="1-31" state="reserved">Reserved, and must be ignored</bit>
+      </bitfield-table>
+     </message>
+    </message-table>
+    <use>
+     <p>
+      This message is broadcast by the controlling application of a plug-in
+      system (the root application, or a group of plug-ins) to tell its
+      plug-ins that they are about to be quit, unless one of them objects. It
+      is sent as recorded delivery, using event type 18, so that if no task
+      claims it the Wimp returns it to the sender. The sender then closes its
+      plug-ins using <reference type="message" name="Quit"/>.
+     </p>
+     <p>
+      A plug-in which does not recognise the descriptor must ignore the
+      message. A plug-in which was started without the
+      <switch name="openat"/> option must ignore it, as it will not receive a
+      following <reference type="message" name="Quit"/>.
+     </p>
+     <p>
+      The behaviour expected of a plug-in is described in
+      <reference type="subsection" name="Quit protocol"/> and in
+      <reference type="subsection" name="Handling the quit protocol"/>.
+     </p>
+    </use>
+    <related>
+     <reference type="message" name="PlugInQuitContinue"/>
+     <reference type="message" name="PlugInQuitAbort"/>
+     <reference type="subsection" name="Quit protocol"/>
+    </related>
+   </message-definition>
+
+   <message-definition name="PlugInQuitContinue" number="50D81"
+                       description="Resume the quitting process after a plug-in has no further objection">
+    <message-table>
+     <message offset="0" data-size="4" name="size">24</message>
+     <message offset="12" data-size="4" name="your_ref">0</message>
+     <message offset="16" data-size="4" name="action">&hex;50D81</message>
+     <message offset="20" data-size="4" name="descriptor">plug-in system descriptor of the plug-in which sends the message</message>
+    </message-table>
+    <use>
+     <p>
+      This message is sent by a plug-in, directly to the task which
+      broadcast <reference type="message" name="PlugInQuit"/>, to tell it to
+      resume the quitting process. The plug-in sends it when it has halted the
+      process in order to ask the user for confirmation, and the user has
+      chosen to discard or set the data.
+     </p>
+     <p>
+      The plug-in must fill in the descriptor correctly. If it does not, the
+      controlling application will ignore the message, or may take the wrong
+      subsequent action.
+     </p>
+    </use>
+    <related>
+     <reference type="message" name="PlugInQuit"/>
+     <reference type="subsection" name="Quit protocol"/>
+    </related>
+   </message-definition>
+
+   <message-definition name="PlugInQuitAbort" number="50D82"
+                       description="Tell plug-ins that the quitting process has been aborted"
+                       broadcast="must">
+    <message-table>
+     <message offset="0" data-size="4" name="size">24</message>
+     <message offset="12" data-size="4" name="your_ref">0</message>
+     <message offset="16" data-size="4" name="action">&hex;50D82</message>
+     <message offset="20" data-size="4" name="descriptor">plug-in system descriptor of the plug-in which sends the message</message>
+    </message-table>
+    <use>
+     <p>
+      This message is broadcast by a plug-in when the user has decided to
+      cancel the quitting process. It allows the other plug-ins to know that
+      the process has been aborted, so that they reset their internal
+      <em>complain</em> flag, and can object again to a later request to quit.
+      A plug-in which receives it resets the flag if the descriptor is its own
+      class, or if it controls the group with that descriptor. A task which
+      does not recognise the descriptor must ignore the message.
+     </p>
+     <p>
+      The controlling application broadcasts the message with its own
+      descriptor before it starts a new quit process, in case the last one has
+      not finished.
+     </p>
+    </use>
+    <related>
+     <reference type="message" name="PlugInQuit"/>
+     <reference type="subsection" name="Quit protocol"/>
+    </related>
+   </message-definition>
+
+   <message-definition name="OpenConfigWindow" number="50D83"
+                       description="Reopen the window of a plug-in at the front of the window stack">
+    <message-table>
+     <message offset="0" data-size="4" name="size">20 for a plain request, or at least 24 with a component name</message>
+     <message offset="12" data-size="4" name="your_ref">0</message>
+     <message offset="16" data-size="4" name="action">&hex;50D83</message>
+     <message offset="20" data-size="4" name="descriptor">plug-in system descriptor (only present if the size is more than 24)</message>
+     <message offset="24" data-size="0" name="component">zero-terminated string naming a component to open, optionally followed by a space and parameters (only present if the size is more than 24)</message>
+    </message-table>
+    <use>
+     <p>
+      This message is sent by the controlling application when the user clicks
+      on the icon of a plug-in whose task is still running. The plug-in must
+      reopen its window at the front of the window stack, in the same x and y
+      position, and must not make any other change to the window or its
+      selections.
+     </p>
+     <p>
+      The message may be sent to a group of plug-ins with a component name,
+      when a request is made to open a particular member (see the
+      <switch name="openwith"/> option of <reference type="command" name="CPIShell"/>).
+      If the message is larger than 24 bytes, the descriptor must be that of
+      the group, and is followed at offset 24 by a name of the form
+      <code type="format">plugin</code> or <code type="format">plugin.component</code>, which is the name
+      of the member to open and, if given, the member of that member. Any
+      parameters for the member follow the name, separated by a space. The
+      message must be padded to a multiple of four bytes, and the whole
+      message must fit within the 256 bytes of a Wimp message. If the
+      descriptor does not match, the component is ignored and the window is
+      reopened as for the plain form.
+     </p>
+    </use>
+    <related>
+     <reference type="subsection" name="Starting a plug-in"/>
+    </related>
+   </message-definition>
+
+   <message-definition name="FSLockStateChangeRequest" number="50D84"
+                       description="The Lock plug-in requests a change of FSLock state"
+                       broadcast="must">
+    <message-table>
+     <message offset="0" data-size="4" name="size">24</message>
+     <message offset="12" data-size="4" name="your_ref">0</message>
+     <message offset="16" data-size="4" name="action">&hex;50D84</message>
+     <message offset="20" data-size="4" name="status">new lock status: 0, 1 or 2</message>
+    </message-table>
+    <use>
+     <p>
+      This message is broadcast by the Lock plug-in for the attention of the
+      root application. Other tasks must ignore it. If the new status is 2,
+      the root application quits all the other plug-ins, using
+      <reference type="message" name="PlugInQuit"/>, and fades their icons in
+      the main window. The plug-ins may object using the quit protocol.
+     </p>
+    </use>
+    <related>
+     <reference type="message" name="FSLockStateChangeConfirm"/>
+     <reference type="subsection" name="Lock protocol"/>
+    </related>
+   </message-definition>
+
+   <message-definition name="FSLockStateChangeConfirm" number="50D85"
+                       description="The root application confirms the change of FSLock state"
+                       broadcast="must">
+    <message-table>
+     <message offset="0" data-size="4" name="size">20</message>
+     <message offset="12" data-size="4" name="your_ref">0</message>
+     <message offset="16" data-size="4" name="action">&hex;50D85</message>
+    </message-table>
+    <use>
+     <p>
+      This message is broadcast by the root application, for the Lock
+      plug-in, to confirm that the change of state may be made. It is not sent
+      if one of the other plug-ins objected to being closed.
+     </p>
+    </use>
+    <related>
+     <reference type="message" name="FSLockStateChangeRequest"/>
+     <reference type="subsection" name="Lock protocol"/>
+    </related>
+   </message-definition>
+
+   <message-definition name="FSLockStateChanged" number="50D86"
+                       description="The FSLock state has been changed"
+                       broadcast="must">
+    <message-table>
+     <message offset="0" data-size="4" name="size">20</message>
+     <message offset="12" data-size="4" name="your_ref">0</message>
+     <message offset="16" data-size="4" name="action">&hex;50D86</message>
+    </message-table>
+    <use>
+     <p>
+      This message is broadcast by the Lock plug-in to announce that the state
+      of FSLock has been changed. It allows several instances of the Lock
+      plug-in to update their windows at the same time.
+     </p>
+    </use>
+    <related>
+     <reference type="message" name="FSLockStateChangeConfirm"/>
+     <reference type="subsection" name="Lock protocol"/>
+    </related>
+   </message-definition>
+  </section>
+
+  <section title="Commands">
+   <p>
+    The first two commands are the command lines with which the applications
+    of the plug-in system are run. They are not star commands; they are
+    given to <code type="format">Wimp_StartTask</code> or the <code type="format">Run</code> command,
+    in the form
+    <code type="format">&lt;directory&gt;.!Run options</code>. The remainder are star commands
+    provided by the Installer module.
+   </p>
+
+   <command-definition name="ConfigurePlugIn"
+                       description="Run a configuration plug-in application">
+    <syntax><text>!Run </text><optional><switch name="openat"><userreplace>x</userreplace> <userreplace>y</userreplace></switch></optional><text> </text><optional><switch name="class"><userreplace>class</userreplace></switch></optional><text> </text><optional><switch name="openwith"><userreplace>component</userreplace></switch></optional></syntax>
+    <parameter switch="openat" name="x y">Position of the top-left corner of the window, in decimal OS units.</parameter>
+    <parameter switch="class" name="class">The plug-in system descriptor of the group of which the plug-in is a member, in hexadecimal.</parameter>
+    <parameter switch="openwith" name="component">Name of a component to open when the plug-in is a group. The parameters for that component may follow, separated by a space.</parameter>
+    <use>
+     <p>
+      The controlling application runs a plug-in in this way. A plug-in which
+      does not receive <switch name="openat"/> must centre its window on the
+      screen, and must not respond to
+      <reference type="message" name="PlugInQuit"/>. The positions are
+      measured from the origin of the screen. A plug-in which does not receive
+      <switch name="class"/> has no class, and ignores the messages of the quit
+      protocol.
+     </p>
+    </use>
+    <related>
+     <reference type="subsection" name="Starting a plug-in"/>
+     <reference type="subsection" name="Plug-in classes"/>
+    </related>
+   </command-definition>
+
+   <command-definition name="CPIShell"
+                       description="Run a group of configuration plug-ins">
+    <syntax><text>!Run </text><switch name="dir"><userreplace>directory</userreplace></switch><text> </text><optional><switch name="msgdir"><userreplace>messages directory</userreplace></switch></optional><text> </text><optional><switch name="openat"><userreplace>x</userreplace> <userreplace>y</userreplace></switch></optional><text> </text><optional><switch name="control"><userreplace>control class</userreplace></switch></optional><text> </text><optional><switch name="class"><userreplace>our class</userreplace></switch></optional><text> </text><optional><switch name="openwith"><userreplace>component</userreplace></switch></optional><text> </text><optional><switch name="openwithparams"><userreplace>parameters</userreplace></switch></optional></syntax>
+    <parameter switch="dir" name="directory">Directory in which to search for the plug-ins to display.</parameter>
+    <parameter switch="msgdir" name="messages directory">Directory containing the messages file for this group; see <reference type="subsection" name="Group shell"/>.</parameter>
+    <parameter switch="openat" name="x y">Position of the top-left corner of the window; see <reference type="command" name="ConfigurePlugIn"/>.</parameter>
+    <parameter switch="control" name="control class">The plug-in system descriptor of the plug-ins which the group controls, in hexadecimal. This is the descriptor sent in the quit messages for the members, and is passed to them as their class. Defaults to &hex;50DBF.</parameter>
+    <parameter switch="class" name="our class">The plug-in system descriptor of the group of which this group is a member, in hexadecimal.</parameter>
+    <parameter switch="openwith" name="component">Open with a particular component displayed. The name is that of the application directory of the member, optionally followed by a dot and the name of one of its own members, for example <code type="format">ScrnSetup.SvrSetup</code> to open the screen saver plug-in.</parameter>
+    <parameter switch="openwithparams" name="parameters">Parameters to use when opening the component named by <switch name="openwith"/>; for example <code type="format">-from ADFS::$.Some.Path.!Boot</code> to give the Boot installation plug-in a source directory.</parameter>
+    <parameter switch="root">Run as the root application, using the configuration directory <filename>BootResources:Configure</filename>.</parameter>
+    <use>
+     <p>
+      The shell presents the plug-ins found in the directory as a window of
+      icons, which can be opened in the same way as those of the root
+      application. Only one instance of the root application may run at any
+      time. If the root application is already running when a second is
+      started, the second sends <reference type="message" name="OpenConfigWindow"/>
+      to the first, with the component given by <switch name="openwith"/> and
+      its parameters, and then exits.
+     </p>
+    </use>
+    <example>
+     <command>Run &lt;ConfigPluginShell$Dir&gt;.!Run -dir &lt;Boot$Dir&gt;.Resources.Configure.!BootSetup -msgdir &lt;Boot$Dir&gt;.Resources.Configure.!BootSetup -openat 120 844 -control 50DBE -class 50DBF</command>
+     <command>Run &lt;ConfigPluginShell$Dir&gt;.!Run -root -openwith BootSetup.BootMerge -openwithparams "-from ADFS::$.Some.Path.!Boot"</command>
+    </example>
+    <related>
+     <reference type="subsection" name="Group shell"/>
+     <reference type="subsection" name="Plug-in classes"/>
+    </related>
+   </command-definition>
+
+   <command-definition name="Install_LogDir"
+                       description="Set the directory for the log file and backups">
+    <syntax><text>*Install_LogDir </text><optional><userreplace>directory</userreplace></optional></syntax>
+    <parameter name="directory">The new log directory.</parameter>
+    <use>
+     <p>
+      Defines the directory into which the Installer module writes the log
+      file, called <filename>Log</filename>, and builds the backup tree. Backed-up
+      files have the same path relative to <code type="format">directory.Backup</code> as they
+      had relative to <code type="format">directory</code>. The directory must therefore be
+      higher up the hierarchy than any file which is to be installed or
+      removed, or the file cannot be backed up.
+     </p>
+     <p>
+      The log directory is undefined by default, so the command is normally
+      used at the beginning of an installation script. If no argument is given
+      the current log directory is printed.
+     </p>
+    </use>
+    <related>
+     <reference type="command" name="Install_NoLogDir"/>
+    </related>
+   </command-definition>
+
+   <command-definition name="Install_NoLogDir"
+                       description="Forget the log directory">
+    <syntax><text>*Install_NoLogDir</text></syntax>
+    <use>
+     <p>
+      Undefines the log directory. The command is normally used at the end of
+      an installation script. While there is no log directory, the data for the
+      log file is written to the screen.
+     </p>
+    </use>
+    <related>
+     <reference type="command" name="Install_LogDir"/>
+    </related>
+   </command-definition>
+
+   <command-definition name="Install_Update"
+                       description="Install a file if it is newer than the destination">
+    <syntax><text>*Install_Update </text><userreplace>source_file</userreplace><text> </text><userreplace>dest_file</userreplace></syntax>
+    <parameter name="source_file">The file to install.</parameter>
+    <parameter name="dest_file">The file to be replaced.</parameter>
+    <use>
+     <p>
+      Copies <code type="format">source_file</code> to <code type="format">dest_file</code> if the source is
+      newer than the destination. The rules which determine newness are given
+      in <reference type="subsection" name="Installer module"/>. A file which is
+      overwritten is first copied into the backup directory, and the details
+      of the operation are appended to the log file. For a font, the messages
+      files in the first application directory above <code type="format">dest_file</code> are
+      updated to include the new font.
+     </p>
+    </use>
+    <related>
+     <reference type="command" name="Install_Remove"/>
+    </related>
+   </command-definition>
+
+   <command-definition name="Install_Remove"
+                       description="Back up and remove a file or directory">
+    <syntax><text>*Install_Remove </text><userreplace>file</userreplace></syntax>
+    <parameter name="file">The file or directory to remove.</parameter>
+    <use>
+     <p>
+      Moves the file to its backup directory, and appends the details of the
+      operation to the log file. A file of the same name which is already in
+      the backup directory is first deleted. For a module, the version number
+      multiplied by 100 is appended to the name of the file in the backup
+      directory, and the version is mentioned in the log. For a font, the
+      messages files in the first fonts directory above the file are updated to
+      reflect its removal.
+     </p>
+    </use>
+    <related>
+     <reference type="command" name="Install_Update"/>
+    </related>
+   </command-definition>
+
+   <command-definition name="Install_Merge"
+                       description="Merge the entries of two obeyfiles">
+    <syntax><text>*Install_Merge </text><userreplace>base_file</userreplace><text> </text><userreplace>changes_file</userreplace><text> </text><userreplace>dest_file</userreplace></syntax>
+    <parameter name="base_file">The base source file.</parameter>
+    <parameter name="changes_file">The changes source file.</parameter>
+    <parameter name="dest_file">The destination file. This may be the same as one of the source files.</parameter>
+    <use>
+     <p>
+      Combines the entries of two obeyfiles, placing the result in the
+      destination file. The entries of the changes file are merged one by one
+      into the base file, using the rules given in
+      <reference type="subsection" name="Merging obeyfiles"/>. If the
+      destination file is overwritten it is first copied into the backup
+      directory. Each successful entry update is listed separately in the log
+      file, with its new version number and any old version number.
+     </p>
+    </use>
+    <example>
+     <p>
+      Adding an application to those which are seen at startup, with a changes
+      file which contains the line <code type="format">|App Configure&gt;*</code>:
+     </p>
+     <command>*Install_Merge &lt;Choices$Write&gt;.Boot.PreDesktop tempfile &lt;Choices$Write&gt;.Boot.PreDesktop</command>
+     <p>
+      The section ResApps and company Acorn are assumed to exist already, as
+      part of the default file; all the other Acorn ResApps entries come
+      first.
+     </p>
+     <p>
+      Creating the section Run after the section Boot, or after Auto if Boot
+      does not yet exist, using a changes file which contains the line
+      <code type="format">|Section Run&gt;Boot Run&gt;Auto</code>:
+     </p>
+     <command>*Install_Merge &lt;Choices$Write&gt;.Boot.Desktop tempfile &lt;Choices$Write&gt;.Boot.Desktop</command>
+    </example>
+    <related>
+     <reference type="command" name="Install_DeMerge"/>
+     <reference type="subsection" name="Merging obeyfiles"/>
+    </related>
+   </command-definition>
+
+   <command-definition name="Install_DeMerge"
+                       description="Remove entries from an obeyfile">
+    <syntax><text>*Install_DeMerge </text><userreplace>base_file</userreplace><text> </text><userreplace>changes_file</userreplace><text> </text><userreplace>dest_file</userreplace></syntax>
+    <parameter name="base_file">The base source file.</parameter>
+    <parameter name="changes_file">The file whose entries identify those to be removed.</parameter>
+    <parameter name="dest_file">The destination file.</parameter>
+    <use>
+     <p>
+      Removes from the base file any entry whose section, company and
+      application match an entry in the changes file, unless the version number
+      of the entry in the base file is newer than that in the changes file.
+      The result is placed in the destination file. The changes file must
+      therefore include at least the entry headers of the most recent version
+      of each entry to be removed. If the destination file is overwritten or
+      deleted it is first copied into the backup directory, and the details of
+      the operation are appended to the log file.
+     </p>
+    </use>
+    <related>
+     <reference type="command" name="Install_Merge"/>
+    </related>
+   </command-definition>
+
+   <command-definition name="Install_CheckSystem"
+                       description="Remove modules which are masked by newer ones">
+    <syntax><text>*Install_CheckSystem</text></syntax>
+    <use>
+     <p>
+      Ensures that the versions of modules in the OS-version subdirectories
+      of <sysvar>System$Dir</sysvar> are not older than those in previous-version
+      subdirectories, or in the root Modules subdirectory. Any which are older
+      are removed in the manner of
+      <reference type="command" name="Install_Remove"/>.
+     </p>
+    </use>
+   </command-definition>
+  </section>
+
+  <section title="Examples">
+   <subsection title="Handling a request to quit">
+    <p>
+     A plug-in which edits a list of items checks, when it receives a request
+     to quit, whether its data has been modified, and asks the user what to do.
+     Only when the user chooses to cancel does it prevent the closure.
+    </p>
+    <p>
+     <extended-example type="c">
+      static int complain = 1;<br/>
+      <br/>
+      int message_plugin_quit(WimpMessage *message, void *handle)<br/>
+      {<br/>
+      &nbsp;&nbsp;if (message-&gt;data.words[0] != plugin_class)<br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;return 1; /* not for us */<br/>
+      <br/>
+      &nbsp;&nbsp;if (complain &amp;&amp; modified)<br/>
+      &nbsp;&nbsp;{<br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;/* Claim the message so that the quit is stopped for now */<br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;message-&gt;hdr.your_ref = message-&gt;hdr.my_ref;<br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;wimp_send_message(Wimp_EUserMessageAcknowledge, message,<br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;message-&gt;hdr.sender, 0, NULL);<br/>
+      <br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;/* Ask the user to Discard, Cancel or Set; for Cancel, abort */<br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;/* the quit for everyone, otherwise let the sender continue */<br/>
+      &nbsp;&nbsp;&nbsp;&nbsp;...<br/>
+      &nbsp;&nbsp;}<br/>
+      &nbsp;&nbsp;return 1;<br/>
+      }
+     </extended-example>
+    </p>
+   </subsection>
+
+   <subsection title="Opening a plug-in within a group">
+    <p>
+     To open the screen saver plug-in of the Display group and set a source
+     directory for it, the shell of the group is started with the name of the
+     component. If the shell is already running, it receives the name in
+     <reference type="message" name="OpenConfigWindow"/> instead.
+    </p>
+    <p>
+     <extended-example type="shell">
+      <userinput>Run &lt;ConfigPluginShell$Dir&gt;.!Run -root -openwith ScrnSetup.SvrSetup</userinput>
+     </extended-example>
+    </p>
+   </subsection>
+
+   <subsection title="Placing an entry before others">
+    <p>
+     To ensure that an entry for a company is placed before all of the others
+     in a section, whether or not the section exists already, the changes file
+     contains positioning rules. The first line states that the section
+     Installation is created after the section Comments, if it does not exist,
+     and the second that the company Acorn is created before all of the other
+     companies.
+    </p>
+    <p>
+     <extended-example type="format">
+      |Section Installation&gt;Comments<br/>
+      |Company Acorn&lt;*
+     </extended-example>
+    </p>
+    <p>
+     A later installer which needs to place an entry after one which may not yet
+     be present can first install an empty entry such as
+     <code type="format">Acorn Wimp 0.00 Installation</code>. If a genuine entry already
+     exists the empty one is ignored; if it is installed later, the position of
+     the empty entry overrides the default rule. This is why non-empty entries
+     must always have a version number of at least 0.01.
+    </p>
+   </subsection>
+  </section>
+ </chapter>
+
+ <meta>
+  <maintainer>
+   <email name="Charles Ferguson" address="gerph@gerph.org" />
+  </maintainer>
+  <disclaimer>
+   <p>
+    &copy; Charles Ferguson, 2026, from the original documents by Ben Avison (Acorn Computers, 1998) and the CPIShell documentation by Justin Fletcher. This documentation is provided under the MIT licence.
+   </p>
+  </disclaimer>
+
+  <history>
+   <revision number="1" author="Ben Avison" date="02 Feb 1998" title="Ursula !Configure Changes functional specification">
+    <change>Functional specification 1309,214/FS, revision C, covering the user interface of the plug-in based Configure, the plug-in protocols and the Installer module.</change>
+   </revision>
+   <revision number="2" author="Ben Avison" date="19 Jun 1998" title="Installer module 0.06">
+    <change>Installer supports the |Variable command, which causes identically-versioned entries to be overwritten.</change>
+   </revision>
+   <revision number="3" author="Justin Fletcher" date="02 Nov 2001" title="CPIShell">
+    <change>The generic plug-in shell is added, with the control and class options, nested groups of plug-ins and the open-with facility.</change>
+   </revision>
+   <revision number="4" author="Charles Ferguson" date="05 Oct 2026" title="Conversion to PRM-in-XML">
+    <change>The functional specification, the CPIShell documentation and the Installer notes are combined into a single description of the interfaces for Configure plug-ins, with the Wimp messages and commands documented as definitions.</change>
+   </revision>
+  </history>
+
+  <related>
+   <reference type="link" href="http://home.gerph.org/~charles/Reference/RISCOS/acorn/www.art.acorn.co.uk/SALES/DEVELOPERS/resource/docs/api/ursula/configure.html" name="Ursula !Configure Changes functional specification"/>
+  </related>
+ </meta>
+</riscos-prm>

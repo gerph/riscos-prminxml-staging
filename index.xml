@@ -10,7 +10,7 @@
     hide-empty="no"
     include-source="no"
     make-contents="no"
-    include-sections="yes"
+    include-sections="no"
     include-sections-depth="1"
     catalog-version="103"
     page-format='html5'
@@ -97,6 +97,9 @@
     </section>
     <section title="Programmer" dir="programmer">
         <page href="pathutils">PathUtils</page>
+    </section>
+    <section title="Boot sequence" dir="boot">
+        <page href="configure-plugins">Configure plugins</page>
     </section>
 </section>
 
