@@ -1,0 +1,2688 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="eXML">
+<section title="Introduction and Overview">
+<p>
+eXML is a RISC OS module which adds support for the XML file format to
+applications written in any language, including BBC BASIC. Existing ports of
+XML libraries have generally been C sources written by others, optimised for
+the C language, and not straightforward to call from other languages; some
+have also been withdrawn by their authors. eXML exists to give RISC OS
+software a single, dependable set of SWI calls for creating and parsing XML
+documents, without requiring a C compiler or a callback-based programming
+style.
+</p>
+<p>
+Only a subset of the full XML specification is implemented. The intention is
+to extend coverage over time, but this is not guaranteed, and several calls
+described in this chapter are only partially implemented or not yet
+implemented at all; each such call says so explicitly.
+</p>
+
+<subsection title="Approach">
+<p>
+Most existing XML libraries rely heavily on callbacks and handlers: the main
+program registers functions that the parser calls when it recognises
+something of interest. This is a natural style in C or C++, but it does not
+suit simpler languages such as BBC BASIC.
+</p>
+<p>
+eXML instead follows the same pattern as the RISC OS window manager. The
+application calls <reference type='swi' name='eXML_Parse'/> with the
+appropriate parameters, and the call exits with a return code describing
+what was found. Once the application has dealt with that return code, it
+calls <reference type='swi' name='eXML_Parse'/> again, and repeats this
+until it receives the <code type='c'>Finished</code> code, at which point it
+resumes the normal flow of the program.
+</p>
+<p>
+When handling long XML files, it may be desirable to call
+<code type='c'>Wimp_Poll</code> frequently from within the parsing loop.
+Take care when doing this: another running task may not be aware that your
+program is still in the middle of parsing a document.
+</p>
+</subsection>
+
+<subsection title="Encodings">
+<p>
+Several character encodings can be used for the data in a document. The
+eXML calls refer to these encodings by a fixed number:
+</p>
+<p>
+<value-table head-number="Number" head-value="Encoding">
+ <value number="0">UTF-8</value>
+ <value number="1">UTF-16</value>
+ <value number="2">ISO-8859-1 (Latin-1)</value>
+ <value number="3">US-ASCII</value>
+ <value number="4">MacRoman</value>
+ <value number="5">Big5</value>
+</value-table>
+</p>
+<p>
+Not every listed encoding is necessarily implemented in the current release
+of the module: selecting an unsupported encoding produces the
+<code type='c'>UnknownEncoding</code> result code from
+<reference type='swi' name='eXML_Parse'/>. Until wider encoding support is
+confirmed, use the standard Latin-1 encoding (2) for documents. UTF-8, in
+particular, though ASCII-compatible and defined in Unicode, ISO 10646-1 and
+RFC 2279, is not currently supported.
+</p>
+<p>
+Reserved characters are escaped transparently on both read and write, so
+calling code does not need to handle this itself:
+</p>
+<p>
+<definition-table head-name="Character" head-value="Escaped form">
+ <definition name="&lt; (less than)">&amp;lt;</definition>
+ <definition name="&gt; (greater than)">&amp;gt;</definition>
+ <definition name="&amp;amp; (ampersand)">&amp;amp;</definition>
+ <definition name="' (apostrophe)">&amp;apos;</definition>
+ <definition name="&quot; (quote)">&amp;quot;</definition>
+</definition-table>
+</p>
+</subsection>
+
+<subsection title="Workspace and the element stack">
+<p>
+The workspace used by the eXML module must be supplied by the calling
+application, rather than being owned by the module itself. This allows the
+module to be replaced by a newer version at any time without disturbing
+running applications, and allows several programs (or several independent
+parts of one program) to run concurrently, each with its own workspace and
+its own preferences. For example, a C or Assembler program expects strings
+to be terminated with a 0x00 byte, whereas BBC BASIC expects a 0x0D
+(Carriage Return) terminator; because each caller supplies its own
+workspace, each can select the terminator it needs without affecting any
+other caller.
+</p>
+<p>
+Within the supplied workspace, eXML keeps a stack of currently open
+elements, fixed at 1024 bytes. Each element that is opened is pushed onto
+this stack as a null-terminated string, and the module maintains pointers to
+the current element. This lets the module track the order in which elements
+are opened and closed, report an error if it finds an inconsistency (for
+example, elements closed out of order), and, when writing, close any
+elements you have left open without you having to name them individually.
+</p>
+</subsection>
+
+<subsection title="The module name 'eXML'">
+<p>
+The module is called eXML, pronounced &quot;ex-em-el&quot;, in the same way
+as the abbreviation XML. The extra leading <code type='c'>e</code> exists
+because SWI names cannot begin with the letter <code type='c'>X</code>: that
+letter is reserved as a prefix which suppresses a SWI's normal error
+handling. To trap errors from an eXML call yourself, prefix its name with
+<code type='c'>X</code> in the usual way, for example
+<userinput>SYS "XeXML_StartElement", ...</userinput>.
+</p>
+</subsection>
+
+<subsection title="Library">
+<p>
+A BBC BASIC library is supplied in the <code type='c'>!eXML</code>
+application folder. Place this folder somewhere the Filer sees at start-up,
+such as inside <code type='c'>!Boot.Resources</code>, so that programs using
+the library can find it.
+</p>
+</subsection>
+</section>
+
+<section title="Technical Details">
+<p>
+eXML offers a set of SWI calls that any application can use to create and
+parse XML files. Because the module can be dynamically replaced, and each
+caller supplies its own workspace, each application (or each routine within
+an application) can hold its own set of preferences to be honoured by eXML
+independently of any other caller.
+</p>
+<p>
+Before eXML can be used, the application must reserve a block of memory of
+suitable size for the workspace. The application requests the required size
+by calling <reference type='swi' name='eXML_InitBuffer'/> with a null
+pointer, then calls it again with a pointer to the newly claimed memory to
+initialise it to sensible defaults. Preferences are then set with
+<reference type='swi' name='eXML_SetOption'/>; for example, textual strings
+returned by the module are terminated with a 0x00 byte by default, which
+suits C or Assembler, but BASIC needs a 0x0D (Carriage Return) terminator
+instead, and <reference type='swi' name='eXML_SetOption'/> is used to change
+this.
+</p>
+<p>
+The available calls fall into four groups, described in the four SWI Calls
+sections below: calls to initialise the XML workspace, calls to read
+(parse) an XML file, calls to write an XML file, and universal calls that
+are not specifically tied to XML parsing or writing.
+</p>
+
+<subsection title="Data structures">
+<category title="Attribute array">
+<p>
+When <reference type='swi' name='eXML_Parse'/> reports a StartElement or
+Declaration, or when supplying attributes to
+<reference type='swi' name='eXML_Open'/>, <reference type='swi'
+name='eXML_StartElement'/>, or <reference type='swi'
+name='eXML_Declaration'/>, attributes are held as an array of pairs of
+pointers: a pointer to the attribute's name, followed by a pointer to its
+value. The array is terminated by a null pointer. For example, the element
+</p>
+<p>
+<extended-example type='format'>
+&lt;frame id=&quot;1&quot; name=&quot;time and date&quot;&gt;
+</extended-example>
+</p>
+<p>
+produces the following <reference type="category" name="Attribute array">attribute array</reference>:
+</p>
+<p>
+<offset-table head-number="Offset" head-data-size="Size" head-value="Contents">
+ <offset number="0" data-size="4">pointer to &quot;id&quot;</offset>
+ <offset number="4" data-size="4">pointer to &quot;1&quot;</offset>
+ <offset number="8" data-size="4">pointer to &quot;name&quot;</offset>
+ <offset number="12" data-size="4">pointer to &quot;time and date&quot;</offset>
+ <offset number="16" data-size="4" state="reserved">0 (name/value pair terminator)</offset>
+</offset-table>
+</p>
+<p>
+A pointer to an <reference type="category" name="Attribute array">attribute array</reference> is
+0 (rather than a valid pointer to an empty array) whenever no attributes
+were found, or none are to be supplied.
+</p>
+</category>
+
+<category title="Context array and context string">
+<p>
+On exit from <reference type='swi' name='eXML_Parse'/>, R3 normally points
+to a zero-terminated array of word pointers, one per currently open element,
+in the order the elements were opened - the path from the document root
+down to (but not including) the element currently being processed. If, for
+example, an element is opened while the parser is at
+<code type='c'>document/chapter/page</code>, the
+<reference type="category" name="Context array and context string">context array</reference>
+on exit looks like this:
+</p>
+<p>
+<offset-table head-number="Offset" head-data-size="Size" head-value="Contents">
+ <offset number="0" data-size="4">pointer to &quot;document&quot;</offset>
+ <offset number="4" data-size="4">pointer to &quot;chapter&quot;</offset>
+ <offset number="8" data-size="4">pointer to &quot;page&quot;</offset>
+ <offset number="12" data-size="4" state="reserved">0 (array terminator)</offset>
+</offset-table>
+</p>
+<p>
+If bit 0 of the flags word is set on entry to
+<reference type='swi' name='eXML_Parse'/>, R3 instead points to a single
+context string using the current element separator (see
+<reference type='swi' name='eXML_SetOption' reason='3' use-description='yes'/>),
+for example <code type='c'>/document/chapter/page</code>, rather than to an
+array of pointers. The name of the element currently being opened or closed
+is not included in either form of context, because at that point it is not
+yet (or is no longer) part of the context; append it yourself if you need
+the full path, eg.
+<code type='c'>context$ = context$ + &quot;/&quot; + $element%</code>.
+<reference type='swi' name='eXML_Context'/> produces the string form of the
+context on demand, at any point, without needing bit 0 of the flags word to
+have been set.
+</p>
+</category>
+
+<category title="Colour data block">
+<p>
+<reference type='swi' name='eXML_ColourOp'/> reads and writes colour values
+through a fixed-size, fixed-format data block held in memory supplied by the
+caller - either a short-lived block used purely for one conversion, or part
+of a larger structure holding several colours or other parameters. Always
+request the required size first (see
+<reference type='swi' name='eXML_ColourOp' reason='0' use-description='yes'/>),
+since it may grow in a future version of the module.
+</p>
+<p>
+<offset-table head-number="Offset" head-name="Field" head-data-size="Size" head-value="Contents">
+ <offset number="0" name="Flags" data-size="4">Bit flags; not used at present</offset>
+ <offset number="4" name="Model" data-size="4">The original colour model used (RGB, CMYK, HSV, YUV); see below</offset>
+ <offset number="8" name="Format" data-size="4">The original format (syntax) used to define the colour; see below</offset>
+ <offset number="12" name="Value" data-size="4">The colour, always as a RISC OS colour word (see below)</offset>
+ <offset number="16" name="Original" data-size="4">The colour in its original colour model</offset>
+ <offset number="20" name="Name" data-size="32">Name of the colour, if it was a named colour, including terminator</offset>
+</offset-table>
+</p>
+<p>
+The Model field is stored purely for reference, for example so that your
+software can preselect an appropriate colour model in a colour picker
+matching how the colour was originally specified.
+</p>
+<p>
+The colour Value is always held as a RISC OS colour word,
+<code type='c'>&amp;BBGGRRtt</code>: one byte each for blue, green and red,
+and a trailing transparency byte (0 for fully opaque, 255 for fully
+transparent).
+</p>
+<p>
+Colour model numbers:
+</p>
+<p>
+<value-table head-number="Number" head-value="Model">
+ <value number="1">RGB (Red, Green, Blue)</value>
+ <value number="2">CMYK (Cyan, Magenta, Yellow, Key/black)</value>
+ <value number="3">HSV (Hue, Saturation, Value)</value>
+ <value number="4">YUV (Luminance, B-Y component, R-Y component)</value>
+</value-table>
+</p>
+<p>
+Colour format numbers, used both to report the format a colour was read in
+and to select the format written by
+<reference type='swi' name='eXML_ColourOp' reason='2' use-description='yes'/>:
+</p>
+<p>
+<value-table head-number="Number" head-value="Format">
+ <value number="0">Default - use the format already recorded in the data block</value>
+ <value number="1">RISCOS - <code type='c'>&amp;BBGGRRtt</code>, eg. <code type='c'>&amp;FF13D400</code></value>
+ <value number="2">RGB - <code type='c'>rgb(red,green,blue)</code>, values 0-255</value>
+ <value number="3">RGB% - <code type='c'>rgb(red%,green%,blue%)</code>, values 0%-100%</value>
+ <value number="4">FullHex - <code type='c'>#RRGGBB</code></value>
+ <value number="5">ShortHex - <code type='c'>#RGB</code> (4096 colours)</value>
+ <value number="6">CMYK - <code type='c'>cmyk(cyan,magenta,yellow,key)</code>, values 0-255</value>
+ <value number="7">CMYK% - <code type='c'>cmyk(cyan%,magenta%,yellow%,key%)</code></value>
+ <value number="8">HSL - <code type='c'>hsl(hue,saturation%,lightness%)</code></value>
+ <value number="9">HSV - <code type='c'>hsv(hue,saturation,value)</code>, values 0-255</value>
+ <value number="10">HSV% - <code type='c'>hsv(hue,saturation%,value%)</code></value>
+ <value number="11">Name - a named HTML colour, eg. white, yellow, green</value>
+ <value number="12">YUV - not yet implemented</value>
+ <value number="13">YUV% - not yet implemented</value>
+ <value number="14">Simple - <code type='c'>red,green,blue[,transparency]</code> with no prefix</value>
+</value-table>
+</p>
+<p>
+The full set of named HTML colours recognised is: white, yellow, orange,
+red, fuchsia, silver, gray, olive, purple, maroon, aqua, lime, teal, green,
+blue, navy, black. Names are not case-sensitive, and their use is
+discouraged in favour of an explicit RGB value wherever possible.
+</p>
+</category>
+</subsection>
+</section>
+
+<section title="SWI Calls: Initialising the XML Workspace">
+<p>
+The SWI calls are grouped, across this section and the three that follow
+it, as they are in the original specification: calls to initialise the XML
+workspace, calls to read (parse) an XML file, calls to write an XML file,
+and universal calls used by both directions (or unrelated to parsing
+altogether).
+</p>
+
+<swi-definition name="eXML_InitBuffer"
+                number="576d8"
+                description="Reserve and initialise the XML workspace, with a configurable Content buffer"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace in the application's own memory, or 0 to request the required size</register-use>
+ <register-use number="1">required size, in bytes, of the Content buffer</register-use>
+ <register-use number="5">flags; 0 for now</register-use>
+</entry>
+<exit>
+ <register-use number="0">required size of the workspace, in bytes (when R0 was 0 on entry)</register-use>
+</exit>
+<use>
+<p>
+Call this SWI twice. First, with a null pointer in R0, to discover the
+required workspace size; then, having claimed a block of that size, call it
+again with a pointer to that block in R0. The second call clears the block
+to zero and fills in sensible default preferences. The resulting pointer
+(R0 on the second call) must be passed in R0 to every other eXML SWI for
+that session.
+</p>
+<p>
+R1 gives the required size of the Content buffer used to hold parsed
+content data; the module imposes a minimum of 1KB if a smaller value (or a
+null pointer) is supplied.
+</p>
+<p>
+This call supersedes <reference type='swi' name='eXML_Init'/> and should be
+used in its place.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+content_size% = 10*1024
+SYS &quot;eXML_InitBuffer&quot;,0,content_size%,,,,0 TO size%
+DIM xml% size%
+SYS &quot;eXML_InitBuffer&quot;,xml%,content_size%
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_Init'/>
+<reference type='swi' name='eXML_SetOption'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_Init"
+                number="576c0"
+                description="Deprecated: reserve and initialise the XML workspace with a fixed-size Content buffer"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace in the application's own memory, or 0 to request the required size</register-use>
+</entry>
+<exit>
+ <register-use number="0">required size of the workspace, in bytes (when R0 was 0 on entry)</register-use>
+</exit>
+<use>
+<p>
+This call is deprecated, and is supplied only for backwards compatibility.
+It assumes a fixed size for the Content buffer (10KB from version 0.18
+onwards; 1KB in older versions).
+<reference type='swi' name='eXML_InitBuffer'/> allows the Content buffer
+size to be chosen and should be used in preference to this call.
+</p>
+<p>
+As with <reference type='swi' name='eXML_InitBuffer'/>, call this SWI twice:
+once with a null pointer in R0 to discover the required size, and once with
+a pointer to a claimed block of that size to initialise it.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+SYS &quot;eXML_Init&quot; TO size%
+DIM xml% size%
+FOR dummy% = 0 TO size% STEP 4
+   xml%!dummy% = 0
+NEXT
+SYS &quot;eXML_Init&quot;,xml%
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_InitBuffer'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_SetOption"
+                number="576c1"
+                description="Set a configurable preference for a workspace"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="yes">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">
+  <p>Variable to set:</p>
+  <p>
+  <value-table head-number="Variable" head-value="Meaning">
+   <value number="0"><reference type='swi' name='eXML_SetOption' reason='0' use-description='yes'/></value>
+   <value number="1"><reference type='swi' name='eXML_SetOption' reason='1' use-description='yes'/></value>
+   <value number="2"><reference type='swi' name='eXML_SetOption' reason='2' use-description='yes'/></value>
+   <value number="3"><reference type='swi' name='eXML_SetOption' reason='3' use-description='yes'/></value>
+   <value number="4"><reference type='swi' name='eXML_SetOption' reason='4' use-description='yes'/></value>
+   <value number="5"><reference type='swi' name='eXML_SetOption' reason='5' use-description='yes'/></value>
+   <value number="6"><reference type='swi' name='eXML_SetOption' reason='6' use-description='yes'/></value>
+  </value-table>
+  </p>
+ </register-use>
+ <register-use number="2">new value, or pointer to a string, as appropriate to the selected variable</register-use>
+</entry>
+<use>
+<p>
+Once initialised, eXML uses sensible default values for every configurable
+preference. This call changes one of them for the workspace given in R0.
+The variable number in R1 behaves as a reason code, selecting which
+preference is changed and how R2 is interpreted; see each reason below.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_InitBuffer'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_SetOption"
+                number="576c1"
+                reason="0" reasonname="Indent"
+                description="Set the number of spaces used to indent nested elements">
+<entry>
+ <register-use number="2">number of spaces to indent by, or 0 to disable indenting</register-use>
+</entry>
+<use>
+<p>
+To produce readable XML output, eXML indents nested elements. This
+preference sets the number of spaces used per nesting level; the default is
+2. Setting it to 0 disables indenting entirely.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+SYS &quot;eXML_SetOption&quot;,xml%,0,2
+</extended-example>
+</p><p>
+<extended-example type='format'>
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;ISO-8859-1&quot;?&gt;
+&lt;page type=&quot;Page&quot; category=&quot;Test&quot; name=&quot;1&quot; fileType=&quot;CNDoc&quot;&gt;
+  &lt;begin&gt;
+    &lt;transition name=&quot;Dissolve&quot;&gt;
+      &lt;parameters&gt;
+        &lt;speed&gt;Fast&lt;/speed&gt;
+      &lt;/parameters&gt;
+    &lt;/transition&gt;
+  &lt;/begin&gt;
+&lt;/page&gt;
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_SetOption'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_SetOption"
+                number="576c1"
+                reason="1" reasonname="ExtraLF"
+                description="Set the depth up to which extra blank lines are inserted before elements">
+<entry>
+ <register-use number="2">deepest nesting level, counting from 1, at which an extra blank line is inserted before an element; 0 to disable</register-use>
+</entry>
+<use>
+<p>
+Readability can be further improved by inserting a blank line before the
+opening tag of higher-level elements. By default, extra lines are only
+inserted at the first nesting level; setting this to 2 or 3 extends that to
+deeper levels.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_SetOption'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_SetOption"
+                number="576c1"
+                reason="2" reasonname="Terminator"
+                description="Set the character used to terminate strings returned by the module">
+<entry>
+ <register-use number="2">ASCII value of the terminating character</register-use>
+</entry>
+<use>
+<p>
+By default, every string returned by eXML is terminated with a 0x00 byte,
+suiting C and Assembler. BASIC programs need a 0x0D (Carriage Return)
+terminator instead; use this preference to change it. The change affects
+only later calls made with this workspace pointer in R0.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+SYS &quot;eXML_SetOption&quot;,xml%,2,13
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_SetOption'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_SetOption"
+                number="576c1"
+                reason="3" reasonname="ElementSeparator"
+                description="Set the character used to separate element names in a context string">
+<entry>
+ <register-use number="2">ASCII value of the separator character, or a string whose first character is used</register-use>
+</entry>
+<use>
+<p>
+<reference type='swi' name='eXML_Context'/>, and the string form of context
+returned by <reference type='swi' name='eXML_Parse'/>, join element names
+with <code type='c'>/</code> by default, eg.
+<code type='c'>/document/chapter/page/frame</code>. This preference selects
+a different separator character. Avoid choosing a character that can
+legally appear inside an element name.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+SYS &quot;eXML_SetOption&quot;,xml%,3,36
+SYS &quot;eXML_SetOption&quot;,xml%,3,&quot;$&quot;
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_SetOption'/>
+<reference type='swi' name='eXML_Context'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_SetOption"
+                number="576c1"
+                reason="4" reasonname="AttributeSeparator"
+                description="Set the character used to separate an element's context from an attribute name">
+<entry>
+ <register-use number="2">ASCII value of the separator character, or a string whose first character is used</register-use>
+</entry>
+<use>
+<p>
+This preference works like
+<reference type='swi' name='eXML_SetOption' reason='3' use-description='yes'/>,
+but for addressing an attribute within an element's opening tag, eg.
+<code type='c'>/document/chapter/page@print</code> to address the
+<code type='c'>print</code> attribute of that <code type='c'>page</code>
+element, once <code type='c'>@</code> has been set as the attribute
+separator.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_SetOption'/>
+<reference type='swi' name='eXML_SetOption' reason='3'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_SetOption"
+                number="576c1"
+                reason="5" reasonname="FileType"
+                description="Set the RISC OS filetype used for files created by the module">
+<entry>
+ <register-use number="2">RISC OS filetype number</register-use>
+</entry>
+<use>
+<p>
+By default, XML files created by eXML are typed as Text (&hex;FFF), so they
+can be checked in a standard text editor such as !Edit, !StrongEd or !Zap.
+This preference sets an alternative filetype, such as &hex;F80 (XML), to be
+applied when the file is closed. It only affects files being created; it is
+ignored when reading an existing file.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+SYS &quot;eXML_SetOption&quot;,xml%,5,&amp;F80
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_SetOption'/>
+<reference type='swi' name='eXML_Close'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_SetOption"
+                number="576c1"
+                reason="6" reasonname="TempPath"
+                description="Set the directory used for the temporary file created when updating an XML file">
+<entry>
+ <register-use number="2">pointer to a directory path string</register-use>
+</entry>
+<use>
+<p>
+<reference type='swi' name='eXML_UpdateFile'/> may need to create a
+temporary file. By default, eXML uses
+<code type='c'>&lt;Wimp$ScrapDir&gt;</code> (creating an
+<code type='c'>eXML</code> subdirectory within it), falling back to
+<code type='c'>&lt;eXML$Dir&gt;.Scrap</code> if that variable cannot be
+accessed. This preference selects a different directory.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+SYS &quot;eXML_SetOption&quot;,xml%,6,&quot;&lt;MyApp$Dir&gt;.Files.Temp&quot;
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_SetOption'/>
+<reference type='swi' name='eXML_UpdateFile'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_ClearAttributes"
+                number="576d5"
+                description="Clear the pending attribute stack"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="yes">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+</entry>
+<use>
+<p>
+Clears the stack of attributes accumulated by
+<reference type='swi' name='eXML_Attribute'/>. The stack is cleared
+automatically once a new element is created, so this call is rarely needed;
+it exists for the case where the state of the stack is uncertain, for
+example after an error.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_Attribute'/>
+</related>
+</swi-definition>
+</section>
+
+<section title="SWI Calls: Reading (Parsing) an XML File">
+
+<swi-definition name="eXML_ParseBuffer"
+                number="576c2"
+                description="Present an XML document already held in memory to the parser"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">pointer to the XML data</register-use>
+ <register-use number="2">size of the data, in bytes</register-use>
+ <register-use number="5">flags; 0 for now</register-use>
+</entry>
+<use>
+<p>
+The simplest way to parse an XML file is to load it entirely into a buffer
+in the application's own memory and hand that buffer to eXML with this
+call, then parse it with repeated calls to
+<reference type='swi' name='eXML_Parse'/>. This only works when the file's
+size is known and it is small enough to hold in memory, which is true of
+most everyday XML files.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+SYS &quot;OS_File&quot;,17,&quot;adfs::4.$.TestFile&quot; TO type%,,,,xml_len%
+IF type% = 0 THEN ERROR 1,&quot;No such file&quot;
+DIM xml_buf% xml_len%
+OSCLI &quot;LOAD &quot;+xml$+&quot; &quot;+STR$~(xml_buf%)
+SYS &quot;eXML_ParseBuffer&quot;,xml%,xml_buf%,xml_len%
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_Parse'/>
+<reference type='swi' name='eXML_ParseFile'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_ParseFile"
+                number="576c3"
+                description="Open an XML file to be read, a character at a time, by the parser"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">pointer to the filename</register-use>
+ <register-use number="5">
+  Flags:
+  <bitfield-table>
+   <bit number="3" name="NoHeader" state="clear">A leading &lt;?xml?&gt; header is required</bit>
+   <bit number="3" name="NoHeader" state="set">Accept a file without a proper &lt;?xml?&gt; header; only the first character of the file is then checked, and must be a &quot;&lt;&quot;</bit>
+  </bitfield-table>
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0">handle of the opened file, or 0 if it could not be opened</register-use>
+</exit>
+<use>
+<p>
+Use this call instead of <reference type='swi' name='eXML_ParseBuffer'/>
+when a file is too large to hold in memory, or when its size is not known
+in advance, such as when parsing streamed data. The file is read a
+character at a time as parsing proceeds. As with
+<reference type='swi' name='eXML_ParseBuffer'/>, call
+<reference type='swi' name='eXML_Parse'/> repeatedly until parsing is
+finished.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+SYS &quot;eXML_InitBuffer&quot; TO size%
+DIM xml% size%
+SYS &quot;eXML_InitBuffer&quot;,xml%
+
+SYS &quot;eXML_SetOption&quot;,xml%,eXML_Option_Terminator,13
+SYS &quot;eXML_SetOption&quot;,xml%,eXML_Option_Separator,&quot;/&quot;
+
+SYS &quot;eXML_ParseFile&quot;,xml%,&quot;adfs::4.$.MyFile&quot; TO in%
+
+REPEAT
+   SYS &quot;eXML_Parse&quot;,xml%,0 TO r%,element%,attr%,context%
+   CASE r% OF
+      WHEN eXML_Parser_Start
+         PRINT &quot;S/&quot;+$element%
+      WHEN eXML_Parser_End
+         PRINT &quot;E/&quot;+$element%
+      WHEN eXML_Parser_ERROR
+         PRINT &quot;ERROR !!!&quot;
+   ENDCASE
+UNTIL r% = eXML_Parser_Finished OR r% = eXML_Parser_ERROR
+
+SYS &quot;eXML_Close&quot;,xml%
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_Parse'/>
+<reference type='swi' name='eXML_ParseBuffer'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_Parse"
+                number="576c4"
+                description="Continue parsing an XML document, one syntactic event at a time"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="1">mask; not used at present, should be 0</register-use>
+ <register-use number="5">
+  Flags:
+  <bitfield-table>
+   <bit number="0" name="Context" state="clear">Return a context array in R3 on exit (see <reference type="category" name="Context array and context string">context array</reference>)</bit>
+   <bit number="0" name="Context" state="set">Return a context string in R3 on exit (see <reference type="category" name="Context array and context string">context string</reference>)</bit>
+   <bit number="1" name="NoError" state="clear">Report an error for badly structured XML</bit>
+   <bit number="1" name="NoError" state="set">Don't escape special characters, and don't produce an error for badly structured input; useful when parsing simple HTML, which may nest elements improperly, but should never be set when parsing genuine XML</bit>
+  </bitfield-table>
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0">
+  <p>Return code:</p>
+  <p>
+  <value-table head-number="Code" head-value="Meaning">
+   <value number="0">Null - no event to report; call <code type='c'>Wimp_Poll</code> and call this SWI again, to allow multitasking to continue whilst parsing a large file</value>
+   <value number="1">Start - a StartElement was found (R1 -&gt; element name)</value>
+   <value number="2">End - an EndElement was found (R1 -&gt; element name)</value>
+   <value number="3">Content - content was found (R1 -&gt; content, R2 = number of bytes to read)</value>
+   <value number="4">Declaration - a declaration was found, eg. <code type='c'>&lt;?xat creator=&quot;MyProg&quot; version=&quot;4.0&quot;?&gt;</code> (R1 -&gt; declaration name)</value>
+   <value number="5">PI - a Processing Instruction was found</value>
+   <value number="6">Entity</value>
+   <value number="7">Comment - a comment was found</value>
+   <value number="8">CDATA</value>
+   <value number="9">DTD - a DOCTYPE definition was found; see <reference type='swi' name='eXML_DecodeDTD'/> (R1 -&gt; undecoded DTD data)</value>
+   <value number="10">Finished - parsing has finished (from version 0.22 onwards, R1 = number of bytes read)</value>
+   <value number="11">ERROR - an error occurred during parsing (R1 = row, R2 = column of the last element encountered before the error)</value>
+   <value number="12">Encoding - the requested encoding is not known or not supported</value>
+  </value-table>
+  </p>
+ </register-use>
+ <register-use number="1">pointer to the current element name, for the codes noted above; terminated with the configured terminator (see <reference type='swi' name='eXML_SetOption' reason='2' use-description='yes'/>)</register-use>
+ <register-use number="2">pointer to an <reference type="category" name="Attribute array">attribute array</reference>, or 0 if there are no attributes, for Start and Declaration</register-use>
+ <register-use number="3">pointer to a <reference type="category" name="Context array and context string">context array or context string</reference>, depending on bit 0 of the flags on entry</register-use>
+</exit>
+<use>
+<p>
+Once the workspace has been initialised and a document has been presented
+with <reference type='swi' name='eXML_ParseBuffer'/> or
+<reference type='swi' name='eXML_ParseFile'/>, call this SWI repeatedly to
+parse it, until it returns the Finished or ERROR code. eXML tracks the exact
+position reached within the document; to restart parsing from the
+beginning, present the document again with
+<reference type='swi' name='eXML_ParseBuffer'/> or
+<reference type='swi' name='eXML_ParseFile'/>.
+</p>
+<p>
+Your application need not respond to every return code - many can safely be
+ignored - but it must always respond to ERROR and Finished, so that the
+parsing loop terminates.
+</p>
+<p>
+A self-closing element, eg.
+<code type='c'>&lt;colour type=&quot;rgb&quot; value=&quot;255,255,255&quot; /&gt;</code>,
+always produces a Start code immediately followed by an End code, so that
+calling code can track nesting depth itself without special-casing
+self-closing elements.
+</p>
+<p>
+When content is found, R1 points to the data and R2 gives the number of
+bytes to read; a suitable terminator is always present at the byte
+immediately following the data, so a short string of content can be read
+directly as a terminated string. The content may arrive as a single block,
+or scattered across a series of Content events, depending on the available
+buffer space and the transport in use; calling code should be able to cope
+with content arriving in several pieces.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+SYS &quot;eXML_ParseBuffer&quot;,xml%,xml_buf%,xml_len%
+
+REPEAT
+   SYS &quot;eXML_Parse&quot;,xml%,0 TO r%,element%,attr%
+   CASE r% OF
+      WHEN eXML_Parser_Start
+         PRINT &quot;S/&quot;+$element%
+      WHEN eXML_Parser_End
+         PRINT &quot;E/&quot;+$element%
+      WHEN eXML_Parser_ERROR
+         PRINT &quot;ERROR !!!&quot;
+   ENDCASE
+UNTIL r% = eXML_Parser_Finished OR r% = eXML_Parser_ERROR
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_ParseBuffer'/>
+<reference type='swi' name='eXML_ParseFile'/>
+<reference type='swi' name='eXML_Context'/>
+<reference type='swi' name='eXML_DecodeDTD'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_Context"
+                number="576c5"
+                description="Return the current parse position as a single context string"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="yes">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">pointer to a separator string, or 0 to use the default separator (&quot;/&quot;)</register-use>
+</entry>
+<exit>
+ <register-use number="0">pointer to the context string</register-use>
+</exit>
+<use>
+<p>
+<reference type='swi' name='eXML_Parse'/> can return the current context as
+an array of element-name pointers (see
+<reference type="category" name="Context array and context string">context array</reference>);
+this call instead builds a single, user-readable context string on demand,
+useful when Content has just been reported and the calling code wants to
+know which series of elements it belongs to.
+</p>
+<p>
+The returned string is terminated with the configured terminator (see
+<reference type='swi' name='eXML_SetOption' reason='2' use-description='yes'/>).
+As with the context array, the name of the element currently being opened
+or closed is not included, since it is not yet (or no longer) part of the
+context at that point.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+REPEAT
+   SYS &quot;eXML_Parse&quot;,xml% TO r%,element%,attr%
+   SYS &quot;eXML_Context&quot;,xml%,&quot;/&quot; TO context$
+   PRINT context$
+UNTIL eXML_Parser_Finished
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_Parse'/>
+<reference type='swi' name='eXML_SetOption' reason='3'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_DecodeDTD"
+                number="576d7"
+                description="Decode a DOCTYPE declaration into its constituent parts"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="yes">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">pointer to the DTD line's contents, as returned by <reference type='swi' name='eXML_Parse'/></register-use>
+ <register-use number="5">flags; should be 0 for now</register-use>
+</entry>
+<exit>
+ <register-use number="0">0 if successful, else -&gt; error block</register-use>
+ <register-use number="1">pointer to the document-type (a string containing no spaces)</register-use>
+ <register-use number="2">pointer to the identifier string</register-use>
+ <register-use number="3">pointer to the URL</register-use>
+ <register-use number="4">undefined at present; reserved for future use</register-use>
+ <register-use number="5">
+  Updated flags:
+  <bitfield-table>
+   <bit number="4" name="Public" state="clear">The declaration is SYSTEM (local)</bit>
+   <bit number="4" name="Public" state="set">The declaration is PUBLIC (external), rather than SYSTEM</bit>
+  </bitfield-table>
+ </register-use>
+</exit>
+<use>
+<p>
+A well-formed XML document should contain a Document Type Declaration
+(DTD), usually near the start of the file, so that its structure and syntax
+can be verified against a set of rules, for example:
+</p>
+<p>
+<extended-example type='format'>
+&lt;!DOCTYPE svg PUBLIC &quot;-//W3C//SVG//EN&quot; &quot;http://www.w3c.org/dtd/svg.dtd&quot;&gt;
+</extended-example>
+</p>
+<p>
+Because the syntax of a DTD line is quite free-form - it may, for instance,
+be spread over several lines - this call decodes it into the useful parts
+listed above. Document creation code is encouraged to build such lines with
+<reference type='swi' name='eXML_DTD'/> instead of constructing them by
+hand, as that ensures correct syntax.
+</p>
+<p>
+There is no support at present for an embedded (in-line) DTD; only a
+reference to an external DTD file (whether local, SYSTEM, or public,
+PUBLIC) is decoded. As in-line DTDs are being phased out in favour of XML
+Schema, it is unlikely that support will be added.
+</p>
+<p>
+The presence of the referenced DTD file is not checked by eXML: the URL is
+supplied purely for the benefit of an external XML validation tool, and by
+convention uses a <code type='c'>.dtd</code> filename extension.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_Parse'/>
+<reference type='swi' name='eXML_DTD'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_DecodeString"
+                number="576df"
+                description="Convert an XML-escaped string back into plain ASCII text"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="yes">
+<entry>
+ <register-use number="0">pointer to the source (escaped) string</register-use>
+ <register-use number="1">pointer to the destination buffer</register-use>
+</entry>
+<exit>
+ <register-use number="0">preserved</register-use>
+ <register-use number="1">pointer to the terminating NULL in the destination buffer</register-use>
+</exit>
+<use>
+<p>
+Performs the reverse operation to
+<reference type='swi' name='eXML_EncodeString'/>: it copies the source
+string to the destination, translating each escape sequence
+(<code type='c'>&amp;amp;lt;</code>, <code type='c'>&amp;amp;gt;</code>,
+<code type='c'>&amp;amp;amp;</code>, <code type='c'>&amp;amp;apos;</code>,
+<code type='c'>&amp;amp;quot;</code>) back into the corresponding ISO
+Latin-1 character.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_EncodeString'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_Pointer"
+                number="576e1"
+                description="Read the parser's current position within the document"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="yes">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+</entry>
+<exit>
+ <register-use number="1">offset into the buffer (or file) holding the document</register-use>
+</exit>
+<use>
+<p>
+Added in version 0.36. This call reads the parser's current position,
+allowing an application to record the start and end points of the content
+held within an element, so that the sub-content between those points can be
+parsed or otherwise processed again later.
+</p>
+</use>
+</swi-definition>
+</section>
+
+<section title="SWI Calls: Writing an XML File">
+
+<swi-definition name="eXML_Open"
+                number="576c6"
+                description="Create a new XML file and write its XML declaration"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">pointer to the filename</register-use>
+ <register-use number="2">pointer to an <reference type="category" name="Attribute array">attribute array</reference>, or 0</register-use>
+ <register-use number="3">pointer to a version string, or 0</register-use>
+ <register-use number="4">pointer to an encoding string, or 0</register-use>
+ <register-use number="5">
+  Flags:
+  <bitfield-table>
+   <bit number="0" name="NoXML" state="clear">Write the &lt;?xml?&gt; header as usual</bit>
+   <bit number="0" name="NoXML" state="set">Do not write the &lt;?xml?&gt; header</bit>
+  </bitfield-table>
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0">file handle, or 0 if not successful</register-use>
+</exit>
+<use>
+<p>
+Creates a new XML file ready for further calls (such as
+<reference type='swi' name='eXML_StartElement'/>) to write its content;
+eXML tracks correct opening and closing of elements, attributes and content
+as they are written. Call <reference type='swi' name='eXML_Close'/> once
+the file is complete.
+</p>
+<p>
+As part of opening the file, this call writes the XML declaration as the
+first line of the file, eg.
+<code type='c'>&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</code>.
+The version and encoding attributes may be supplied directly in R3 and R4
+(the common case, since both are more or less mandatory), or as ordinary
+attributes in the array pointed to by R2 - or a mixture of the two, though R2
+may be 0 if only version and encoding are required. R2, R3 and R4 are all
+optional and should be 0 if not used.
+</p>
+<p>
+The call returns the handle of the newly opened file (or 0 on failure), so
+that the caller can track it and close it if an error occurs partway
+through writing.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+SYS &quot;eXML_Open&quot;,xml%,&quot;adfs::4.$.TestFile&quot;,0,&quot;1.0&quot;,&quot;UTF-8&quot;
+</extended-example>
+</p><p>produces:</p><p>
+<extended-example type='format'>
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+</extended-example>
+</p><p>and the following is equivalent:</p><p>
+<extended-example type='basic'>
+SYS &quot;eXML_Attribute&quot;,xml%,&quot;version&quot;,&quot;1.0&quot;
+SYS &quot;eXML_Attribute&quot;,xml%,&quot;encoding&quot;,&quot;UTF-8&quot; TO attr%
+SYS &quot;eXML_Open&quot;,xml%,&quot;adfs::4.$.TestFile&quot;,attr%
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_OpenFile'/>
+<reference type='swi' name='eXML_OpenBuffer'/>
+<reference type='swi' name='eXML_Close'/>
+<reference type='swi' name='eXML_StartElement'/>
+<reference type='swi' name='eXML_Attribute'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_OpenFile"
+                number="576db"
+                description="Alternative spelling for eXML_Open"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<use>
+<p>
+This call behaves identically to <reference type='swi' name='eXML_Open'/>;
+see that entry for its registers and use.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_Open'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_OpenBuffer"
+                number="576dc"
+                description="Begin a new XML document written to a buffer in memory, rather than a file"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">pointer to a buffer to hold the data; the first word of the buffer must hold its size</register-use>
+ <register-use number="2">pointer to an <reference type="category" name="Attribute array">attribute array</reference>, or 0</register-use>
+ <register-use number="3">pointer to a version string, or 0</register-use>
+ <register-use number="4">pointer to an encoding string, or 0</register-use>
+ <register-use number="5">
+  Flags:
+  <bitfield-table>
+   <bit number="0" name="NoXML" state="clear">Write the &lt;?xml?&gt; header as usual</bit>
+   <bit number="0" name="NoXML" state="set">Do not write the &lt;?xml?&gt; header</bit>
+  </bitfield-table>
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0">error code (0 if OK)</register-use>
+</exit>
+<use>
+<p>
+Works in the same way as <reference type='swi' name='eXML_Open'/>, except
+that all further output is written into the supplied memory buffer rather
+than to a file. This is useful, for example, when building a header for
+streamed (eg. internet) communication that does not need to be saved to
+disc first.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_Open'/>
+<reference type='swi' name='eXML_Close'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_Close"
+                number="576c7"
+                description="Close a file previously opened for writing"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">RISC OS filetype to give the file, or 0 to use the currently configured filetype (see <reference type='swi' name='eXML_SetOption' reason='5' use-description='yes'/>)</register-use>
+</entry>
+<exit>
+ <register-use number="0">pointer to the buffer, if <reference type='swi' name='eXML_OpenBuffer'/> was used to create the file (otherwise preserved)</register-use>
+ <register-use number="1">number of bytes written, if <reference type='swi' name='eXML_OpenBuffer'/> was used to create the file (otherwise preserved)</register-use>
+ <register-use number="2">size of the buffer given in R0, if <reference type='swi' name='eXML_OpenBuffer'/> was used to create the file (otherwise preserved)</register-use>
+</exit>
+<use>
+<p>
+Closes the file most recently opened with
+<reference type='swi' name='eXML_Open'/> or
+<reference type='swi' name='eXML_OpenBuffer'/>, and clears the module's
+internal pointers to it. If it was opened as a file, the filetype given in
+R1 (or the configured default, Text &hex;FFF, if R1 is 0) is applied. The
+filetype is only used when writing; it has no effect when reading an
+existing XML file.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_Open'/>
+<reference type='swi' name='eXML_OpenBuffer'/>
+<reference type='swi' name='eXML_SetOption' reason='5'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_UpdateBuffer"
+                number="576c8"
+                description="Open an in-memory XML document for selective update"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<use>
+<p>
+Not yet implemented.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_UpdateFile'/>
+<reference type='swi' name='eXML_Update'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_UpdateFile"
+                number="576c9"
+                description="Open an existing XML file for selective update"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">pointer to the filename</register-use>
+</entry>
+<exit>
+ <register-use number="0">filehandle of the input file, or 0 if not successful</register-use>
+ <register-use number="1">filehandle of the output file, or 0 if not successful</register-use>
+</exit>
+<use>
+<p>
+In some situations, an application needs to update only part of an existing
+XML file, for example one that several applications share. This call opens
+an existing file (creating a new output file alongside it) so that its
+content can be scanned for a required element; the caller's own data can
+then be inserted, the original element skipped, and scanning continued.
+Once opened, call <reference type='swi' name='eXML_Update'/> repeatedly
+until parsing is finished, in the same way as
+<reference type='swi' name='eXML_Parse'/>.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+SYS &quot;eXML_Init&quot; TO size%
+DIM xml% size%
+SYS &quot;eXML_Init&quot;,xml%
+
+SYS &quot;eXML_SetOption&quot;,xml%,eXML_Option_Terminator,13
+SYS &quot;eXML_SetOption&quot;,xml%,eXML_Option_Separator,&quot;/&quot;
+
+SYS &quot;eXML_UpdateFile&quot;,xml%,&quot;adfs::4.$.MyFile&quot; TO in%,out%
+
+claim% = 0
+REPEAT
+   SYS &quot;eXML_Update&quot;,xml%,,,,,claim% TO r%,,,context$
+   claim% = 0
+   CASE r% OF
+   WHEN eXML_Parser_Start
+      CASE context$ OF
+      WHEN &quot;/document/chapter/page&quot;
+         claim% = 1
+      ENDCASE
+   WHEN eXML_Parser_ERROR
+      PRINT &quot;!!! Parser ERROR !!!&quot;
+   ENDCASE
+UNTIL r% = eXML_Parser_Finished OR r% = eXML_Parser_ERROR
+
+SYS &quot;eXML_Close&quot;,xml%,FileType_XML
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_UpdateBuffer'/>
+<reference type='swi' name='eXML_Update'/>
+<reference type='swi' name='eXML_SetOption' reason='6'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_Update"
+                number="576ca"
+                description="Continue a selective update of an XML file previously opened for update"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">mask; 0 for now</register-use>
+ <register-use number="5">
+  Flags: on the first call, bit 0 must be clear.
+  <bitfield-table>
+   <bit number="0" name="Claim" state="clear">Leave the current element unclaimed</bit>
+   <bit number="0" name="Claim" state="set">Claim the previous element (and everything within it): it will be skipped, and no further elements within it will be reported, until it has closed</bit>
+   <bit number="1" name="ClaimTag" state="set">When claiming, claim only the opening tag of the element, so it can be replaced by an updated one</bit>
+  </bitfield-table>
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0">
+  <p>Return code (a subset of those used by <reference type='swi' name='eXML_Parse'/>; only these are returned):</p>
+  <p>
+  <value-table head-number="Code" head-value="Meaning">
+   <value number="1">Start - StartElement found</value>
+   <value number="10">Finished - parsing has finished</value>
+   <value number="11">ERROR - an error occurred during parsing</value>
+  </value-table>
+  </p>
+ </register-use>
+ <register-use number="1">pointer to the name of the last element</register-use>
+ <register-use number="2">pointer to an <reference type="category" name="Attribute array">attribute array</reference> of the last element</register-use>
+ <register-use number="3">pointer to an expanded context string, which - unlike <reference type='swi' name='eXML_Parse'/>'s context - includes the name of the current element</register-use>
+</exit>
+<use>
+<p>
+Call this SWI repeatedly, after opening a file with
+<reference type='swi' name='eXML_UpdateBuffer'/> or
+<reference type='swi' name='eXML_UpdateFile'/>, until parsing has finished.
+Once the expanded context string in R3 matches the element you were looking
+for, set bit 0 of the flags on the next call to claim that element (and
+everything nested within it): it is skipped, and no further elements
+within it are reported, until it has closed.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_UpdateFile'/>
+<reference type='swi' name='eXML_UpdateBuffer'/>
+<reference type='swi' name='eXML_Parse'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_StartElement"
+                number="576cb"
+                description="Write the opening tag of a new element"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">pointer to the element name (optionally prefixed with &quot;/&quot; to mark it self-closing; see below)</register-use>
+ <register-use number="2">pointer to an <reference type="category" name="Attribute array">attribute array</reference>, or 0</register-use>
+ <register-use number="3">pointer to a content string, or 0</register-use>
+ <register-use number="5">
+  Flags:
+  <bitfield-table>
+   <bit number="0" name="Empty" state="clear">A normal element, requiring a matching <reference type='swi' name='eXML_EndElement'/></bit>
+   <bit number="0" name="Empty" state="set">This is an empty (self-closing) element; do not call <reference type='swi' name='eXML_EndElement'/> for it</bit>
+   <bit number="1" name="NoLF" state="clear">Insert a line feed at the end of this tag</bit>
+   <bit number="1" name="NoLF" state="set">Don't insert a line feed at the end of this tag</bit>
+   <bit number="2" name="NoIndent" state="clear">Indent this element with leading spaces, as normal</bit>
+   <bit number="2" name="NoIndent" state="set">Don't indent this element (no leading spaces before the tag)</bit>
+   <bit number="3" name="NewLine" state="clear">Keep all attributes on the same line as the tag</bit>
+   <bit number="3" name="NewLine" state="set">Start each attribute on a new line, to improve readability</bit>
+  </bitfield-table>
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0">0 if successful, else -&gt; error block</register-use>
+</exit>
+<use>
+<p>
+Writes the opening tag of a new element to the file (or buffer) opened by
+<reference type='swi' name='eXML_Open'/> or
+<reference type='swi' name='eXML_OpenBuffer'/>. A StartElement should
+normally be followed by optional content, optional nested elements, and
+finally a matching <reference type='swi' name='eXML_EndElement'/>.
+</p>
+<p>
+An element may instead be marked empty (self-closing), in which case it may
+still hold attributes but cannot hold content or nested elements, and a
+<code type='c'>/</code> is inserted before the tag's closing
+<code type='c'>&gt;</code>, eg.
+<code type='c'>&lt;colour red=&quot;255&quot; green=&quot;128&quot; blue=&quot;44&quot;/&gt;</code>.
+An element can be marked self-closing in any of three ways: by setting bit
+0 of the flags on entry; by prefixing the element name in R1 with
+<code type='c'>/</code>, eg. R1 -&gt; <code type='c'>/colour</code>; or by
+supplying a content string in R3 (see below). In every case, do not call
+<reference type='swi' name='eXML_EndElement'/> for the element - it is
+closed automatically.
+</p>
+<p>
+A single short line of text can be inserted as content by pointing R3 at
+it: the StartElement is written, the content is inserted, and the
+EndElement is written automatically, so no separate call to
+<reference type='swi' name='eXML_EndElement'/> is required. For example:
+</p>
+<p>
+<extended-example type='basic'>
+SYS &quot;eXML_StartElement&quot;,xml%,&quot;comment&quot;,attr%,&quot;Just a line of text.&quot;
+</extended-example>
+</p>
+<p>
+produces:
+</p>
+<p>
+<extended-example type='format'>
+&lt;comment&gt;Just a line of text.&lt;/comment&gt;
+</extended-example>
+</p>
+<p>
+If more than one line of text is needed, omit the string in R3 and use
+<reference type='swi' name='eXML_Content'/> between matching
+<reference type='swi' name='eXML_StartElement'/> and
+<reference type='swi' name='eXML_EndElement'/> calls instead.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_EndElement'/>
+<reference type='swi' name='eXML_Content'/>
+<reference type='swi' name='eXML_Attribute'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_EndElement"
+                number="576cc"
+                description="Write the closing tag of an element previously opened with eXML_StartElement"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">pointer to the element name, or 0 to close the most recently opened element</register-use>
+ <register-use number="5">
+  Flags:
+  <bitfield-table>
+   <bit number="1" name="NoLF" state="clear">Insert a line feed after this element, as normal</bit>
+   <bit number="1" name="NoLF" state="set">Don't insert a line feed after this element</bit>
+   <bit number="2" name="NoIndent" state="clear">Indent as normal (leading spaces before the tag)</bit>
+   <bit number="2" name="NoIndent" state="set">Don't indent (no leading spaces before the tag)</bit>
+  </bitfield-table>
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0">0 if successful, else -&gt; error block</register-use>
+</exit>
+<use>
+<p>
+Closes an element previously opened with
+<reference type='swi' name='eXML_StartElement'/> - except an element that
+was marked self-closing, which must not be closed explicitly. Every other
+opened element must eventually be closed, and elements must be closed in
+the correct (nested) order; XML does not permit overlapping elements.
+</p>
+<p>
+eXML checks the element name given in R1 against its internal stack of open
+elements, and produces an error if the wrong element is closed. Supplying 0
+in R1 closes the most recently opened element without this check, but this
+is not recommended, since it prevents eXML from verifying that elements are
+being closed in the correct order.
+</p>
+</use>
+<example><p>The following opens and closes correctly:</p><p>
+<extended-example type='format'>
+&lt;document&gt;
+   &lt;page id=&quot;1&quot;&gt;
+      &lt;frame&gt;
+         &lt;text&gt;Example&lt;/text&gt;
+      &lt;/frame&gt;
+   &lt;/page&gt;
+&lt;/document&gt;
+</extended-example>
+</p><p>whilst this produces an error, because &lt;frame&gt; and &lt;page&gt; close in the wrong order:</p><p>
+<extended-example type='format'>
+&lt;document&gt;
+   &lt;page id=&quot;1&quot;&gt;
+      &lt;frame&gt;
+         &lt;text&gt;Example&lt;/text&gt;
+      &lt;/page&gt;
+   &lt;/frame&gt;
+&lt;/document&gt;
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_StartElement'/>
+<reference type='error' name='eXML_NoEnd'/>
+<reference type='error' name='eXML_WrongEnd'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_Content"
+                number="576cd"
+                description="Write content data inside the currently open element"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">pointer to the data</register-use>
+ <register-use number="2">number of bytes to write</register-use>
+ <register-use number="5">
+  Flags:
+  <bitfield-table>
+   <bit number="1" name="NoLF" state="clear">Insert a line feed after the data, as normal</bit>
+   <bit number="1" name="NoLF" state="set">Don't insert a line feed after the data</bit>
+   <bit number="2" name="NoIndent" state="clear">Insert leading white space before the output, as normal</bit>
+   <bit number="2" name="NoIndent" state="set">Don't insert leading white space before the output</bit>
+   <bit number="6" name="NoEnc" state="clear">Translate reserved characters, as normal</bit>
+   <bit number="6" name="NoEnc" state="set">Don't translate reserved (special) characters</bit>
+  </bitfield-table>
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0">0 if successful, else -&gt; error block</register-use>
+</exit>
+<use>
+<p>
+Inserts content inside the element most recently opened with
+<reference type='swi' name='eXML_StartElement'/>. A single short line can
+also be supplied directly to
+<reference type='swi' name='eXML_StartElement'/>; use this call instead for
+larger blocks of text, multiple lines, or any number of bytes. Content may
+contain line feed and/or carriage return characters, and these are
+preserved (unlike in HTML).
+</p>
+<p>
+Content may only be written once an element is open; writing content
+without an open element produces the
+<reference type='error' name='eXML_FileNotOpen'/> error.
+</p>
+</use>
+<example><p>The following places content inside a nested element:</p><p>
+<extended-example type='format'>
+&lt;document&gt;
+   &lt;page&gt;
+      &lt;frame id=&quot;1&quot;&gt;This is content&lt;/frame&gt;
+   &lt;/page&gt;
+&lt;/document&gt;
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_StartElement'/>
+<reference type='error' name='eXML_FileNotOpen'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_Attribute"
+                number="576ce"
+                description="Add one attribute to the pending attribute stack"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">pointer to the attribute name</register-use>
+ <register-use number="2">pointer to the attribute value</register-use>
+</entry>
+<exit>
+ <register-use number="0">pointer to an <reference type="category" name="Attribute array">attribute array</reference>, or 0 if unsuccessful</register-use>
+</exit>
+<use>
+<p>
+An attribute takes the form <code type='c'>name=&quot;value&quot;</code>, and
+an element may carry any number of them. Rather than building an
+<reference type="category" name="Attribute array">attribute array</reference>
+by hand, call this SWI once for each attribute to be added to the pending
+stack, then pass the returned pointer to
+<reference type='swi' name='eXML_StartElement'/>,
+<reference type='swi' name='eXML_Open'/>, or
+<reference type='swi' name='eXML_Declaration'/>. The stack is cleared
+automatically once the element is created, so it rarely needs to be cleared
+explicitly (see <reference type='swi' name='eXML_ClearAttributes'/>).
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+SYS &quot;eXML_StartElement&quot;,xml%,&quot;document&quot;
+id$ = &quot;1&quot;
+value$ = &quot;date and time&quot;
+SYS &quot;eXML_Attribute&quot;,xml%,&quot;id&quot;,id$ TO attr%
+SYS &quot;eXML_Attribute&quot;,xml%,&quot;name&quot;,value$ TO attr%
+SYS &quot;eXML_StartElement&quot;,xml%,&quot;field&quot;,attr%,&quot;Hello&quot;
+SYS &quot;eXML_EndElement&quot;,xml%,&quot;document&quot;
+</extended-example>
+</p><p>produces:</p><p>
+<extended-example type='format'>
+&lt;document&gt;
+   &lt;field id=&quot;1&quot; name=&quot;date and time&quot;&gt;Hello&lt;/field&gt;
+&lt;/document&gt;
+</extended-example>
+</p><p>
+Note that the <code type='c'>field</code> element does not need an explicit
+<reference type='swi' name='eXML_EndElement'/> call, since it was given a
+content string and so is closed automatically.
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_ClearAttributes'/>
+<reference type='swi' name='eXML_StartElement'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_Declaration"
+                number="576d0"
+                description="Write a processing declaration, such as the leading &lt;?xml?&gt; declaration"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">pointer to the declaration name</register-use>
+ <register-use number="2">pointer to an <reference type="category" name="Attribute array">attribute array</reference>, or 0</register-use>
+ <register-use number="5">flags</register-use>
+</entry>
+<exit>
+ <register-use number="0">pointer to an <reference type="category" name="Attribute array">attribute array</reference>, or 0 if unsuccessful</register-use>
+</exit>
+<use>
+<p>
+Declarations are typically used near the start of a document; the most
+common is the <code type='c'>&lt;?xml?&gt;</code> declaration, which must be
+present for a document to be considered valid. This call produces output
+similar to <reference type='swi' name='eXML_StartElement'/>, but the line
+begins with <code type='c'>&lt;?</code> and ends with <code type='c'>?&gt;</code>.
+Declarations do not need to be (and cannot be) closed with
+<reference type='swi' name='eXML_EndElement'/>, and are not considered part
+of the document body.
+</p>
+<p>
+The content and processing of a declaration is entirely up to the
+application reading it; eXML places no further interpretation on it.
+</p>
+</use>
+<example><p>
+<extended-example type='format'>
+&lt;?xat doctype=&quot;status&quot; version=&quot;4.0&quot;?&gt;
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_StartElement'/>
+<reference type='swi' name='eXML_Open'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_Comment"
+                number="576cf"
+                description="Write a comment"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">pointer to the comment text</register-use>
+ <register-use number="2">length of the string in R1, or 0 to use the entire string up to a control character</register-use>
+</entry>
+<exit>
+ <register-use number="0">0 if successful, else Corrupted</register-use>
+</exit>
+<use>
+<p>
+Writes a comment to the output document, in the standard form
+<code type='c'>&lt;!-- comment text --&gt;</code>.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+SYS &quot;eXML_Comment&quot;,xml%,&quot;this is a comment&quot;
+SYS &quot;eXML_Comment&quot;,xml%,&quot;this is a comment&quot;,17
+</extended-example>
+</p>
+</example>
+</swi-definition>
+
+<swi-definition name="eXML_DTD"
+                number="576d1"
+                description="Write a DOCTYPE declaration"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">pointer to the document-type string</register-use>
+ <register-use number="2">pointer to an identifier string (optional, PUBLIC only)</register-use>
+ <register-use number="3">pointer to a URL string</register-use>
+ <register-use number="5">
+  Flags:
+  <bitfield-table>
+   <bit number="2" name="NoIndent" state="clear">Insert white space before this element, as normal</bit>
+   <bit number="2" name="NoIndent" state="set">Don't insert white space before this element</bit>
+   <bit number="4" name="Public" state="clear">The DTD is SYSTEM (local)</bit>
+   <bit number="4" name="Public" state="set">The DTD is PUBLIC, rather than SYSTEM</bit>
+   <bit number="5" name="Include" state="set">Information from the DTD is included in-line (not currently supported)</bit>
+  </bitfield-table>
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0">0 if successful, else -&gt; error block</register-use>
+</exit>
+<use>
+<p>
+Writes a DOCTYPE line at the start of a document, after the
+<code type='c'>&lt;?xml?&gt;</code> declaration but before the first
+element. A DTD describes the structure of a document, and the possible
+values for each attribute, so that a validation tool can check the document
+against it; it is also used by the
+<reference type='section' name='XML File Despatcher'>XML File Despatcher</reference>
+to identify a document's type when it is double-clicked.
+</p>
+<p>
+There are three kinds of DTD. A SYSTEM DTD is stored locally, and needs only
+a relative URL to the DTD file in R3. A PUBLIC DTD is stored externally (for
+example on the internet); it needs a URL in R3 and an identifier string in
+R2 describing the publisher, format and language of the document, and is
+selected by setting bit 4 of the flags. An in-line DTD embeds its
+information directly in the DOCTYPE declaration, but this is not currently
+supported by eXML.
+</p>
+<p>
+The document-type in R1 identifies the kind of document, eg.
+<code type='c'>svg</code>; where an application uses several document
+types, including the application's own name as a prefix, eg.
+<code type='c'>artworks:svg</code>, allows an unlimited number of distinct
+types to be created without clashing with anyone else's.
+</p>
+<p>
+The identifier in R2 (PUBLIC DTDs only) should describe the publisher, the
+document format and version, and the language, separated by double
+forward-slashes, eg.
+<code type='c'>-//XAT//CableNews Edition 4.0//EN</code>. A leading
+<code type='c'>-</code> indicates a publisher that is not ISO certified; a
+leading <code type='c'>+</code> indicates one that is. A SYSTEM DTD has no
+identifier; if one is supplied it is ignored, so that XML checkers and
+browsers do not report an error over it.
+</p>
+<p>
+The URL in R3 is not used by eXML's own parser: it exists purely for an
+external XML validation tool. For a SYSTEM DTD, use a relative path, eg.
+<code type='c'>edition.dtd</code> or
+<code type='c'>files/edition.dtd</code>; for a PUBLIC DTD, use an absolute
+URL, eg.
+<code type='c'>http://www.xat.nl/dtd/cablenews/edition.dtd</code>. In both
+cases the filename should carry a <code type='c'>.dtd</code> extension, and
+the path should be given in URL form rather than RISC OS pathname form.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+SYS &quot;eXML_DTD&quot;,xml%,&quot;edition&quot;,,&quot;files/edition.dtd&quot;
+</extended-example>
+</p><p>produces a SYSTEM DTD:</p><p>
+<extended-example type='format'>
+&lt;!DOCTYPE edition SYSTEM &quot;files/edition.dtd&quot;&gt;
+</extended-example>
+</p><p>whereas:</p><p>
+<extended-example type='basic'>
+id$ = &quot;-//XAT//Edition 4.0//EN&quot;
+url$ = &quot;http://www.xat.nl/dtd/edition.dtd&quot;
+SYS &quot;eXML_DTD&quot;,xml%,&quot;edition&quot;,id$,url$,,(1 &lt;&lt; 4)
+</extended-example>
+</p><p>produces a PUBLIC DTD:</p><p>
+<extended-example type='format'>
+&lt;!DOCTYPE edition PUBLIC &quot;-//XAT//Edition 4.0//EN&quot; &quot;http://www.xat.nl/dtd/edition.dtd&quot;&gt;
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_DecodeDTD'/>
+<reference type='section' name='XML File Despatcher'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_PI"
+                number="576d2"
+                description="Write a Processing Instruction"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">pointer to the data</register-use>
+ <register-use number="2">number of bytes to insert</register-use>
+ <register-use number="5">flags</register-use>
+</entry>
+<exit>
+ <register-use number="0">0 if successful, else -&gt; error block</register-use>
+</exit>
+<use>
+<p>
+Inserts a Processing Instruction into the output document, used to pass
+information directly to whatever XML processor reads the document (for
+example, the parser inside your own application). Processing instructions
+are not considered part of the document body, and their syntax is not
+checked by eXML. Only the opening (<code type='c'>&lt;?</code>) and closing
+(<code type='c'>?&gt;</code>) delimiters are added; the data in R1 is
+inserted between them exactly as supplied.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+$data% = &quot;xat:impression validation extra&quot;
+size% = LEN($data%) + 1
+SYS &quot;eXML_PI&quot;,xml%,data%,size%
+</extended-example>
+</p><p>produces:</p><p>
+<extended-example type='format'>
+&lt;?xat:impression validation extra?&gt;
+</extended-example>
+</p>
+</example>
+</swi-definition>
+
+<swi-definition name="eXML_CDATA"
+                number="576d3"
+                description="Write a CDATA (raw data) section"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">pointer to workspace</register-use>
+ <register-use number="1">pointer to the data</register-use>
+ <register-use number="2">number of bytes to insert</register-use>
+ <register-use number="5">flags</register-use>
+</entry>
+<exit>
+ <register-use number="0">0 if successful, else -&gt; error block</register-use>
+</exit>
+<use>
+<p>
+The XML standard allows raw data - including reserved characters such as
+<code type='c'>&lt;</code> and <code type='c'>&gt;</code> - to be inserted
+into a document without escaping, inside a CDATA section. The only
+sequence a CDATA section cannot contain is <code type='c'>]]&gt;</code>,
+which marks its end. A CDATA section is opened with
+<code type='c'>&lt;![CDATA[</code> and closed with
+<code type='c'>]]&gt;</code>.
+</p>
+<p>
+Reading CDATA sections is not currently supported by eXML.
+</p>
+</use>
+</swi-definition>
+</section>
+
+<section title="SWI Calls: Universal Calls">
+
+<swi-definition name="eXML_GetString"
+                number="576d4"
+                description="Copy a control-terminated string, applying a chosen terminator"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="yes">
+<entry>
+ <register-use number="0">pointer to the original string</register-use>
+ <register-use number="1">pointer to the destination, somewhere in the caller's own workspace</register-use>
+ <register-use number="2">required string terminator, eg. 0 or 13</register-use>
+</entry>
+<exit>
+ <register-use number="1">pointer to the terminating character written into the destination string</register-use>
+ <register-use number="2">length of the destination string, excluding its terminator</register-use>
+</exit>
+<use>
+<p>
+This call is not really specific to XML, but is provided because it is
+useful for building structures (such as large menus) from data received
+elsewhere, for example a WIMP message. It copies a string terminated by any
+control character into the caller's own buffer, applying whichever
+terminator the caller's software requires.
+</p>
+</use>
+<example><p>
+The following, in BBC BASIC, extracts the document-type and path from a
+<reference type='message' name='XMLDataOpen'/> message block:
+</p><p>
+<extended-example type='basic'>
+DIM mes 256
+DIM par% 256
+...
+SYS &quot;eXML_GetString&quot;,mes!40,par%,13
+doctype$ = $par%
+SYS &quot;eXML_GetString&quot;,mes+44,par%,13
+path$ = $par%
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='message' name='XMLDataOpen'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_ColourOp"
+                number="576d6"
+                description="Read, write, and convert between colour formats"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="yes">
+<entry>
+ <register-use number="0">
+  <p>Reason code:</p>
+  <p>
+  <value-table head-number="Reason" head-value="Action">
+   <value number="0"><reference type='swi' name='eXML_ColourOp' reason='0' use-description='yes'/></value>
+   <value number="1"><reference type='swi' name='eXML_ColourOp' reason='1' use-description='yes'/></value>
+   <value number="2"><reference type='swi' name='eXML_ColourOp' reason='2' use-description='yes'/></value>
+   <value number="3"><reference type='swi' name='eXML_ColourOp' reason='3' use-description='yes'/></value>
+   <value number="4"><reference type='swi' name='eXML_ColourOp' reason='4' use-description='yes'/></value>
+  </value-table>
+  </p>
+ </register-use>
+</entry>
+<use>
+<p>
+There are many ways to express a colour in an XML document - some inherited
+from HTML, some specific to XML - and converting between them can be
+tedious, especially when the user should be free to choose their preferred
+colour model. <reference type='swi' name='eXML_ColourOp'/> converts between
+these formats, and reads or writes colours directly. Every reason code
+operates on a
+<reference type="category" name="Colour data block">colour data block</reference>
+held in the caller's own memory (except reason codes 3 and 4, which use the
+module's own internal workspace instead - see below). R0 selects the
+operation; the meaning of the other registers depends on the reason code.
+</p>
+<p>
+It is recommended that colour be expressed as an attribute on an existing
+element rather than as an element of its own, eg.
+<code type='c'>&lt;background colour=&quot;rgb(255,255,255)&quot;/&gt;</code>
+rather than
+<code type='c'>&lt;background&gt;&lt;colour value=&quot;rgb(255,255,255)&quot;/&gt;&lt;/background&gt;</code>.
+</p>
+</use>
+<related>
+<reference type="category" name="Colour data block"/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_ColourOp"
+                number="576d6"
+                reason="0" reasonname="Init"
+                description="Initialise a colour data block, or find its required size">
+<entry>
+ <register-use number="1">pointer to a <reference type="category" name="Colour data block">colour data block</reference>, or 0 to find the required size</register-use>
+ <register-use number="5">
+  Flags:
+  <bitfield-table>
+   <bit number="0-7" name="Terminator">Required string terminator, eg. 0 or 13</bit>
+  </bitfield-table>
+ </register-use>
+</entry>
+<exit>
+ <register-use number="2">size of the colour data block, in bytes, when R1 was 0 on entry</register-use>
+</exit>
+<use>
+<p>
+Before a
+<reference type="category" name="Colour data block">colour data block</reference>
+is used with any other reason code, it should be set to a defined state by
+calling this reason code with a pointer to it in R1. To find the required
+size of the block, call with a null pointer in R1; the size is returned in
+R2. The size should always be requested first, since it may grow in a
+future version of the module.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_ColourOp'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_ColourOp"
+                number="576d6"
+                reason="1" reasonname="Read"
+                description="Read a colour from a text string into a colour data block">
+<entry>
+ <register-use number="1">pointer to a <reference type="category" name="Colour data block">colour data block</reference></register-use>
+ <register-use number="2">pointer to a text string containing a colour definition</register-use>
+ <register-use number="5">flags; 0 for now</register-use>
+</entry>
+<exit>
+ <register-use number="0" state="preserved"/>
+</exit>
+<use>
+<p>
+Parses the colour definition string in R2, in any of the formats described
+under
+<reference type="category" name="Colour data block">colour data block</reference>,
+and updates the block pointed to by R1 with the resulting colour, colour
+model, and format.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_ColourOp'/>
+<reference type='swi' name='eXML_ColourOp' reason='3'/>
+<reference type='error' name='eXML_ColourUnknown'/>
+<reference type='error' name='eXML_ColourSyntax'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_ColourOp"
+                number="576d6"
+                reason="2" reasonname="Write"
+                description="Write a colour data block out as a formatted text string">
+<entry>
+ <register-use number="1">pointer to a <reference type="category" name="Colour data block">colour data block</reference></register-use>
+ <register-use number="2">pointer to a buffer to hold the resulting string</register-use>
+ <register-use number="5">
+  Flags:
+  <bitfield-table>
+   <bit number="0-7" name="Terminator">Required string terminator, eg. 0 or 13</bit>
+   <bit number="8-15" name="Format">Required output colour format (see <reference type="category" name="Colour data block">colour data block</reference>); 0 to use the format already recorded in the block</bit>
+  </bitfield-table>
+ </register-use>
+</entry>
+<use>
+<p>
+Formats the colour held in the data block pointed to by R1 as text, in
+either the colour's original format or the format requested in bits 8-15
+of the flags, and writes it to the buffer in R2. This is typically used
+directly to produce XML output.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+SYS &quot;eXML_ColourOp&quot;,0,0 TO ,,size%
+DIM block% size%
+DIM string% 256
+
+SYS &quot;eXML_ColourOp&quot;,0,block%
+
+SYS &quot;eXML_ColourOp&quot;,2,block%,string%,,,13 OR (2 &lt;&lt; 8)
+PRINT $string%
+
+SYS &quot;eXML_ColourOp&quot;,1,block%,string%
+PRINT ~block%!12
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_ColourOp'/>
+<reference type='swi' name='eXML_ColourOp' reason='4'/>
+<reference type='error' name='eXML_ColourFormat'/>
+<reference type='error' name='eXML_ColourValue'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_ColourOp"
+                number="576d6"
+                reason="3" reasonname="Get"
+                description="Convert a colour string directly into a RISC OS colour value">
+<entry>
+ <register-use number="1">pointer to a formatted colour text string</register-use>
+</entry>
+<exit>
+ <register-use number="0">the colour, as a RISC OS colour value</register-use>
+</exit>
+<use>
+<p>
+Equivalent to
+<reference type='swi' name='eXML_ColourOp' reason='1' use-description='yes'/>,
+but uses the module's own internal workspace for the conversion rather than
+a caller-supplied
+<reference type="category" name="Colour data block">colour data block</reference>,
+so no block needs to be created first.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+SYS &quot;eXML_ColourOp&quot;,3,&quot;rgb(255,127,64)&quot; TO colour%
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_ColourOp' reason='1'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_ColourOp"
+                number="576d6"
+                reason="4" reasonname="Put"
+                description="Convert a RISC OS colour value directly into a formatted text string">
+<entry>
+ <register-use number="1">colour value, in RISC OS format</register-use>
+ <register-use number="5">flags, as for <reference type='swi' name='eXML_ColourOp' reason='2'/></register-use>
+</entry>
+<exit>
+ <register-use number="0">pointer to the resulting string</register-use>
+</exit>
+<use>
+<p>
+Equivalent to
+<reference type='swi' name='eXML_ColourOp' reason='2' use-description='yes'/>,
+but uses the module's own internal workspace for the conversion rather than
+a caller-supplied
+<reference type="category" name="Colour data block">colour data block</reference>.
+</p>
+</use>
+<example><p>
+<extended-example type='basic'>
+SYS &quot;eXML_ColourOp&quot;,4,&amp;4682FF00,,,,&amp;020D TO colour$
+PRINT colour$
+</extended-example>
+</p><p>produces:</p><p>
+<extended-example type='basic'>
+rgb(255,130,70)
+</extended-example>
+</p>
+</example>
+<related>
+<reference type='swi' name='eXML_ColourOp' reason='2'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_DateOp"
+                number="576dd"
+                description="Read (and, in future, write) dates and times in various formats"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="yes">
+<entry>
+ <register-use number="0">
+  <p>
+  Format to read (or, when writing, to produce):
+  </p>
+  <p>
+  <value-table head-number="Format" head-value="Meaning">
+   <value number="0">Auto - detect the format automatically</value>
+   <value number="1">XML - year-month-date, separated by dashes, eg. 2016-12-31</value>
+   <value number="2">EUR - date-month-year, separated by dashes, eg. 31-12-2016</value>
+   <value number="3">USA - month/date/year, separated by slashes, eg. 12/31/2016</value>
+  </value-table>
+  </p>
+ </register-use>
+ <register-use number="1">
+  <p>
+  When writing (not yet implemented), further flags select what is written:
+  </p>
+  <p>
+  <bitfield-table>
+   <bit number="16" name="Write" state="set">Write a date (rather than read one)</bit>
+   <bit number="17" name="Date" state="set">Include the date</bit>
+   <bit number="18" name="Time" state="set">Include the time</bit>
+   <bit number="19" name="Sec" state="set">Include seconds</bit>
+  </bitfield-table>
+  </p>
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0">
+  <value-table head-number="Value" head-value="Meaning">
+   <value number="0">No error</value>
+   <value number="1">Wrong format</value>
+  </value-table>
+ </register-use>
+</exit>
+<use>
+<p>
+The official XML standard specifies dates in reverse (year-month-date)
+order, separated by dashes, eg. <code type='c'>2014-06-31</code>, optionally
+followed by a time, separated by an optional space and the letter
+<code type='c'>T</code>, eg. <code type='c'>2014-06-31 T14:23:01</code>. The
+part following <code type='c'>T</code> gives hours, minutes and seconds,
+each separated by a colon.
+</p>
+<p>
+Reading is implemented: this call reads an existing date (and optional
+time) from a text string, either in a specific format selected in R0, or
+automatically (format 0), in which case XML and EUR dates are assumed to be
+separated by dashes and USA dates by slashes. Writing a date is not yet
+implemented.
+</p>
+</use>
+</swi-definition>
+
+<swi-definition name="eXML_EncodeString"
+                number="576de"
+                description="Copy a NULL-terminated string, escaping reserved XML characters"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="yes">
+<entry>
+ <register-use number="0">pointer to the source string</register-use>
+ <register-use number="1">pointer to the destination buffer</register-use>
+</entry>
+<exit>
+ <register-use number="0">preserved</register-use>
+ <register-use number="1">pointer to the terminating NULL in the destination buffer</register-use>
+</exit>
+<use>
+<p>
+Copies a NULL-terminated string from the source in R0 to the destination in
+R1, translating any of the reserved characters
+(<code type='c'>&lt;</code>, <code type='c'>&gt;</code>,
+<code type='c'>&amp;amp;</code>, <code type='c'>'</code>,
+<code type='c'>&quot;</code>) into the corresponding XML escape sequence
+(<code type='c'>&amp;amp;lt;</code>, <code type='c'>&amp;amp;gt;</code>,
+<code type='c'>&amp;amp;amp;</code>, <code type='c'>&amp;amp;apos;</code>,
+<code type='c'>&amp;amp;quot;</code>).
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_DecodeString'/>
+</related>
+</swi-definition>
+
+<swi-definition name="eXML_Base64"
+                number="576e0"
+                description="Encode or decode Base64 data"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="SVC"
+                re-entrant="yes">
+<use>
+<p>
+Not implemented.
+</p>
+</use>
+</swi-definition>
+
+<p>
+The eXML module distributed as version 0.43 (13 Jun 2020) - one point
+release after this API document - also occupies four further SWI numbers
+in its decoding table which this specification does not describe:
+<code type='c'>eXML_GetStack</code> (&hex;576D9),
+<code type='c'>eXML_ConvertToUTF8</code> (&hex;576DA),
+<code type='c'>eXML_DecodeBlock</code> (&hex;576E2), and
+<code type='c'>eXML_Debug</code> (&hex;576E3). Their names are known from
+the module's own SWI decoding table, but their calling conventions are not
+published anywhere, so they are not documented as full SWI entries here.
+</p>
+</section>
+
+<section title="XML File Despatcher">
+<p>
+Most files on RISC OS carry a filetype, which lets an application recognise
+its own files and respond when the Filer reports that one has been
+double-clicked; if no application claims a filetype, the Filer falls back
+to a system variable such as <code type='c'>Alias$@RunType_FFF</code> to
+launch something suitable.
+</p>
+<p>
+XML makes it easy to create many new file formats, but RISC OS filetypes
+are a scarce resource (numbers &hex;000 to &hex;FFF only), and typically
+only one filetype will be allocated to a given application, which must then
+inspect each file's contents to work out how to use it. By default, an XML
+file with no more specific filetype allocated to it should use RISC OS
+filetype &hex;F80. Although every such file then looks identical to the
+Filer, its document-type can still be recovered from its DOCTYPE line, eg.
+</p>
+<p>
+<extended-example type='format'>
+&lt;?xml version=&quot;1.0&quot; encoding=&quot;ISO-8859-1&quot;?&gt;
+&lt;!DOCTYPE MyDoc SYSTEM &quot;mydoc.dtd&quot;&gt;
+&lt;document&gt;
+   &lt;chapter id=&quot;1&quot;&gt;
+      &lt;page id=&quot;1&quot;&gt;
+         &lt;frame&gt;Hello world...&lt;/frame&gt;
+      &lt;/page&gt;
+   &lt;/chapter&gt;
+&lt;/document&gt;
+</extended-example>
+</p>
+<p>
+Here, the document-type (referred to below as
+<code type='c'>&lt;doctype&gt;</code>) is <code type='c'>MyDoc</code>. A
+document-type may be any length and contain any printable XML character
+except a space; conventionally it uses only letters and, perhaps, numbers,
+eg. <code type='c'>artworks</code>, <code type='c'>svg</code>,
+<code type='c'>cablenews</code>, <code type='c'>config</code>. An
+application handling several distinct document-types of its own may prefix
+them with a family name and a colon, eg.
+<code type='c'>artworks:config</code>, but should only do this for a format
+that is intended to remain private, rather than public - see also
+<reference type='section' name='XML File Despatcher: Naming Conventions'/> below.
+</p>
+<p>
+For any of this to work, the file must carry RISC OS filetype &hex;F80.
+Double-clicking such a file is intercepted by eXML, which extracts the
+document-type from its DOCTYPE line and then either broadcasts a WIMP
+message, or launches a suitable application, as described below.
+</p>
+</section>
+
+<section title="XML File Despatcher: System Variables">
+<p>
+eXML uses system variables of the following form to decide what to launch
+when an XML file is opened:
+</p>
+<sysvar-definition name="XML$@Run_&lt;doctype&gt;" description="Command used to launch an application for a given XML document-type">
+<use>
+<p>
+An application which wants to be launched automatically whenever the user
+double-clicks a file of a given <code type='c'>&lt;doctype&gt;</code>
+should set this variable, replacing <code type='c'>&lt;doctype&gt;</code>
+with the actual document-type it handles, to a command that launches it
+with the file's pathname in its command tail:
+</p>
+</use>
+<example><p><userinput>Set XML$@Run_svg Run &lt;ArtWorks$Dir&gt;.!Run %%**0</userinput></p><p>
+Note the doubled <code type='c'>%</code>, which is required to escape the
+literal <code type='c'>%</code> that follows it. Whenever the user
+double-clicks an XML file (RISC OS filetype &hex;F80) with document-type
+<code type='c'>svg</code>, and ArtWorks is not already running, eXML
+launches it as configured, substituting the file's pathname for
+<code type='c'>%*0</code> in the command tail.
+</p>
+</example>
+</sysvar-definition>
+<p>
+If no <code type='c'>XML$@Run_&lt;doctype&gt;</code> variable exists for a
+file's document-type, and no running application claims the
+<reference type='message' name='XMLDataOpen'/> message described below,
+the file cannot be opened automatically. Every other system variable
+beginning <code type='c'>XML$@</code> is reserved for future use by eXML.
+</p>
+</section>
+
+<section title="XML File Despatcher: Messages">
+<p>
+Before falling back to the <code type='c'>XML$@Run_&lt;doctype&gt;</code>
+system variable, the despatcher broadcasts a User_Message (18) of type
+<reference type='message' name='XMLDataOpen'/>, in a format similar to the
+standard <code type='c'>Message_DataOpen</code> (5) broadcast by the Filer
+when any file is double-clicked. The only difference is that the field at
+offset +40 holds a pointer to a string giving the document-type, rather
+than the filetype.
+</p>
+<message-definition name="XMLDataOpen" number="40D59" description="A user has double-clicked an XML file of the given document-type">
+<message-table>
+ <message offset="0" name="size" data-size="4">Size of the message block</message>
+ <message offset="4" name="sender" data-size="4">Task handle of the sender</message>
+ <message offset="8" name="my_ref" data-size="4">The sender's reference for this message</message>
+ <message offset="12" name="your_ref" data-size="4">0</message>
+ <message offset="16" name="action" data-size="4">&amp;40D59 (Message_XMLDataOpen)</message>
+ <message offset="20" name="window_handle" data-size="4">Window handle of the directory display containing the file</message>
+ <message offset="24" data-size="4" state="reserved">Unused</message>
+ <message offset="28" name="icon_x" data-size="4">X offset of the file icon that was double-clicked</message>
+ <message offset="32" name="icon_y" data-size="4">Y offset of the file icon that was double-clicked</message>
+ <message offset="36" data-size="4">0</message>
+ <message offset="40" name="doctype" data-size="4">Pointer to a zero-terminated string giving the document-type</message>
+ <message offset="44" name="pathname" data-size="?">Full pathname of the file, zero-terminated</message>
+</message-table>
+<use>
+<p>
+Any application that can load a file of the document-type given at offset
++40 should respond by first claiming the message - by sending a
+<reference type='message' name='XMLDataOpenAck'/> reply, with
+<code type='c'>your_ref</code> set to the original message's
+<code type='c'>my_ref</code> - and only then loading the file. Claiming
+first, before attempting to load, avoids the message being passed on to
+another application if the load subsequently fails.
+</p>
+<p>
+<extended-example type='basic'>
+DIM mes 256
+...
+REPEAT
+   SYS &quot;Wimp_Poll&quot;, 0, mes TO r%
+   CASE r% OF
+   WHEN 17, 18, 19 : PROC_message
+   ENDCASE
+UNTIL quit
+
+DEF PROC_message
+   CASE mes!16 OF
+   WHEN &amp;40D59 : PROC_xml_dataopen
+   ENDCASE
+ENDPROC
+
+DEF PROC_xml_dataopen
+   doctype$ = FN_read_string(mes!40)
+   file$ = FNread_string(mes+44)
+   CASE doctype$ OF
+   WHEN &quot;svg&quot;
+      mes!16 = &amp;40D5A
+      mes!12 = mes!8
+      SYS &quot;Wimp_SendMessage&quot;,17,mes,mes!4
+      REM ---&gt; load the file
+      ...
+   ENDCASE
+ENDPROC
+</extended-example>
+</p>
+</use>
+<related>
+<reference type='message' name='XMLDataOpenAck'/>
+<reference type='sysvar' name='XML$@Run_&lt;doctype&gt;'/>
+</related>
+</message-definition>
+
+<message-definition name="XMLDataOpenAck" number="40D5A" description="Acknowledges and claims a XMLDataOpen message">
+<use>
+<p>
+Sent as a User_Message (17) reply to
+<reference type='message' name='XMLDataOpen'/>, with
+<code type='c'>your_ref</code> copied from the original message's
+<code type='c'>my_ref</code>, to claim the file before loading it.
+</p>
+</use>
+<related>
+<reference type='message' name='XMLDataOpen'/>
+</related>
+</message-definition>
+</section>
+
+<section title="XML File Despatcher: Naming Conventions">
+<p>
+Choose a document-type carefully, to avoid clashing with another
+application's document-type when a file is loaded automatically. Prefer a
+name qualified by your own application or company, such as
+<code type='c'>MyApp:MyDoc</code> or <code type='c'>MyCompany:MyDoc</code>,
+over an unqualified name such as <code type='c'>MyDoc</code>. Some
+examples: <code type='c'>artworks</code>, <code type='c'>xat:database</code>,
+<code type='c'>dbman:users</code>, <code type='c'>xat:dbman:database</code>.
+</p>
+</section>
+
+<section title="Error Messages">
+<error-definition name="eXML_FileNotOpen" number="81CD00"
+                  description="A call that writes to, or reads the position of, an XML file was made with no file currently open">
+<use>
+<p>
+Returned by any call that writes content, elements, or other output when no
+file (or buffer) is currently open for writing, for example calling
+<reference type='swi' name='eXML_Content'/> before
+<reference type='swi' name='eXML_Open'/> or
+<reference type='swi' name='eXML_OpenBuffer'/>.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_Open'/>
+<reference type='swi' name='eXML_Content'/>
+</related>
+</error-definition>
+
+<error-definition name="eXML_NoElement" number="81CD01"
+                  description="An operation on an element was requested, but no element is currently open">
+<use>
+<p>
+Returned, for example, by
+<reference type='swi' name='eXML_EndElement'/> when there is no
+corresponding open element left to close.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_EndElement'/>
+</related>
+</error-definition>
+
+<error-definition name="eXML_NoEnd" number="81CD02"
+                  description="More elements were closed than have been opened">
+<use>
+<p>
+Returned by <reference type='swi' name='eXML_EndElement'/> when trying to
+close an element after every currently open element has already been
+closed.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_EndElement'/>
+</related>
+</error-definition>
+
+<error-definition name="eXML_WrongEnd" number="81CD03"
+                  description="An element was closed with a name that does not match the most recently opened element">
+<use>
+<p>
+Returned by <reference type='swi' name='eXML_EndElement'/> when the element
+name given in R1 does not match the element eXML expects to be closed next,
+according to its internal stack of open elements - for example, closing
+elements in the wrong (non-nested) order.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_EndElement'/>
+</related>
+</error-definition>
+
+<error-definition name="eXML_NoEncoding" number="81CD04"
+                  description="The requested character encoding is not known, or is not supported by this version of the module">
+<use>
+<p>
+Returned by <reference type='swi' name='eXML_Parse'/> (as the Encoding
+return code) when a document requests an encoding outside the set listed
+under
+<reference type='subsection' name='Encodings'/>, or one that is not yet
+implemented in the running version of the module.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_Parse'/>
+</related>
+</error-definition>
+
+<error-definition name="eXML_NoDocType" number="81CD05"
+                  description="An operation on a DOCTYPE declaration was requested, but no document-type could be determined">
+<use>
+<p>
+Returned when a document-type cannot be established from a DOCTYPE
+declaration, for example when despatching a double-clicked XML file, or
+when decoding a malformed DTD line with
+<reference type='swi' name='eXML_DecodeDTD'/>.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_DecodeDTD'/>
+<reference type='section' name='XML File Despatcher'/>
+</related>
+</error-definition>
+
+<error-definition name="eXML_Despatch" number="81CD06"
+                  description="The XML File Despatcher could not despatch a double-clicked file">
+<use>
+<p>
+Returned when the
+<reference type='section' name='XML File Despatcher'>XML File
+Despatcher</reference> cannot despatch a double-clicked XML file - for
+example, no application claimed the
+<reference type='message' name='XMLDataOpen'/> message, and no matching
+<code type='c'>XML$@Run_&lt;doctype&gt;</code> system variable was set.
+</p>
+</use>
+<related>
+<reference type='section' name='XML File Despatcher'/>
+<reference type='message' name='XMLDataOpen'/>
+</related>
+</error-definition>
+
+<error-definition name="eXML_Workspace" number="81CD07"
+                  description="The workspace pointer supplied in R0 is not valid, or has not been initialised">
+<use>
+<p>
+Returned when a call is made with a workspace pointer that eXML does not
+recognise as having been initialised by
+<reference type='swi' name='eXML_Init'/> or
+<reference type='swi' name='eXML_InitBuffer'/>.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_InitBuffer'/>
+</related>
+</error-definition>
+
+<error-definition name="eXML_Buffer" number="81CD08"
+                  description="No content buffer is available, or the supplied buffer pointer is not valid">
+<use>
+<p>
+Returned when a call needs the workspace's Content buffer (see
+<reference type='swi' name='eXML_InitBuffer'/>), but none is available, or
+when a caller-supplied buffer pointer, for example to
+<reference type='swi' name='eXML_OpenBuffer'/>, is not valid.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_InitBuffer'/>
+<reference type='swi' name='eXML_OpenBuffer'/>
+</related>
+</error-definition>
+
+<error-definition name="eXML_BufferSize" number="81CD09"
+                  description="The supplied buffer is too small for the data being read or written">
+<use>
+<p>
+Returned when a caller-supplied buffer, such as the Content buffer sized by
+<reference type='swi' name='eXML_InitBuffer'/>, or the buffer given to
+<reference type='swi' name='eXML_OpenBuffer'/>, is too small to hold the
+data eXML needs to read or write into it.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_InitBuffer'/>
+<reference type='swi' name='eXML_OpenBuffer'/>
+</related>
+</error-definition>
+
+<error-definition name="eXML_ColourUnknown" number="81CD10"
+                  description="A colour string uses a format that is not recognised">
+<use>
+<p>
+Returned by
+<reference type='swi' name='eXML_ColourOp' reason='1'/> (or reason 3) when
+the text supplied does not match any of the colour formats described under
+<reference type="category" name="Colour data block">colour data block</reference>.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_ColourOp' reason='1'/>
+</related>
+</error-definition>
+
+<error-definition name="eXML_ColourSyntax" number="81CD11"
+                  description="A colour string is in a recognised format, but is not syntactically valid">
+<use>
+<p>
+Returned by
+<reference type='swi' name='eXML_ColourOp' reason='1'/> (or reason 3) when
+the text supplied is recognisably one of the supported colour formats, but
+its syntax is malformed - for example, a missing value or an unmatched
+bracket.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_ColourOp' reason='1'/>
+</related>
+</error-definition>
+
+<error-definition name="eXML_ColourFormat" number="81CD12"
+                  description="The requested output colour format is not supported for writing">
+<use>
+<p>
+Returned by
+<reference type='swi' name='eXML_ColourOp' reason='2'/> (or reason 4) when
+the colour format requested in the flags is one that the module does not
+yet support producing, such as YUV or YUV%.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_ColourOp' reason='2'/>
+</related>
+</error-definition>
+
+<error-definition name="eXML_ColourValue" number="81CD13"
+                  description="A colour value cannot be converted into the requested format or model">
+<use>
+<p>
+Returned by
+<reference type='swi' name='eXML_ColourOp' reason='2'/> (or reason 4) when
+the stored colour value cannot be represented in the requested output
+format, for example because it falls outside the range that format can
+express.
+</p>
+</use>
+<related>
+<reference type='swi' name='eXML_ColourOp' reason='2'/>
+</related>
+</error-definition>
+</section>
+</chapter>
+
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+    &amp;copy; Copyright 2004-2020, Paul Reuvers and X-Ample Technology bv.
+    This chapter is a PRM-in-XML rendering of the eXML Application
+    Programming Interface (version 0.42, Preliminary Specification,
+    Revision A, 08 Jun 2020), published by X-Ample Technology at
+    <reference type='link' href="http://www.xat.nl/riscos/sw/xml/" name="http://www.xat.nl/riscos/sw/xml/"/>.
+    The original disclaimer applies: the information is given &quot;as
+    is&quot; and is subject to change without prior notice, and neither the
+    original author nor X-Ample Technology can be held responsible for any
+    damage arising from its use.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Paul Reuvers" date="08 Jun 2020" title="eXML API, version 0.42 (Preliminary Specification, Revision A)">
+   <change>Original published API document, covering the eXML module's SWI calls, the XML File Despatcher, and the module's error messages.</change>
+  </revision>
+  <revision number="2" author="Charles Ferguson" date="24 September 2026" title="PRM-in-XML conversion">
+   <change>Converted the published API document into PRM-in-XML, adding structured SWI, message, system variable and error definitions, and cross-references between them.</change>
+   <change>Filled the sequential numbering gap in the source between &hex;81CD05 (NoDocType) and &hex;81CD07 (Workspace) by assigning &hex;81CD06 to the Despatch error, which the source lists sharing NoDocType's number.</change>
+  </revision>
+  <revision number="3" author="Charles Ferguson" date="30 September 2026" title="SWI numbers confirmed against the shipped module">
+   <change>Cross-checked every documented SWI number against the module's own SWI decoding table in the shipped distribution (xml_043.zip, module version 0.43, 13 Jun 2020), and against the SWI chunk base (&hex;576C0) recorded in its module header. Every number already given in the API document matched exactly.</change>
+   <change>Added the SWI numbers for eXML_OpenFile (&hex;576DB), eXML_OpenBuffer (&hex;576DC), eXML_DateOp (&hex;576DD), eXML_EncodeString (&hex;576DE), eXML_DecodeString (&hex;576DF), eXML_Base64 (&hex;576E0), and eXML_Pointer (&hex;576E1), none of which the API document itself gave a number for.</change>
+   <change>Confirmed, from the same decoding table, that the &hex;81CD06 gap-fill for the Despatch error made in the previous revision matches the value the BASIC library's Vars file (eXML_ERROR_Despatch) actually ships with.</change>
+   <change>Noted four further SWIs present in the shipped module's decoding table but not described anywhere in the API document: eXML_GetStack, eXML_ConvertToUTF8, eXML_DecodeBlock and eXML_Debug.</change>
+  </revision>
+ </history>
+
+ <related>
+    <reference type='link' href="http://www.xat.nl/riscos/sw/xml/" name="eXML home page"/>
+ </related>
+</meta>
+</riscos-prm>

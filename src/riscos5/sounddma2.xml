@@ -1,0 +1,907 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="SoundDMA: System Information, Notification, and Controller Enumeration">
+
+<section title="Introduction">
+<p>
+The SoundDMA module (<filename>Sound0</filename>) implements the lowest level
+of the RISC OS sound system, generating the interrupt-driven flow of sample
+data to the sound hardware. Its original interface is described in the
+Programmer's Reference Manual chapters on the sound system and on SoundDMA
+itself, and its first significant extension, adding 16-bit linear stereo
+output alongside the original 8-bit mu-law format, is described in the
+addendum "16-Bit Stereo Sound Support for RISC OS" (referred to below as the
+16-bit stereo addendum).
+</p>
+<p>
+Since that addendum was written, SoundDMA has continued to develop in two
+directions. First, the module gained a small self-describing capability
+query, and a set of notifications broadcast whenever the sound system starts,
+stops, or has its configuration changed, so that other software can react to
+these events without polling. Second, RISC OS has grown a family of machines
+with more than one sound controller (for example, more than one hardware
+audio path, or a machine capable of routing sound through different physical
+outputs); a HAL-based module, Sound0HAL, was introduced to support such
+hardware, sharing the same SWI chunk and the same Service_Sound reason-code
+space as SoundDMA, so that client software can use one consistent interface
+regardless of which of the two modules answers a given call.
+</p>
+<p>
+This document is a second addendum to the SoundDMA chapters. It describes:
+</p>
+<p>
+<list type="unordered">
+<item>the <reference type="swi" name="Sound_ReadSysInfo"/> SWI, and how client
+software should use it to discover which of the facilities below are actually
+available before relying on them;</item>
+<item>the new <reference type="service" name="Sound"/> reason codes broadcast
+when the sound system starts, stops, or has its sample rate or buffering
+changed;</item>
+<item>the SWI numbers and reason codes for sound-controller enumeration and
+selection, as implemented by Sound0HAL; and</item>
+<item>a set of implementation decisions, seen in the RISC OS Select lineage of
+this module, concerning how the sound DMA buffers are obtained and mapped,
+which are useful background for anyone maintaining or re-implementing a
+compatible module.</item>
+</list>
+</p>
+<p>
+Everything in this document is additional to, not a replacement for, the base
+PRM chapters and the 16-bit stereo addendum: the SWIs described there
+(<reference type="swi" name="Sound_Configure"/>,
+<reference type="swi" name="Sound_Mode"/>,
+<reference type="swi" name="Sound_LinearHandler"/>,
+<reference type="swi" name="Sound_SampleRate"/>, and so on) are unaffected by
+anything documented here.
+</p>
+</section>
+
+<section title="Overview">
+<p>
+SoundDMA occupies a fixed SWI chunk, and its module header additionally
+defines a block of <reference type="service" name="Sound"/> sub-reason codes
+used to announce changes within the sound system. Historically, both of these
+number spaces grew only when SoundDMA itself gained new facilities. That
+changed when Sound0HAL was introduced: rather than allocate Sound0HAL its own,
+separate SWI chunk and service numbering, its SWI numbers and Service_Sound
+reason codes were defined to continue on directly from SoundDMA's own, and
+SoundDMA's own header is kept up to date with Sound0HAL's additions even
+where SoundDMA itself does not implement the corresponding facility. The
+result is that a client program can call, for example,
+<reference type="swi" name="Sound_ReadSysInfo"/> without needing to know or
+care whether the underlying sound driver is SoundDMA or Sound0HAL.
+</p>
+<p>
+This matters in practice because SoundDMA (this module) targets classic
+VIDC- and IOMD-based sound hardware, which provides exactly one sound
+controller, whereas Sound0HAL supports hardware with a HAL-described choice
+of controllers. Client software that only ever expects a single controller
+can safely ignore the controller-selection facilities described below; that
+is precisely why they were made discoverable through
+<reference type="swi" name="Sound_ReadSysInfo"/> rather than assumed.
+</p>
+<p>
+Sound0HAL does not assume its set of sound controllers is fixed at start-up.
+Each controller is a HAL device of the audio type, and Sound0HAL learns of
+one, and stops using one, through the same Service_Hardware mechanism used
+for HAL device claim and release generally, rather than through any facility
+specific to sound. Consequently controllers
+can appear or disappear while the machine is running, for example a
+removable audio interface being attached or detached, and the set reported
+by <reference type="swi" name="Sound_EnumerateControllers"/> reflects
+whatever is present at the moment of the call. If the controller currently
+selected as default disappears, Sound0HAL stops sound output and, if another
+suitable controller remains, switches to it automatically; it does not
+attempt to fall back to a previous controller if a newly selected one fails
+to start.
+</p>
+<p>
+The notification service calls exist for a different reason: several parts
+of the desktop (loudness/mixer utilities, oscilloscope-style monitoring
+tools, and power-management code) need to know promptly when the sound
+system's operating state changes, and previously had no way to find out
+except by polling <reference type="swi" name="Sound_Enable"/> or
+<reference type="swi" name="Sound_SampleRate"/> repeatedly. The new
+<reference type="service" name="Sound"/> reason codes let such software
+register once, via <reference type="swi" name="OS_ServiceCall"/> claim
+handling in the usual way, and be told as changes happen.
+</p>
+</section>
+
+<section title="Terminology">
+<p>
+<list type="unordered">
+<item><strong>Sound controller</strong>: a distinct hardware sound-generation
+path (for example, a particular set of DACs and associated mixer), as
+enumerated by Sound0HAL on hardware that provides more than one. SoundDMA, on
+VIDC/IOMD hardware, always presents exactly one controller and does not
+itself implement enumeration.</item>
+<item><strong>Sound0HAL</strong>: the HAL-based sound driver module that
+extends the numbering defined by SoundDMA to cover controller enumeration and
+selection, and implements the SWIs and reason codes that do so. Its internal
+handling of individual HAL audio devices (DMA scatter lists, interrupt
+handling, and the like) is outside the scope of this document; the SWI and
+service interface it shares with SoundDMA, and the sound-controller
+enumeration model built on top of it, are described here.</item>
+</list>
+</p>
+</section>
+
+<section title="Technical details">
+
+<subsection title="Capability discovery">
+<p>
+Client software that wants to use any facility described in this document
+should first call <reference type="swi" name="Sound_ReadSysInfo"
+reason="1" use-description="yes"/> and inspect the returned flags, rather
+than infer support from the module's version number. This is because
+Sound0HAL, not SoundDMA, is what actually implements controller enumeration
+on hardware that needs it, and the two modules are versioned independently.
+</p>
+<p>
+SoundDMA's SWI dispatcher does not raise an error for a reason code it does
+not recognise: it simply returns without altering any register. This applies
+both to whole SWIs beyond the end of the module's own jump table, and to
+reason codes of <reference type="swi" name="Sound_ReadSysInfo"/> that this
+module does not handle. Consequently, a call that appears to succeed is not
+by itself evidence that the requested facility is supported; a caller must
+check the returned flags (or, for
+<reference type="swi" name="Sound_ReadSysInfo" reason="2"
+use-description="yes"/>, be aware that this module does not populate any
+result at all) rather than treat "the SWI didn't error" as confirmation. For
+this reason, reason codes of <reference type="swi" name="Sound_ReadSysInfo"/>
+are numbered from 1 rather than 0, so that a zeroed or otherwise
+uninitialised register cannot be mistaken for a valid reason code.
+</p>
+</subsection>
+
+<subsection title="State-change notification">
+<p>
+Four new <reference type="service" name="Sound"/> reason codes report
+changes of state within the sound system: the sample rate or buffer size
+changing, and the sound system being enabled or disabled. Unlike the
+older, low-level <reference type="service" name="Sound" reason="0"
+use-description="yes"/>-family notices, which invite a claimant to alter the
+parameters being set up and are documented as such in the base PRM, these new
+notices are issued once SoundDMA has already committed to the new state.
+They are broadcast purely for information: a recipient cannot use them to
+prevent or change the transition that has already taken place, and should
+not attempt to.
+</p>
+<p>
+On hardware where <reference type="swi" name="Sound_ReadSysInfo" reason="1"
+use-description="yes"/> reports the relevant feature bit clear, these four
+reason codes are never issued; client software that wants to rely on them
+should check for this first rather than assume they are always available on
+every machine SoundDMA can run on.
+</p>
+<p>
+<reference type="service" name="Sound" reason="11" use-description="yes"/>
+is included in this group for numbering purposes, but is issued by the
+SoundChannels module, not by SoundDMA; see its own entry below for details.
+</p>
+</subsection>
+
+<subsection title="Sound-controller enumeration and selection">
+<p>
+Three further SWI numbers, immediately following
+<reference type="swi" name="Sound_ReadSysInfo"/> in the same chunk, are used
+to enumerate and select among sound controllers:
+<reference type="swi" name="Sound_SelectDefaultController"/>,
+<reference type="swi" name="Sound_EnumerateControllers"/>, and
+<reference type="swi" name="Sound_ControllerInfo"/>. A fourth reason code,
+<reference type="swi" name="Sound_ReadSysInfo" reason="2"
+use-description="yes"/>, sits alongside them, to report which controller is
+currently the default.
+</p>
+<p>
+These three SWI numbers, and the second
+<reference type="swi" name="Sound_ReadSysInfo"/> reason code, are not
+implemented by SoundDMA itself: on VIDC/IOMD hardware there is exactly one
+sound controller, so no enumeration is needed. They are implemented by
+Sound0HAL, and documented here, alongside the feature flag that announces
+their availability, so that:
+</p>
+<p>
+<list type="unordered">
+<item>client software written against this chunk of SWI numbers keeps working
+unmodified on hardware where Sound0HAL, rather than SoundDMA, answers the
+call; and</item>
+<item>anyone implementing a compatible sound-controller driver for new
+hardware follows the same interface, rather than inventing a conflicting
+one.</item>
+</list>
+</p>
+<p>
+A sound controller is identified, throughout all four calls, by an opaque,
+null-terminated identifier string, obtained from
+<reference type="swi" name="Sound_EnumerateControllers"/> or
+<reference type="swi" name="Sound_ReadSysInfo" reason="2"
+use-description="yes"/> and passed back verbatim to select or query that
+controller. Client software should treat this string as an opaque token: it
+must be passed back exactly as returned, but nothing should be inferred from
+its content or length. Where a controller identifier is read by SoundDMA
+rather than written by it (as the input to
+<reference type="swi" name="Sound_SelectDefaultController"/>,
+<reference type="swi" name="Sound_EnumerateControllers"/>, and
+<reference type="swi" name="Sound_ControllerInfo"/>), it may be terminated
+by a space or any other control character (any byte value 32 or lower), not
+only by a null byte, so that a controller identifier can be embedded in a
+larger, space-separated command line without further quoting.
+</p>
+<p>
+The three calls that return a controller identifier or other variable-length
+data - <reference type="swi" name="Sound_ReadSysInfo" reason="2"
+use-description="yes"/>, <reference type="swi"
+name="Sound_EnumerateControllers"/>, and <reference type="swi"
+name="Sound_ControllerInfo"/> - share a common buffer convention: the caller
+supplies a buffer pointer and its length, and on exit the length is updated
+to the length of data actually available, whether or not the call succeeded.
+If the supplied buffer is too small, the call returns an error indicating a
+buffer overflow, but still updates the length register with the length that
+would have been required, so that a caller can allocate a larger buffer from
+this value and repeat the call, rather than having to guess a sufficiently
+large buffer size up front.
+</p>
+</subsection>
+
+<subsection title="Sound DMA buffer allocation">
+<p>
+The following implementation decisions are drawn from the RISC OS Select
+lineage of this module. They do not change any SWI or service call
+documented above or in the base PRM, but they are useful background for
+anyone maintaining, re-implementing, or closely interoperating with a
+compatible SoundDMA module, and one of them - read access to the DMA buffer
+memory - is directly observable by client software.
+</p>
+<p>
+Rather than rely on a fixed area of low memory set aside by the kernel at
+boot, the module can instead create its own dynamic area, named "Sound
+hardware buffers", at initialisation, sized to hold its two DMA buffers, and
+release it again at finalisation. This removes the need for the kernel to
+reserve any fixed sound workspace address in advance; a module built this way
+holds the whole of its Level 0 workspace, including the DMA buffers, within
+memory it has allocated for itself.
+</p>
+<p>
+The dynamic area's pages are obtained by requesting DMA-able memory
+specifically (using the "recommend pages" operation of
+<reference type="swi" name="OS_Memory"/> with the DMA-able-memory bit set),
+so that the buffers are always taken from genuine, on-board, DMA-capable RAM
+rather than from any memory that is unsuitable for hardware DMA transfer
+(such as video/Stealth memory when present). Because the sound hardware only
+supports a single page per buffer, the two buffers are allocated as
+contiguous pages, and the area's pre-grow handler maps them in one page at a
+time as the area is created.
+</p>
+<p>
+The dynamic area is flagged for user-mode read access rather than for user
+faulting. This is a deliberate relaxation: there is little reason why a
+user-mode client - for example, a simple oscilloscope-style display, or a
+utility inspecting the raw sample stream - should be prevented from reading
+the buffer memory, and a number of such utilities exist. The area remains
+protected against being written from user mode, and against being paged out,
+cached, or made bufferable, so this does not weaken the guarantees SoundDMA
+itself depends on.
+</p>
+<p>
+The value used to mark "no channel handler installed" or "no scheduler
+installed" in the Level 0/Level 1 data structures (documented in the base
+PRM) is a fixed sentinel constant rather than an address mask. Client code
+that installs or removes channel handlers should compare against the
+documented constant symbolically, rather than assume any particular bit
+pattern, since the exact value used for this sentinel is not guaranteed to
+remain the same across versions of the module.
+</p>
+<p>
+Finally, a module built this way restricts its own initialisation to
+machines it recognises as suitable (RiscPC, A7000, A7000Plus, or a
+virtualised RiscPC), and exits without claiming any vectors on other
+hardware, rather than attempting to run and failing later. Anything that
+replaces or extends SoundDMA on new hardware should apply an equivalent
+check appropriate to that hardware, rather than assume the module will
+simply refuse gracefully by itself.
+</p>
+</subsection>
+
+<subsection title="Audio HAL device interface">
+<p>
+Sound0HAL drives each sound controller through a HAL device of the audio
+type, discovered as described above. Such a device begins with the fields
+common to every HAL device - whose layout is defined elsewhere and is
+outside the scope of this document - followed by an audio-specific
+extension that Sound0HAL uses directly to control the controller and move
+sample data to it.
+</p>
+<category title="Audio HAL device (audio-specific fields)">
+<p>
+The audio-specific fields follow immediately after the generic HAL device
+header, in the order given below. Sound0HAL only uses a device that
+declares an API version between 1 and 3 inclusive; fields introduced by a
+later API version are not present, and must not be accessed, on a device
+declaring an earlier one.
+</p>
+<p>
+<definition-table head-name="Field" head-extra="Size (bytes)" head-value="Contents">
+<definition name="AudioMixer" extra="4">Pointer to the associated HAL mixer device, or 0 if the controller has no hardware mixer of its own; see <reference type="swi" name="Sound_ControllerInfo" reason="1" use-description="yes"/>.</definition>
+<definition name="AudioChannelsOut" extra="4">Number of output channels the controller provides.</definition>
+<definition name="AudioChannelsIn" extra="4">Number of input channels the controller provides.</definition>
+<definition name="AudioDMAParams" extra="20">API 1 and later. Values of R0, R1, R2, R3, and R7 to supply to DMA_RegisterChannel when registering this controller's DMA channel.</definition>
+<definition name="AudioPreEnable" extra="4">API 1 and later. Entry point called before DMA is enabled, with R1 set to the DMA buffer size.</definition>
+<definition name="AudioPostEnable" extra="4">API 1 and later. Entry point called after DMA is enabled, with R1 set to the DMA buffer size.</definition>
+<definition name="AudioPreDisable" extra="4">API 1 and later. Entry point called before DMA is disabled.</definition>
+<definition name="AudioPostDisable" extra="4">API 1 and later. Entry point called after DMA is disabled.</definition>
+<definition name="AudioIRQHandle" extra="4">API 1 and later. Interrupt handler entry point; returns, in R0, 0 for normal servicing or 1 to request that Sound0HAL reset the audio hardware.</definition>
+<definition name="AudioNumRates" extra="4">API 1 and later. Number of entries in the sample rate table pointed to by AudioRateTable.</definition>
+<definition name="AudioRateTable" extra="4">API 1 and later. Pointer to the sample rate table described below.</definition>
+<definition name="AudioSetRate" extra="4">API 1 and later. Entry point called, with R1 set to the 0-based index into the sample rate table of the rate to select, to change the controller's sample rate.</definition>
+<definition name="AudioCustomDMAEnable" extra="4">API 2 and later. Where present, replaces AudioPreEnable and AudioPostEnable for a controller that manages its own buffering rather than using DMAManager. Called with R1 = DMA buffer size, R2 and R3 = the two buffer addresses, and a callback parameter and function pointer passed on the stack.</definition>
+<definition name="AudioFlags" extra="4">API 2 and later. Flags describing the controller's data requirements and behaviour, described below.</definition>
+<definition name="AudioMinBuffSize" extra="4">API 2 and later. Minimum buffer size the controller accepts, in bytes.</definition>
+<definition name="AudioBuffAlign" extra="4">API 2 and later. Required buffer alignment and size granularity, in bytes.</definition>
+</definition-table>
+</p>
+<p>
+Two flag bits are defined for AudioFlags:
+<bitfield-table>
+ <bit number="0" name="StereoReverse" state="clear">Sample data is supplied to this controller in the VIDC-style right-left channel order used elsewhere in this chapter.</bit>
+ <bit number="0" name="StereoReverse" state="set">Sample data must instead be supplied to this controller in left-right channel order.</bit>
+ <bit number="1" name="Synchronous" state="clear">API 3 and later, when AudioCustomDMAEnable is in use: buffer-fill processing is deferred rather than performed directly from the callback function.</bit>
+ <bit number="1" name="Synchronous" state="set">API 3 and later, when AudioCustomDMAEnable is in use: the controller's callback function performs buffer-fill processing synchronously, within the callback itself.</bit>
+</bitfield-table>
+</p>
+<p>
+Each entry in the sample rate table pointed to by AudioRateTable is 8 bytes
+long, and gives the rate in the same Hz&times;1024 units used elsewhere in
+this chapter (see <reference type="service" name="Sound" reason="8"
+use-description="yes"/>), followed by the corresponding sample period in
+microseconds.
+</p>
+</category>
+</subsection>
+
+</section>
+
+<section title="Service calls">
+
+<service-definition name="Sound" number="54"
+                    description="Notifies of, and allows limited control of, changes within the sound system">
+<entry>
+ <register-use number="0">
+ Reason code:
+ <p>
+ <value-table head-number="Reason" head-value="Action">
+  <value number="0-7">See the base PRM chapter on the sound system for the pre-existing Level 0/1/2 alive/dying and SharedSound reason codes.</value>
+  <value number="8"><reference type="service" name="Sound" reason="8" use-description="yes"/></value>
+  <value number="9"><reference type="service" name="Sound" reason="9" use-description="yes"/></value>
+  <value number="10"><reference type="service" name="Sound" reason="10" use-description="yes"/></value>
+  <value number="11"><reference type="service" name="Sound" reason="11" use-description="yes"/></value>
+ </value-table>
+ </p>
+ </register-use>
+ <register-use number="1-9">Dependent on reason code</register-use>
+</entry>
+<exit>
+ <register-use number="0-9" state="preserved"/>
+</exit>
+<use>
+<p>
+Reason codes 8-11 are new since the 16-bit stereo addendum; see the
+individual entries below, and
+<reference type="section" name="Technical details"/> above, for how they are
+used.
+</p>
+</use>
+<related>
+ <reference type="swi" name="Sound_ReadSysInfo"/>
+</related>
+</service-definition>
+
+<service-definition name="Sound" number="54" reason="8" reasonname="SoundConfigChanging"
+                    description="The sound system's sample rate or buffer size has changed">
+<entry>
+ <register-use number="0">8 (reason code)</register-use>
+ <register-use number="1">54 (Service_Sound)</register-use>
+ <register-use number="2">new sample rate, in units of 1/1024 Hz</register-use>
+ <register-use number="3">new number of samples per buffer</register-use>
+</entry>
+<exit>
+ <register-use number="0-3" state="preserved"/>
+</exit>
+<use>
+<p>
+This reason code is broadcast once SoundDMA has already adopted a new sample
+rate and/or buffer size, whether that change was made through
+<reference type="swi" name="Sound_SampleRate" reason="3"
+use-description="yes"/> or through an equivalent change made while producing
+compatibility mu-law output. It is not issued unless the new values actually
+differ from the previous ones.
+</p>
+<p>
+Recipients cannot prevent or alter the change; it has already taken effect
+by the time this notice is broadcast. A recipient that needs to resynchronise
+buffered data or a rate-dependent display should treat R2 and R3 as
+informational and, if it needs authoritative current values, re-read them
+with <reference type="swi" name="Sound_SampleRate" reason="1"
+use-description="yes"/>.
+</p>
+<p>
+This reason code is only issued on hardware where
+<reference type="swi" name="Sound_ReadSysInfo" reason="1"
+use-description="yes"/> reports the relevant feature bit set.
+</p>
+</use>
+<related>
+ <reference type="swi" name="Sound_SampleRate"/>
+ <reference type="swi" name="Sound_ReadSysInfo"/>
+</related>
+</service-definition>
+
+<service-definition name="Sound" number="54" reason="9" reasonname="SoundEnabled"
+                    description="The sound system has been enabled">
+<entry>
+ <register-use number="0">9 (reason code)</register-use>
+ <register-use number="1">54 (Service_Sound)</register-use>
+</entry>
+<exit>
+ <register-use number="0-1" state="preserved"/>
+</exit>
+<use>
+<p>
+Broadcast when sound output is enabled, for example by
+<reference type="swi" name="Sound_Enable"/> being called to turn the sound
+system on. As with the other new reason codes, this is a pure notification:
+the transition has already been made by the time it is broadcast, and it is
+only issued on hardware where
+<reference type="swi" name="Sound_ReadSysInfo" reason="1"
+use-description="yes"/> reports the relevant feature bit set.
+</p>
+</use>
+<related>
+ <reference type="swi" name="Sound_Enable"/>
+ <reference type="service" name="Sound" reason="10"/>
+</related>
+</service-definition>
+
+<service-definition name="Sound" number="54" reason="10" reasonname="SoundDisabled"
+                    description="The sound system has been disabled">
+<entry>
+ <register-use number="0">10 (reason code)</register-use>
+ <register-use number="1">54 (Service_Sound)</register-use>
+</entry>
+<exit>
+ <register-use number="0-1" state="preserved"/>
+</exit>
+<use>
+<p>
+Broadcast when sound output is disabled, for example by
+<reference type="swi" name="Sound_Enable"/> being called to turn the sound
+system off. This is a pure notification, issued once output has already
+stopped, and only on hardware where
+<reference type="swi" name="Sound_ReadSysInfo" reason="1"
+use-description="yes"/> reports the relevant feature bit set.
+</p>
+</use>
+<related>
+ <reference type="swi" name="Sound_Enable"/>
+ <reference type="service" name="Sound" reason="9"/>
+</related>
+</service-definition>
+
+<service-definition name="Sound" number="54" reason="11" reasonname="SoundAutoTune"
+                    description="The SoundChannels module's automatic sample-rate tuning has been enabled or disabled">
+<entry>
+ <register-use number="0">11 (reason code)</register-use>
+ <register-use number="1">54 (Service_Sound)</register-use>
+</entry>
+<exit>
+ <register-use number="0-1" state="preserved"/>
+</exit>
+<use>
+<p>
+This reason code is issued by the SoundChannels module, not by SoundDMA:
+SoundChannels shares SoundDMA's Service_Sound reason-code space, and this
+number is allocated here to keep the numbering coordinated between the two
+modules. It is broadcast whenever SoundChannels' automatic tuning facility
+is switched on or off. SoundDMA defines no further register conventions for
+this reason code beyond the reason code itself; consult SoundChannels'
+own documentation for anything further it may pass.
+</p>
+</use>
+<related>
+ <reference type="swi" name="Sound_ReadSysInfo"/>
+</related>
+</service-definition>
+
+</section>
+
+<section title="SWI calls">
+
+<swi-definition name="Sound_ReadSysInfo" number="40147"
+                description="Reads capability and configuration information about the sound system"
+                irqs="undefined" fiqs="enabled"
+                processor-mode="SVC" re-entrant="no">
+<entry>
+ <register-use number="0">
+ Reason code:
+ <p>
+ <value-table head-number="Reason" head-value="Action">
+  <value number="1"><reference type="swi" name="Sound_ReadSysInfo" reason="1" use-description="yes"/></value>
+  <value number="2"><reference type="swi" name="Sound_ReadSysInfo" reason="2" use-description="yes"/></value>
+ </value-table>
+ </p>
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0-2">Dependent on reason code</register-use>
+</exit>
+<use>
+<p>
+Reason codes are numbered from 1, not 0, because SoundDMA's SWI dispatcher
+does not raise an error for a reason code it does not recognise: it simply
+returns without touching any register. Starting the numbering at 1 means a
+caller can distinguish "this reason code is genuinely unsupported by the
+module answering the call" from "R0 happened to be left at 0" by the fact
+that reason code 0 is never assigned to anything.
+</p>
+<p>
+Client software should call this SWI with reason code 1 before relying on
+any of the facilities described in this document, since not every reason
+code, and not every other new SWI in this chunk, is implemented by every
+module that answers calls in it.
+</p>
+</use>
+<related>
+ <reference type="service" name="Sound"/>
+ <reference type="swi" name="Sound_SelectDefaultController"/>
+</related>
+</swi-definition>
+
+<swi-definition name="Sound_ReadSysInfo" number="40147" reason="1" reasonname="Features"
+                description="Reads which of the facilities described in this document are supported"
+                irqs="undefined" fiqs="enabled"
+                processor-mode="SVC" re-entrant="no">
+<entry>
+ <register-use number="0">1 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="0">0</register-use>
+ <register-use number="1">
+ Feature flags:
+ <bitfield-table>
+  <bit number="0" name="Service8910" state="clear">
+  The <reference type="service" name="Sound" reason="8"/>,
+  <reference type="service" name="Sound" reason="9"/>, and
+  <reference type="service" name="Sound" reason="10"/> notifications are not
+  generated.
+  </bit>
+  <bit number="0" name="Service8910" state="set">
+  The <reference type="service" name="Sound" reason="8"/>,
+  <reference type="service" name="Sound" reason="9"/>, and
+  <reference type="service" name="Sound" reason="10"/> notifications are
+  generated by this module.
+  </bit>
+  <bit number="1" name="ControllerSelection" state="clear">
+  <reference type="swi" name="Sound_SelectDefaultController"/>,
+  <reference type="swi" name="Sound_EnumerateControllers"/>, and
+  <reference type="swi" name="Sound_ControllerInfo"/> are not supported by
+  this module.
+  </bit>
+  <bit number="1" name="ControllerSelection" state="set">
+  <reference type="swi" name="Sound_SelectDefaultController"/>,
+  <reference type="swi" name="Sound_EnumerateControllers"/>, and
+  <reference type="swi" name="Sound_ControllerInfo"/> are supported.
+  </bit>
+  <bit number="2-31" state="reserved">Reserved, must be ignored</bit>
+ </bitfield-table>
+ </register-use>
+</exit>
+<use>
+<p>
+On the classic VIDC/IOMD implementation of SoundDMA, bit 0 depends on the
+underlying hardware (it is only set on IOMD-based machines with VIDC20
+sound hardware), and bit 1 is always clear, since that module supports only
+a single sound controller and does not implement controller enumeration.
+Hardware with more than one sound controller is instead served by
+Sound0HAL, which sets bit 1 when its controller-enumeration SWIs are
+available.
+</p>
+</use>
+<related>
+ <reference type="swi" name="Sound_ReadSysInfo"/>
+ <reference type="service" name="Sound" reason="8"/>
+ <reference type="service" name="Sound" reason="9"/>
+ <reference type="service" name="Sound" reason="10"/>
+</related>
+</swi-definition>
+
+<swi-definition name="Sound_ReadSysInfo" number="40147" reason="2" reasonname="DefaultController"
+                description="Reads the identifier of the currently selected default sound controller"
+                irqs="undefined" fiqs="enabled"
+                processor-mode="SVC" re-entrant="no">
+<entry>
+ <register-use number="0">2 (reason code)</register-use>
+ <register-use number="1">pointer to a buffer to receive the controller identifier</register-use>
+ <register-use number="2">length of the buffer at R1, in bytes</register-use>
+</entry>
+<exit>
+ <register-use number="0">0, or an error if the buffer at R1 is too small</register-use>
+ <register-use number="1" state="preserved"/>
+ <register-use number="2">the length of the identifier actually available, in bytes, including its terminating null; the buffer at R1 is filled in with the null-terminated identifier only if it was large enough</register-use>
+</exit>
+<use>
+<p>
+This reason code is implemented by Sound0HAL, not by the classic VIDC/IOMD
+SoundDMA module documented elsewhere in this chapter: calling it there
+returns without altering any register (see
+<reference type="swi" name="Sound_ReadSysInfo"/> above), so a caller must
+first check
+<reference type="swi" name="Sound_ReadSysInfo" reason="1"
+use-description="yes"/> to confirm controller selection is supported before
+relying on this reason code.
+</p>
+<p>
+The identifier returned is the same opaque string
+<reference type="swi" name="Sound_EnumerateControllers"/> would return for
+the controller currently in use, and can be passed to
+<reference type="swi" name="Sound_ControllerInfo"/> to read further details
+about it, or back to
+<reference type="swi" name="Sound_SelectDefaultController"/> to select it
+again after some other controller has been selected.
+</p>
+</use>
+<related>
+ <reference type="swi" name="Sound_ReadSysInfo" reason="1"/>
+ <reference type="swi" name="Sound_SelectDefaultController"/>
+ <reference type="swi" name="Sound_EnumerateControllers"/>
+ <reference type="swi" name="Sound_ControllerInfo"/>
+</related>
+</swi-definition>
+
+<swi-definition name="Sound_SelectDefaultController" number="40148"
+                description="Selects which sound controller subsequent sound output is directed to"
+                internal="no"
+                irqs="undefined" fiqs="enabled"
+                processor-mode="SVC" re-entrant="no">
+<entry>
+ <register-use number="0">pointer to the null, space, or control-character terminated identifier of the controller to select</register-use>
+</entry>
+<exit>
+ <register-use number="0">0, or an error if no controller with this identifier is currently present</register-use>
+</exit>
+<use>
+<p>
+This SWI is implemented by Sound0HAL, alongside
+<reference type="swi" name="Sound_EnumerateControllers"/> and
+<reference type="swi" name="Sound_ControllerInfo"/>, for selecting the
+default sound controller on hardware with more than one; it is not
+implemented by the classic VIDC/IOMD SoundDMA module documented elsewhere
+in this chapter, which supports only a single controller. Availability is
+announced by the ControllerSelection bit of
+<reference type="swi" name="Sound_ReadSysInfo" reason="1"
+use-description="yes"/>.
+</p>
+<p>
+If the identifier given names the controller already selected, this SWI
+does nothing further. Otherwise, sound output is stopped on the current
+controller, the new controller is started in its place, and sound is
+resumed if it was in use beforehand. If the new controller fails to start,
+this SWI returns the resulting error and does not attempt to fall back to
+the previous controller, which remains stopped.
+</p>
+</use>
+<related>
+ <reference type="swi" name="Sound_ReadSysInfo" reason="1"/>
+ <reference type="swi" name="Sound_ReadSysInfo" reason="2"/>
+ <reference type="swi" name="Sound_EnumerateControllers"/>
+ <reference type="swi" name="Sound_ControllerInfo"/>
+</related>
+</swi-definition>
+
+<swi-definition name="Sound_EnumerateControllers" number="40149"
+                description="Lists the sound controllers available on this machine"
+                internal="no"
+                irqs="undefined" fiqs="enabled"
+                processor-mode="SVC" re-entrant="no">
+<entry>
+ <register-use number="0">0, or the null, space, or control-character terminated identifier of the controller to continue from, to list the next one</register-use>
+ <register-use number="1">pointer to a buffer to receive the next identifier; may be the same address as R0</register-use>
+ <register-use number="2">length of the buffer at R1, in bytes</register-use>
+</entry>
+<exit>
+ <register-use number="0">0, or an error if the buffer at R1 is too small</register-use>
+ <register-use number="2">the length of the identifier actually available, in bytes, including its terminating null; the buffer at R1 is filled in with the null-terminated identifier only if it was large enough</register-use>
+</exit>
+<use>
+<p>
+This SWI is implemented by Sound0HAL, working alongside
+<reference type="swi" name="Sound_SelectDefaultController"/> and
+<reference type="swi" name="Sound_ControllerInfo"/>, for enumerating the
+sound controllers present on hardware with more than one; it is not
+implemented by the classic VIDC/IOMD SoundDMA module. Its availability is
+announced by the ControllerSelection bit of
+<reference type="swi" name="Sound_ReadSysInfo" reason="1"
+use-description="yes"/>.
+</p>
+<p>
+To list every controller present, a caller passes 0 (or a pointer to an
+empty string) in R0 on the first call, then repeats the call feeding the
+identifier just returned back in as R0 each time, until the buffer at R1 is
+filled in with an empty string, which marks the end of the list. Because R1
+may be the same address as R0, a caller can step through the whole list
+using a single buffer. The list reflects the controllers present at the
+moment of each call; a controller that has appeared or disappeared between
+two calls may cause the remainder of the enumeration to change accordingly.
+</p>
+</use>
+<related>
+ <reference type="swi" name="Sound_ReadSysInfo" reason="1"/>
+ <reference type="swi" name="Sound_ReadSysInfo" reason="2"/>
+ <reference type="swi" name="Sound_SelectDefaultController"/>
+ <reference type="swi" name="Sound_ControllerInfo"/>
+</related>
+</swi-definition>
+
+<swi-definition name="Sound_ControllerInfo" number="4014A"
+                description="Reads information about a specific sound controller"
+                internal="no"
+                irqs="undefined" fiqs="enabled"
+                processor-mode="SVC" re-entrant="no">
+<entry>
+ <register-use number="0">pointer to the null, space, or control-character terminated identifier of the controller to read</register-use>
+ <register-use number="1">pointer to a buffer to receive the result</register-use>
+ <register-use number="2">length of the buffer at R1, in bytes</register-use>
+ <register-use number="3">
+ Reason code:
+ <p>
+ <value-table head-number="Reason" head-value="Action">
+  <value number="0"><reference type="swi" name="Sound_ControllerInfo" reason="0" use-description="yes"/></value>
+  <value number="1"><reference type="swi" name="Sound_ControllerInfo" reason="1" use-description="yes"/></value>
+  <value number="2"><reference type="swi" name="Sound_ControllerInfo" reason="2" use-description="yes"/></value>
+ </value-table>
+ </p>
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0">0, or an error if no controller with this identifier is currently present, the buffer at R1 is too small, or R3 is not one of the reason codes below</register-use>
+ <register-use number="2">the length of the data actually available, in bytes; the buffer at R1 is filled in with it only if it was large enough</register-use>
+</exit>
+<use>
+<p>
+This SWI is implemented by Sound0HAL for reading details of a particular
+sound controller identified by
+<reference type="swi" name="Sound_EnumerateControllers"/>,
+<reference type="swi" name="Sound_ReadSysInfo" reason="2"
+use-description="yes"/>, or <reference type="swi"
+name="Sound_SelectDefaultController"/>; it is not implemented by the
+classic VIDC/IOMD SoundDMA module. Its availability is announced by the
+ControllerSelection bit of
+<reference type="swi" name="Sound_ReadSysInfo" reason="1"
+use-description="yes"/>. The reason codes below record what each is for and
+the exact form of data each returns.
+</p>
+</use>
+<related>
+ <reference type="swi" name="Sound_ReadSysInfo" reason="1"/>
+ <reference type="swi" name="Sound_EnumerateControllers"/>
+ <reference type="swi" name="Sound_SelectDefaultController"/>
+</related>
+</swi-definition>
+
+<swi-definition name="Sound_ControllerInfo" number="4014A" reason="0" reasonname="DisplayName"
+                description="Reads a human-readable name for a sound controller"
+                internal="no"
+                irqs="undefined" fiqs="enabled"
+                processor-mode="SVC" re-entrant="no">
+<entry>
+ <register-use number="3">0 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="1">filled in with a null-terminated name suitable for presenting the controller to the user, for example in a Configure-style choice of output device; where a translation into the user's chosen language is available, it is returned in preference to the controller's own description</register-use>
+</exit>
+<use>
+<p>
+Reads a name suitable for presenting a sound controller to the user. Defined
+by Sound0HAL; see <reference type="swi" name="Sound_ControllerInfo"/> above.
+</p>
+</use>
+<related>
+ <reference type="swi" name="Sound_ControllerInfo"/>
+</related>
+</swi-definition>
+
+<swi-definition name="Sound_ControllerInfo" number="4014A" reason="1" reasonname="MixerDevice"
+                description="Reads the mixer device associated with a sound controller"
+                internal="no"
+                irqs="undefined" fiqs="enabled"
+                processor-mode="SVC" re-entrant="no">
+<entry>
+ <register-use number="3">1 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="2">4</register-use>
+ <register-use number="1">filled in with a single word: a pointer to the HAL mixer device associated with this controller. If the controller provides no hardware mixer of its own, this instead points to a software mixer device that Sound0HAL substitutes transparently, so that mixer-aware client software need not treat the two cases differently.</register-use>
+</exit>
+<use>
+<p>
+Reads which mixer device is associated with a sound controller, for
+software that adjusts volume or routing independently of SoundDMA itself.
+Defined by Sound0HAL; see
+<reference type="swi" name="Sound_ControllerInfo"/> above. The layout of
+the mixer device itself is defined elsewhere and is outside the scope of
+this document.
+</p>
+</use>
+<related>
+ <reference type="swi" name="Sound_ControllerInfo"/>
+</related>
+</swi-definition>
+
+<swi-definition name="Sound_ControllerInfo" number="4014A" reason="2" reasonname="SampleRates"
+                description="Reads the sample rates supported by a sound controller"
+                internal="no"
+                irqs="undefined" fiqs="enabled"
+                processor-mode="SVC" re-entrant="no">
+<entry>
+ <register-use number="3">2 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="2">the number of supported rates multiplied by 4</register-use>
+ <register-use number="1">filled in with one word per supported sample rate, each in the same Hz&times;1024 units used elsewhere in this chapter (see <reference type="service" name="Sound" reason="8" use-description="yes"/>)</register-use>
+</exit>
+<use>
+<p>
+Reads which sample rates a given sound controller supports, complementing
+<reference type="swi" name="Sound_SampleRate"/> on hardware where different
+controllers may support different rates. Defined by Sound0HAL; see
+<reference type="swi" name="Sound_ControllerInfo"/> above.
+</p>
+</use>
+<related>
+ <reference type="swi" name="Sound_ControllerInfo"/>
+ <reference type="swi" name="Sound_SampleRate"/>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson (Gerph)" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+    &copy; Charles Ferguson, 2026. Licensed for use under the terms of the
+    documentation licence applying to the rest of this manual set.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Charles Ferguson (Gerph)" date="30 Jul 2026" title="Initial version">
+    <change>Documented Sound_ReadSysInfo, the new Service_Sound notification
+    reason codes, the SWI numbers and reason codes reserved for Sound0HAL's
+    sound-controller enumeration, and implementation notes on dynamic-area
+    based DMA buffer allocation.</change>
+  </revision>
+  <revision number="2" author="Charles Ferguson (Gerph)" date="31 Jul 2026" title="Sound0HAL implementation detail">
+    <change>Replaced the reserved-numbering placeholders for
+    Sound_ReadSysInfo reason 2, Sound_SelectDefaultController,
+    Sound_EnumerateControllers, and Sound_ControllerInfo with full register
+    conventions, the controller identifier and buffer conventions they
+    share, and the audio HAL device interface Sound0HAL uses to drive
+    individual sound controllers.</change>
+  </revision>
+ </history>
+
+ <related>
+    <reference type='link' href="https://www.riscos.com/support/developers/prm/sound.html" name="The sound system (PRM)"/>
+    <reference type='link' href="https://www.riscos.com/support/developers/prm/sounddma.html" name="SoundDMA (PRM)"/>
+ </related>
+</meta>
+</riscos-prm>

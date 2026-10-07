@@ -1,0 +1,607 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="External Edit Protocol">
+<section title="Introduction">
+<p>
+The External Edit protocol allows one application to delegate editing,
+display, or playback of a single data object to another application. The
+client application starts an external editing session, transfers an initial
+data object if required, and later requests the edited data back. The editor
+application opens an appropriate window or playback context for that object,
+allows the user to work with it, and returns the resulting data through the
+normal RISC OS data transfer mechanisms.
+</p>
+</section>
+
+<section title="Overview">
+<p>
+The protocol is intended to provide a simple, desktop-oriented alternative to
+embedding many specialised editors inside larger applications. It applies the
+same basic idea used by command-line systems, where an application saves data,
+invokes an external editor, and then reloads the result, but adapts that model
+to a multitasking desktop environment.
+</p>
+
+<p>
+The protocol also exists as a reaction against monolithic applications that
+contain their own weak built-in editors for specialist data. Instead of
+forcing every application to carry a private bitmap editor, text editor, sound
+viewer, or palette chooser, the desktop can share one capable editor for each
+kind of data and let users choose which editor they prefer.
+</p>
+
+<p>
+Using a separate data editor has several practical advantages:
+<list type="unordered">
+<item><p>The main application does not need to contain all the editing code for every data type it wishes to support.</p></item>
+<item><p>The editor code need only be resident and executing while it is actually needed.</p></item>
+<item><p>The user can choose one preferred editor for each kind of data and use that choice consistently across applications.</p></item>
+<item><p>The main application can support data whose detailed format or editing semantics it does not fully understand.</p></item>
+<item><p>An editor does not have to be an editor in the narrow sense; it may simply display, play, or otherwise present the data.</p></item>
+</list>
+</p>
+
+<p>
+The protocol therefore provides a lightweight form of hotlinking. The data is
+treated as a single transferable object, handed out to another task for work,
+and later returned as a single object. It does not try to provide continuous,
+system-wide live linking, but it does provide a simple and effective base
+level of inter-application cooperation with far less operating system support
+and far less implementation complexity.
+</p>
+
+<p>
+An external edit session always involves three parties:
+<list type="unordered">
+<item><p>The client, which requests the session and may later request the data back.</p></item>
+<item><p>The editor, which claims the request and provides the editing or playback environment.</p></item>
+<item><p>The user, who decides when to edit, save, discard, or close the external session.</p></item>
+</list>
+</p>
+
+<p>
+The protocol is deliberately built around standard Wimp messages and the
+existing RAM transfer and file transfer protocols. This keeps client-side
+support small and allows editors to reuse existing data transfer code.
+</p>
+
+<subsection title="Typical uses">
+<p>
+The original protocol document described a range of uses that motivated the
+design:
+</p>
+
+<p>
+<list type="unordered">
+<item><p>A compiler can open a source file in a text editor, position the cursor at the error, and recompile when the user requests return of the edited text.</p></item>
+<item><p>A desktop publisher can hand a DrawFile illustration to a drawing package and later replace the embedded object with the returned result.</p></item>
+<item><p>A DrawFile editor can hand text areas to a text editor and sprites to a paint package.</p></item>
+<item><p>A music or sample editor can display and play individual sample data in a specialist sample editor.</p></item>
+<item><p>An adventure authoring system can use fully-featured external text and graphics editors while keeping only the game-specific location and object editing logic in-house.</p></item>
+<item><p>A hypermedia or browser-style application can ask the desktop to display or play file types that it does not itself understand.</p></item>
+<item><p>A configuration tool can centralise preference editing for multiple applications through a shared editor for the configuration data.</p></item>
+<item><p>Palette or true-colour chooser data can be delegated to a colour editor that returns the chosen values in a form the client can use.</p></item>
+</list>
+</p>
+</subsection>
+</section>
+
+<section title="Technical Details">
+<subsection title="Session model">
+<p>
+The client starts a session by broadcasting <reference type="message"
+name="EditRq"/>. An editor that can handle the requested data type
+opens a blank editing context and replies with
+<reference type="message" name="EditAck"/>. The client may then send
+one or more <reference type="message" name="EditDataSave"/> messages
+to insert data, may use <reference type="message" name="EditCursor"/>
+to set or inspect the current cursor or selection, and may use
+<reference type="message" name="EditReturn"/> to request the edited
+data back. Either party may terminate the session with
+<reference type="message" name="EditAbort"/>.
+</p>
+
+<p>
+The editor may also initiate return of the data, for example when the user
+chooses a save action or closes the external edit window. The returned data is
+sent through <reference type="message" name="EditDataSave"/> followed
+by the normal Acorn data transfer messages.
+</p>
+</subsection>
+
+<subsection title="Common data items">
+<subsubsection title="Data type word">
+<p>
+Most protocol messages carry a 32-bit data type word in the form
+<userinput>&amp;eeee0ttt</userinput>. The low 16 bits carry the base RISC OS
+file type. The high 16 bits carry an extension that refines the meaning of
+that file type when a plain file type is not precise enough.
+</p>
+
+<p>
+An extension of <userinput>&amp;0000</userinput> means that no extra typing
+information is supplied beyond the base RISC OS file type. Values
+<userinput>&amp;0001</userinput> to <userinput>&amp;04FF</userinput> are
+reserved for user allocation, although shared protocol use benefits from a
+single agreed allocation for each specialised data type.
+</p>
+</subsubsection>
+
+<subsubsection title="Job handle">
+<p>
+The job handle identifies one session throughout its lifetime. It has the form
+<userinput>&amp;eeeecccc</userinput>, where the low 16 bits are chosen by the
+client and the high 16 bits are chosen by the editor. Both halves must be
+non-zero. Once established, the handle never changes for that session.
+</p>
+
+<p>
+Each side should choose values that are unique across the lifetime of the
+task, rather than recycling handle values. A practical implementation is to
+use part of the local 16-bit half as a monotonically increasing session number
+and part as an array index, then validate the full 32-bit handle before acting
+on any message for an existing session.
+</p>
+</subsubsection>
+
+<subsubsection title="Flag word">
+<p>
+The protocol uses a single flag word layout across all messages. Some flags
+are only meaningful for particular messages; unsupported or irrelevant flags
+should be ignored.
+</p>
+
+<p>
+<bitfield-table>
+<bit number="0" name="Continue editing">
+For messages that return data, this bit controls whether the session continues
+after the transfer completes. A set bit means that editing should continue; a
+clear bit means that the session should end once the data has been returned.
+</bit>
+<bit number="1" name="Selection only">
+In <reference type="message" name="EditReturn"/>, this bit requests
+that only the current selection be returned. When data is returned, the same
+bit reports whether the whole object or only the selection is being sent.
+</bit>
+<bit number="2" name="Read-only">
+Requests that the editor treat the data as read-only. Editors that support
+read-only operation should prevent modification; clients must still be ready to
+ignore unexpected attempts to return changed data.
+</bit>
+<bit number="3" name="Immediate execution">
+Requests that playable or executable data should start as soon as practical
+after receipt. If the data type has no playback concept, the editor ignores
+this flag.
+</bit>
+<bit number="4" name="Adjust selection">
+For <reference type="message" name="EditCursor"/>, adds the supplied
+selection range to the current selection rather than replacing it.
+</bit>
+<bit number="5-31" state="reserved">
+Reserved. These bits must be zero when sending and ignored when receiving.
+</bit>
+</bitfield-table>
+</p>
+</subsubsection>
+</subsection>
+
+<subsection title="Data transfer">
+<p>
+The protocol does not define a new payload transfer format. Instead, it uses
+<reference type="message" name="EditDataSave"/> as the session-scoped
+equivalent of <userinput>Message_DataSave</userinput>, then follows the normal
+RAM transfer or file transfer conventions already used elsewhere on the
+desktop.
+</p>
+
+<p>
+The client typically sends one initial data transfer immediately after
+receiving <reference type="message" name="EditAck"/>, but a blank edit
+window is also valid. Additional transfers from the client are inserted at the
+current cursor position when that concept exists. Transfers from the editor
+return the current edited object or selection to the client.
+</p>
+</subsection>
+
+<subsection title="Cursor and selection model">
+<p>
+<reference type="message" name="EditCursor"/> positions a cursor,
+selects a contiguous range of data units, or queries the current values. The
+smallest meaningful unit depends on the data type. If no specialised unit has
+been agreed for a type, byte offsets are the default.
+</p>
+
+<p>
+The cursor position identifies a data unit counted from the start of the
+object. Unit 1 is the first item, unit 2 the second, and so on. For text-like
+data where a caret sits between units, the caret is positioned after the named
+unit; the special position 0 therefore places the caret before the first unit.
+For object-based formats such as DrawFile, position 0 should be treated as 1.
+</p>
+
+<p>
+The value <userinput>-1</userinput> (<userinput>&amp;FFFFFFFF</userinput>)
+means "leave this position unchanged". The value
+<userinput>-2</userinput> (<userinput>&amp;FFFFFFFE</userinput>) means
+"end of data". Setting all three new position fields to
+<userinput>-1</userinput> reads the current positions without moving them.
+</p>
+
+<p>
+<definition-table head-name="Type" head-extra="File type"
+                  head-value="Data unit">
+<definition name="Text" extra="&hex;FFF">Character.</definition>
+<definition name="Command" extra="&hex;FFE">Character.</definition>
+<definition name="TaskObey" extra="&hex;FD7">Character.</definition>
+<definition name="TaskExec" extra="&hex;FD6">Character.</definition>
+<definition name="Obey" extra="&hex;FEB">Character.</definition>
+<definition name="Data" extra="&hex;FFD">Byte offset.</definition>
+<definition name="BASIC" extra="&hex;FFB">Byte offset in tokenised form, or character offset in text form.</definition>
+<definition name="Sprite" extra="&hex;FF9">Sprite number or index.</definition>
+<definition name="Palette" extra="&hex;FED">Colour index in the standard file format.</definition>
+<definition name="DrawFile" extra="&hex;AFF">Draw object.</definition>
+<definition name="ARMovie" extra="&hex;AE7">Animation frame number.</definition>
+</definition-table>
+</p>
+</subsection>
+
+<subsection title="Returning data">
+<p>
+The client can explicitly request return of the edited data by sending
+<reference type="message" name="EditReturn"/>. The editor can also
+return the data because of user actions within the editing session.
+</p>
+
+<p>
+Common editor-side triggers are:
+<list type="unordered">
+<item><p>The user chooses a save action or confirms the save-as dialogue, in which case the editor returns the data and then ends the session only if the Continue editing flag is clear.</p></item>
+<item><p>The user drags the save icon to a file destination, in which case the editor writes a copy to disc and continues editing.</p></item>
+<item><p>The user closes the external edit window, in which case the editor should offer the same Save, Discard, and Cancel choices that it would for an ordinary modified document.</p></item>
+</list>
+</p>
+</subsection>
+
+<subsection title="Error handling and closure">
+<p>
+Missing replies do not always indicate failure. Some protocol steps expect no
+response, and <reference type="message" name="EditCursor"/> in
+particular is not a reliable heartbeat for session liveness. A session should
+only be assumed dead when a definitive failure occurs or when the surrounding
+data transfer protocols report a real breakdown.
+</p>
+
+<p>
+When communication has genuinely failed, or when either task must abandon the
+session unexpectedly, it should send
+<reference type="message" name="EditAbort"/> if at all possible and
+then release all local state for that handle. Clients should treat externally
+edited data as modified data when deciding whether a document may be closed.
+</p>
+
+<p>
+If a document contains data currently being edited externally, closing that
+document should behave like closing a document with unsaved changes. The user
+should be able to request a return-and-save operation or discard the external
+session explicitly.
+</p>
+</subsection>
+
+<subsection title="Multi-file and nested editing">
+<p>
+ExtEdit exchanges a single data object. Document formats that consist of
+multiple files or directories must define their own representation for
+transporting that object as a single transferable entity. One workable
+approach is to avoid RAM transfer for such formats and rely on saved files on
+disc; another is to define a custom single-file transport form.
+</p>
+
+<p>
+Editors should treat child external edits as separate sessions rather than
+automatically pulling those child results back into the parent object when the
+parent itself is returned. A parent editor may warn that child external edits
+remain unreturned, but it should not silently update its own return data from
+those child sessions.
+</p>
+</subsection>
+
+<subsection title="Registered users and future extensions">
+<p>
+The original document recorded current and planned users of the protocol to
+encourage adoption and interoperability. At that time, StrongEd 2 and
+StrongHlp already supported the protocol, and Zap, ZEdit, and DSEdit II were
+listed as intending to support it.
+</p>
+
+<p>
+The protocol also reserved space for future extension. New flag bits, extended
+data types, and any extra messages or SWI-based support layered on top of the
+core protocol should be allocated in a coordinated way so that independent
+applications do not collide.
+</p>
+</subsection>
+</section>
+
+<section title="Wimp Messages">
+<message-definition name="EditRq"
+                    number="45D80"
+                    description="Request an external editing session"
+                    source="Client task"
+                    destination="Editors able to handle the requested data type"
+                    broadcast="must"
+                    recorded="never">
+<message-table>
+<message offset="20" name="data_type" data-size="4">Data type word for the object to be edited.</message>
+<message offset="24" name="job_handle" data-size="4">Client-generated session handle. The top 16 bits must be zero and the low 16 bits must contain a unique non-zero client identifier.</message>
+<message offset="28" name="flags" data-size="4">Flag word. Valid bits are Continue editing, Read-only, and Immediate execution.</message>
+<message offset="32" name="parent_name" data-size="20">Null-terminated parent document or application name. Editors should include this in the temporary window title when present.</message>
+<message offset="52" name="leaf_name" data-size="204">Suggested leafname for display in the title bar and as the default save-as name.</message>
+</message-table>
+<use>
+<p>
+The client broadcasts this message when it wants another task to open an
+external editing or playback session. Editors that can support the request
+claim it by opening an appropriate blank context and replying with
+<reference type="message" name="EditAck"/>.
+</p>
+
+<p>
+Read-only editors should only reply when the Read-only flag is set. A client
+that prefers a full editor should first broadcast with Read-only clear, then
+retry with Read-only set only if no suitable editor responds.
+</p>
+</use>
+<related>
+<reference type="message" name="EditAck" />
+</related>
+</message-definition>
+
+<message-definition name="EditAck"
+                    number="45D81"
+                    description="Acknowledge and claim an external editing session"
+                    source="Editor task"
+                    destination="The requesting client task"
+                    broadcast="never"
+                    recorded="never">
+<message-table>
+<message offset="20" name="data_type" data-size="4">Copied from the request message.</message>
+<message offset="24" name="job_handle" data-size="4">The client half from the request plus the editor's own unique non-zero high 16-bit identifier.</message>
+<message offset="28" name="flags" data-size="4">Returned status flags. The editor reports the actual state it can provide, including whether the session is read-only.</message>
+</message-table>
+<use>
+<p>
+An editor sends this message only in reply to
+<reference type="message" name="EditRq"/> after opening a blank
+editing context for the requested data type.
+</p>
+
+<p>
+The returned flags tell the client what kind of session has actually been
+opened. If the reported state is unacceptable, such as a forced read-only
+session when editable data was required, the client should inform the user and
+abort the session.
+</p>
+</use>
+<related>
+<reference type="message" name="EditRq" />
+<reference type="message" name="EditAbort" />
+</related>
+</message-definition>
+
+<message-definition name="EditReturn"
+                    number="45D82"
+                    description="Request return of the current external edit data"
+                    source="Client task"
+                    destination="The editor task for the session"
+                    broadcast="never"
+                    recorded="never">
+<message-table>
+<message offset="20" name="data_type" data-size="4">Requested return type. This allows the client to ask for the returned data in a format different from the one originally sent.</message>
+<message offset="24" name="job_handle" data-size="4">Session handle.</message>
+<message offset="28" name="flags" data-size="4">Valid bits are Continue editing and Selection only.</message>
+</message-table>
+<use>
+<p>
+The client sends this message when it wants the current edited data back, for
+example to recompile a source file or update an embedded object in its own
+document.
+</p>
+
+<p>
+If the editor cannot return the data in the requested type, it should ignore
+the request. The client may then retry with a different type until a suitable
+compromise is found. This message should not be used for read-only sessions.
+</p>
+</use>
+<related>
+<reference type="message" name="EditDataSave" />
+</related>
+</message-definition>
+
+<message-definition name="EditAbort"
+                    number="45D83"
+                    description="Terminate an external editing session"
+                    source="Client or editor task"
+                    destination="The other task participating in the session"
+                    broadcast="never"
+                    recorded="never">
+<message-table>
+<message offset="20" name="reserved" data-size="4" state="reserved">Reserved and should be zero.</message>
+<message offset="24" name="job_handle" data-size="4">Session handle to be abandoned.</message>
+</message-table>
+<use>
+<p>
+Either party may send this message to terminate the session completely. After
+receiving it, both parties should discard local state for the handle and
+ignore all later traffic that refers to that session.
+</p>
+
+<p>
+The editor should close its window and stop any playback associated with the
+session. The sender is responsible for reporting any failure to the user. This
+message should not be sent before a valid session exists and should not be
+sent in the middle of a data transfer.
+</p>
+</use>
+<related>
+<reference type="message" name="EditRq" />
+<reference type="message" name="EditDataSave" />
+</related>
+</message-definition>
+
+<message-definition name="EditDataSave"
+                    number="45D84"
+                    description="Start a data transfer within an external edit session"
+                    source="Client or editor task"
+                    destination="The other task participating in the session"
+                    broadcast="never"
+                    recorded="never">
+<message-table>
+<message offset="20" name="job_handle" data-size="4">Session handle. This replaces the normal window handle field of Message_DataSave.</message>
+<message offset="24" name="ignored_icon" data-size="4">Ignored. Occupies the position of the normal icon handle.</message>
+<message offset="28" name="ignored_x" data-size="4">Ignored. Occupies the position of the normal X coordinate.</message>
+<message offset="32" name="ignored_y" data-size="4">Ignored. Occupies the position of the normal Y coordinate.</message>
+<message offset="36" name="estimated_size" data-size="4">Estimated transfer size in bytes.</message>
+<message offset="40" name="file_type" data-size="4">Base RISC OS file type for the transferred object, not the extended data type word.</message>
+<message offset="44" name="leaf_name" data-size="212">Proposed leafname for the transfer, as in Message_DataSave.</message>
+</message-table>
+<use>
+<p>
+This message is the ExtEdit equivalent of
+<userinput>Message_DataSave</userinput>. After it is sent, all follow-up
+messages are the normal Acorn data transfer messages. The sender may use RAM
+transfer or file transfer exactly as it would for any other desktop data
+exchange.
+</p>
+
+<p>
+The client normally sends this message soon after
+<reference type="message" name="EditAck"/> to provide the initial
+object to edit, but it may also send additional transfers later. The editor
+sends this message when returning data after
+<reference type="message" name="EditReturn"/> or after user-driven
+save or close actions.
+</p>
+</use>
+<related>
+<reference type="message" name="EditAck" />
+<reference type="message" name="EditReturn" />
+</related>
+</message-definition>
+
+<message-definition name="EditCursor"
+                    number="45D85"
+                    description="Set or query cursor and selection positions"
+                    source="Client task"
+                    destination="The editor task for the session"
+                    broadcast="never"
+                    recorded="never">
+<message-table>
+<message offset="20" name="reserved" data-size="4" state="reserved">Reserved and should be zero.</message>
+<message offset="24" name="job_handle" data-size="4">Session handle.</message>
+<message offset="28" name="flags" data-size="4">Valid bits are Read-only, Immediate execution, and Adjust selection. The editor returns the new current flag state in the reply.</message>
+<message offset="32" name="new_cursor" data-size="4">New cursor position, or -1 to leave unchanged.</message>
+<message offset="36" name="new_selection_start" data-size="4">New start of selection, or -1 to leave unchanged.</message>
+<message offset="40" name="new_selection_end" data-size="4">New end of selection, or -1 to leave unchanged.</message>
+<message offset="44" name="old_cursor" data-size="4">Previous or current cursor position returned by the editor.</message>
+<message offset="48" name="old_selection_start" data-size="4">Previous or current selection start returned by the editor.</message>
+<message offset="52" name="old_selection_end" data-size="4">Previous or current selection end returned by the editor.</message>
+</message-table>
+<use>
+<p>
+The client sends this message to position the cursor, select data, toggle
+read-only or playback state, or inspect the editor's current values. The
+editor returns the message immediately to confirm the result.
+</p>
+
+<p>
+The value <userinput>-2</userinput> means end of data. To select an entire
+object, set the selection range from 0 to -2. Editors that cannot describe
+their current cursor or selection as one contiguous range should return
+<userinput>-1</userinput> in the old-value fields.
+</p>
+</use>
+<related>
+<reference type="message" name="EditRq" />
+</related>
+</message-definition>
+</section>
+
+<section title="System Variables">
+<sysvar-definition name="Alias$@EditType_xxx"
+                   description="Command used to start a suitable external editor for a file type">
+<use>
+<p>
+Clients that receive no suitable reply to
+<reference type="message" name="EditRq"/> should first retry with less
+specific data types or with a read-only request if that is acceptable. If no
+editor is already running, the client may then attempt to start one by
+executing the most appropriate <sysvar>Alias$@EditType_xxx</sysvar> variable,
+where <userinput>xxx</userinput> is the three-digit hexadecimal base file
+type.
+</p>
+
+<p>
+Editors should normally define these aliases in their boot sequence so that
+clients can run a suitable editor without hard-wiring any particular
+application name.
+</p>
+</use>
+</sysvar-definition>
+</section>
+
+<section title="Examples">
+<subsection title="Boot-time alias definition">
+<p>
+An editor for plain text might define both a normal run alias and an ExtEdit
+alias in its boot file:
+</p>
+
+<p>
+<extended-example type="shell">
+<userinput>Set Alias$@RunType_FFF Run &lt;Obey$Dir&gt;.!Run %%*0</userinput><br/>
+<userinput>Set Alias$@EditType_FFF Run &lt;Obey$Dir&gt;.!Run</userinput>
+</extended-example>
+</p>
+</subsection>
+
+<subsection title="Client fallback behaviour">
+<p>
+A robust client follows this general policy:
+</p>
+
+<p>
+<list type="ordered">
+<item><p>Broadcast <reference type="message" name="EditRq"/> for the preferred extended data type.</p></item>
+<item><p>If no editor replies, retry with a less specific type or with a read-only request if displaying the data would still be useful.</p></item>
+<item><p>If no running editor responds, execute the most appropriate <sysvar>Alias$@EditType_xxx</sysvar> variable and then retry the request.</p></item>
+<item><p>If every attempt fails, report to the user that no suitable editor is available.</p></item>
+</list>
+</p>
+</subsection>
+</section>
+</chapter>
+
+<meta>
+ <maintainer>
+  <email name="Gerph" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+  <p>&copy; Jason Williams, 1993. PRMinXML conversion &copy; Gerph, 2026.</p>
+ </disclaimer>
+ <history>
+  <revision number="1" author="Jason Williams" date="Dec 1992" title="First official release">
+   <change>Published version 1.00 as the first official release of the External Edit protocol documents.</change>
+  </revision>
+  <revision number="2" author="Jason Williams" date="01 Jan 1993" title="Second official release">
+   <change>Published version 1.02 with substantially revised documentation, added state diagrams, introduced the EditCursor message protocol, added guidance on recursive sessions and multi-file formats, documented automatic editor launch fallback, and listed current protocol users.</change>
+  </revision>
+  <revision number="3" author="Gerph" date="25 Jun 2026" title="Initial PRMinXML conversion">
+   <change>Converted the External Edit protocol documentation from the Acorn Latin-1 text document into a canonical PRMinXML reference, preserving the protocol model, common fields, Wimp message definitions, and operational guidance.</change>
+  </revision>
+ </history>
+</meta>
+</riscos-prm>

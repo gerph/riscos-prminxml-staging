@@ -1,0 +1,1175 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+<riscos-prm>
+<chapter title="SysLog">
+<section title="Introduction">
+<p>
+SysLog is a resident module that provides a common logging service for RISC OS
+applications. It is intended for programs which need persistent diagnostic
+logging without each application having to implement its own log-file
+management, log rotation, buffering, or session grouping.
+</p>
+<p>
+The module writes plain text log files in a directory chosen by the
+<sysvar>SysLog$LogDir</sysvar> system variable. Each application normally logs
+to its own file, and the user controls the amount of information retained for
+each file through the SysLog options file.
+</p>
+<p>
+The original SysLog distribution was supplied as the <filename type="riscos">!SysLog</filename>
+application. Running that application sets <sysvar>SysLog$Dir</sysvar> and
+<sysvar>SysLog$LogDir</sysvar>, then loads the module. RISC OS Select and some
+later systems already include a compatible SysLog module, so a separate
+application is not always required.
+</p>
+</section>
+
+<section title="Overview">
+<p>
+SysLog is designed around three goals:
+</p>
+<p>
+<list type="unordered">
+<item><p>give applications a simple API for recording timestamped text, formatted values, and binary data;</p></item>
+<item><p>let the user, rather than the application, decide how much information each log should retain; and</p></item>
+<item><p>make heavy logging practical by buffering output, recovering from write failures, and rotating oversized log files automatically.</p></item>
+</list>
+</p>
+<p>
+Messages are filtered by priority. Lower numeric values are more important.
+Each log has a threshold, and only messages whose priority is strictly lower
+than that threshold are recorded. The default threshold is 125, so messages at
+priority 0 to 124 are logged unless the user overrides that default.
+</p>
+<p>
+SysLog also supports session logging. Instead of writing directly to the main
+log file, an application may open a temporary session log, write a sequence of
+related entries to it, and then merge the whole session into the main log in a
+single operation. This keeps concurrent or repeated activities together in the
+final log.
+</p>
+<p>
+When a write to a log fails, SysLog records the failure in the <filename type="riscos">SysLog</filename>
+log and backs off from touching the failing log for a short period. The retry
+period starts at one second, increases by a factor of 1.5 after each further
+failure, and is capped at ten minutes. This prevents repeated filing-system
+errors from dominating the machine.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Log Names and Files">
+<p>
+Each normal log is identified by a log name. The name is used directly as the
+leafname of the file stored in <sysvar>SysLog$LogDir</sysvar>, so the name must
+be a valid RISC OS leafname and must not exceed ten characters. The
+implementation rejects empty names and names containing <userinput>.</userinput>,
+<userinput>:</userinput>, <userinput>*</userinput>, <userinput>#</userinput>,
+<userinput>$</userinput>, <userinput>&amp;</userinput>, <userinput>@</userinput>,
+<userinput>^</userinput>, <userinput>%</userinput>, or <userinput>\</userinput>.
+</p>
+<p>
+The original SysLog documentation reserves the following names for SysLog
+itself:
+</p>
+<p>
+<list type="unordered">
+<item><p>any name beginning with <userinput>-</userinput>;</p></item>
+<item><p>any name beginning with <userinput>SysLog</userinput>; and</p></item>
+<item><p><userinput>Old</userinput>.</p></item>
+</list>
+</p>
+<p>
+Applications should treat those names as unavailable even though the module
+only enforces the general leafname rules directly.
+</p>
+<p>
+The intended convention is that each application has its own log, usually
+named after the application without any leading <userinput>!</userinput>. Very
+large applications may use more than one log, but they should still choose
+names that are stable and recognisable to the user.
+</p>
+<p>
+The original documentation also recommended allocating distributed log names
+formally so that unrelated applications did not collide on the same log file.
+The module itself does not enforce such a registry, but applications should
+still avoid reusing names already associated with other software.
+</p>
+</subsection>
+
+<subsection title="Priorities and Thresholds">
+<p>
+Message priorities are integers in the range 0 to 255, where 0 is the highest
+priority and 255 is the lowest. Log thresholds are compared using a strict
+less-than test:
+</p>
+<p>
+<list type="unordered">
+<item><p>if <userinput>message_priority &lt; log_threshold</userinput>, the message is recorded;</p></item>
+<item><p>if <userinput>message_priority &gt;= log_threshold</userinput>, the message is discarded without error.</p></item>
+</list>
+</p>
+<p>
+A threshold of 256 therefore disables ordinary logging for that log while
+still allowing callers to query or alter the threshold. The command parser for
+<reference type="command" name="SysLog"/> accepts thresholds in the range 0 to
+256.
+</p>
+<p>
+In practice, priorities around 100 suit ordinary day-to-day information.
+Non-critical chatter should generally avoid the very high-importance range
+below about 50. The original guidance characterised priority 10 as comparable
+to <userinput>Government declares war</userinput>, priority 0 as
+<userinput>Armageddon imminent</userinput>, and priority 255 as
+<userinput>Water detected in ocean</userinput>. Those examples are informal,
+but they express the intended spread of the scale clearly.
+</p>
+<p>
+Applications should choose priorities based on the effect of the condition on
+the user, not merely its technical cause. An out-of-memory condition can be a
+startup-fatal error in one context and an unimportant transient condition in
+another.
+</p>
+</subsection>
+
+<subsection title="Log File Format">
+<p>
+The basic logging primitive stores one line of text terminated by a line-feed.
+<reference type="swi" name="SysLog_LogMessage"/> prepends a textual timestamp,
+a three-digit priority field, and indentation spaces. <reference type="swi" name="SysLog_LogUnstamped"/>
+stores the supplied text without that prefix. The module stops copying at the
+first zero byte, line-feed, or carriage return in the supplied string.
+</p>
+<p>
+Indented logging is cumulative per log. The indent level starts at zero,
+<reference type="swi" name="SysLog_Indent"/> increments it up to a maximum of
+32, <reference type="swi" name="SysLog_UnIndent"/> decrements it down to zero,
+and <reference type="swi" name="SysLog_NoIndent"/> resets it immediately.
+</p>
+</subsection>
+
+<subsection title="Options File">
+<p>
+SysLog reads its configuration from the plain text file
+<filename type="riscos">&lt;SysLog$Dir&gt;.Options</filename> when the module
+initialises. The standard <filename type="riscos">!SysLog.!Boot</filename>
+file sets <sysvar>SysLog$Dir</sysvar> to the application directory, so the
+distributed options file lives in <filename type="riscos">!SysLog.Options</filename>.
+</p>
+<p>
+Each options line begins with a log name. The special name
+<userinput>*</userinput> supplies defaults used for logs that do not have a
+matching explicit line.
+</p>
+<p>
+The recognised syntax is:
+</p>
+<p>
+<extended-example type='format'>
+logname [Reserve kilobytes | NoReserve] [Sessions | NoSessions]
+        [threshold [max_size_kilobytes [timeout_centiseconds]]]
+</extended-example>
+</p>
+<p>
+The supplied sample file documents only the first four fields, but the source
+also accepts an optional fifth numeric field. That final number becomes the
+flush timeout, measured in centiseconds, for that log. If it is omitted, the
+default is 50 centiseconds, or half a second.
+</p>
+<p>
+The options have these effects:
+</p>
+<p>
+<list type="unordered">
+<item><p><userinput>Reserve</userinput> causes SysLog to keep extra space allocated at the end of the file. The value is stored in bytes, but the file syntax is in kilobytes.</p></item>
+<item><p><userinput>NoReserve</userinput> disables reserved-space management for that log.</p></item>
+<item><p><userinput>Sessions</userinput> enables temporary session logs for the log.</p></item>
+<item><p><userinput>NoSessions</userinput> causes session logging requests to fall back to direct logging in the main log.</p></item>
+<item><p><userinput>threshold</userinput> sets the log threshold used by priority filtering.</p></item>
+<item><p><userinput>max_size_kilobytes</userinput> sets the maximum size of the main log before it is rotated to <filename type="riscos">Old.&lt;logname&gt;</filename>.</p></item>
+<item><p><userinput>timeout_centiseconds</userinput> sets the inactivity period after which buffered output is flushed automatically.</p></item>
+</list>
+</p>
+<p>
+SysLog expands <sysvar>SysLog$Dir</sysvar> and <sysvar>SysLog$LogDir</sysvar>
+once at startup and caches the options file in memory. Editing the file does
+not affect the running module until it is reloaded.
+</p>
+</subsection>
+
+<subsection title="Buffering and Rotation">
+<p>
+Each log may have an in-memory buffer. SysLog chooses the buffer size from the
+current threshold:
+</p>
+<p>
+<list type="unordered">
+<item><p>threshold 0 to 100: 1024 bytes;</p></item>
+<item><p>101 to 125: 2048 bytes;</p></item>
+<item><p>126 to 150: 4096 bytes;</p></item>
+<item><p>151 to 175: 8192 bytes;</p></item>
+<item><p>176 to 200: 16384 bytes; and</p></item>
+<item><p>201 to 256: 32768 bytes.</p></item>
+</list>
+</p>
+<p>
+That choice makes the lowest-priority, most verbose logs the cheapest to use.
+Buffers are allocated lazily, flushed after the per-log timeout expires, and
+released after ten minutes of inactivity or when
+<reference type="swi" name="SysLog_LogComplete"/> is called.
+</p>
+<p>
+When a main log exceeds its configured maximum size, SysLog truncates it to the
+last real byte of data, deletes any existing <filename type="riscos">Old.&lt;logname&gt;</filename>,
+renames the current log to that old-file name, and starts a fresh current log.
+Temporary session logs are handled differently: if a session log grows too
+large and SysLog knows its parent log, the temporary file is deleted and
+recreated instead of being rotated.
+</p>
+</subsection>
+
+<subsection title="Session Logs">
+<p>
+Session logs are created by <reference type="swi" name="SysLog_OpenSessionLog"/>.
+Despite the historic documentation calling the return value a <em>session log
+handle</em>, the returned handle is actually a pointer to a temporary log name
+string. That temporary log name begins with <userinput>-</userinput> and names
+the temporary file used under <sysvar>SysLog$LogDir</sysvar>.
+</p>
+<p>
+When a session log is opened, SysLog writes the parent log name and a blank
+line at the start of the temporary file, then writes a session marker line.
+When the session is closed by <reference type="swi" name="SysLog_CloseSessionLog"/>,
+SysLog appends the whole temporary file to the main log and deletes the
+temporary file.
+</p>
+<p>
+Applications can usually treat the returned value opaquely:
+</p>
+<p>
+<list type="unordered">
+<item><p>if the requested priority is not being logged, <reference type="swi" name="SysLog_OpenSessionLog"/> returns 0 and later SWIs ignore that null handle;</p></item>
+<item><p>if sessions are disabled for the parent log, <reference type="swi" name="SysLog_OpenSessionLog"/> returns the original log name instead of creating a temporary file; and</p></item>
+<item><p><reference type="swi" name="SysLog_CloseSessionLog"/> safely does nothing when given an ordinary log name instead of a temporary session name.</p></item>
+</list>
+</p>
+<p>
+At module initialisation and finalisation SysLog scans the log directory for
+stray temporary files whose names begin with <userinput>-</userinput>. Any it
+finds are merged back into their parent logs automatically.
+</p>
+</subsection>
+
+<subsection title="IRQ Mode">
+<p>
+Normally SysLog may flush buffers and touch the filing system while handling a
+log request, so the logging SWIs are not safe from interrupt handlers. Calling
+<reference type="swi" name="SysLog_IRQMode"/> with a non-zero value places the
+module in IRQ mode. In that mode <reference type="swi" name="SysLog_LogMessage"/>,
+<reference type="swi" name="SysLog_LogUnstamped"/>, <reference type="swi" name="SysLog_LogData"/>,
+and <reference type="swi" name="SysLog_LogFormatted"/> only append to in-memory
+buffers.
+</p>
+<p>
+If a buffer fills while IRQ mode is active, the new message is dropped and a
+missed-message count is recorded. Once IRQ mode is no longer active, SysLog
+inserts a line reporting how many log lines were missed.
+</p>
+<p>
+IRQ mode is reference-counted. Each non-zero call increments the counter and
+each zero call decrements it down to zero. Applications which enable IRQ mode
+must disable it again when the critical section ends.
+</p>
+<p>
+The following SWIs are always safe from interrupt code because they do not need
+to flush buffered data:
+</p>
+<p>
+<list type="unordered">
+<item><p><reference type="swi" name="SysLog_GetLogLevel"/></p></item>
+<item><p><reference type="swi" name="SysLog_Indent"/></p></item>
+<item><p><reference type="swi" name="SysLog_UnIndent"/></p></item>
+<item><p><reference type="swi" name="SysLog_NoIndent"/></p></item>
+<item><p><reference type="swi" name="SysLog_ReadErrorMessage"/></p></item>
+</list>
+</p>
+</subsection>
+
+<subsection title="Formatted Logging and the C Veneer">
+<p>
+<reference type="swi" name="SysLog_LogFormatted"/> provides a low-level
+formatter primarily for assembler code. It builds a line in an internal
+scratch buffer and then writes it as a normal stamped log message. The format
+language is deliberately small and is described in the SWI definition.
+</p>
+<p>
+The original source distribution also supplies a C veneer in
+<filename type="riscos">!SysLog.C-veneer</filename>. The header
+<filename type="riscos">h.syslog</filename> declares one non-X and one X form
+for each exported SWI, plus the convenience functions <userinput>syslogf</userinput>
+and <userinput>xsyslogf</userinput>. Those two helper functions format a
+string with <userinput>vsprintf</userinput> and then call
+<reference type="swi" name="SysLog_LogMessage"/>.
+</p>
+<p>
+The C veneer documentation warns that its temporary formatting buffer is only
+1024 bytes long. The assembled veneer source actually reserves 1536 bytes, but
+portable code should continue to treat 1024 bytes as the safe upper limit
+because the SysLog text interfaces themselves truncate logged strings to 1024
+bytes.
+</p>
+<p>
+The veneer exports the following entry points:
+</p>
+<p>
+<list type="unordered">
+<item><p>non-X calls: <userinput>syslog_logmessage</userinput>, <userinput>syslog_getloglevel</userinput>, <userinput>syslog_flushlog</userinput>, <userinput>syslog_setloglevel</userinput>, <userinput>syslog_logunstamped</userinput>, <userinput>syslog_indent</userinput>, <userinput>syslog_unindent</userinput>, <userinput>syslog_noindent</userinput>, <userinput>syslog_opensessionlog</userinput>, <userinput>syslog_closesessionlog</userinput>, <userinput>syslog_logdata</userinput>, <userinput>syslog_readerrormessage</userinput>, <userinput>syslog_logcomplete</userinput>, <userinput>syslog_irqmode</userinput>, and <userinput>syslogf</userinput>;</p></item>
+<item><p>X calls: <userinput>xsyslog_logmessage</userinput>, <userinput>xsyslog_getloglevel</userinput>, <userinput>xsyslog_flushlog</userinput>, <userinput>xsyslog_setloglevel</userinput>, <userinput>xsyslog_logunstamped</userinput>, <userinput>xsyslog_indent</userinput>, <userinput>xsyslog_unindent</userinput>, <userinput>xsyslog_noindent</userinput>, <userinput>xsyslog_opensessionlog</userinput>, <userinput>xsyslog_closesessionlog</userinput>, <userinput>xsyslog_logdata</userinput>, <userinput>xsyslog_readerrormessage</userinput>, <userinput>xsyslog_logcomplete</userinput>, <userinput>xsyslog_irqmode</userinput>, and <userinput>xsyslogf</userinput>.</p></item>
+</list>
+</p>
+<p>
+The non-X forms are usually more convenient for application code because they
+return ordinary values directly. The X forms are intended for code that must
+handle errors explicitly, such as modules and other low-level components.
+</p>
+</subsection>
+</section>
+
+<section title="System Variables">
+<sysvar-definition name="SysLog$Dir"
+                   description="Directory containing the SysLog application files">
+<use>
+<p>
+SysLog expands <sysvar>SysLog$Dir</sysvar> during module initialisation to
+locate the options file as <filename type="riscos">&lt;SysLog$Dir&gt;.Options</filename>.
+The distributed <filename type="riscos">!SysLog.!Boot</filename> file sets this
+variable to the application directory before loading the module.
+</p>
+</use>
+<related>
+<reference type="sysvar" name="SysLog$LogDir"/>
+</related>
+</sysvar-definition>
+
+<sysvar-definition name="SysLog$LogDir"
+                   description="Directory in which SysLog stores log files">
+<use>
+<p>
+SysLog writes one plain file per main log in this directory, together with any
+temporary session files whose names begin with <userinput>-</userinput> and the
+rotated files named <filename type="riscos">Old.&lt;logname&gt;</filename>. The
+distributed <filename type="riscos">!SysLog.!Boot</filename> file sets this
+variable to <filename type="riscos">&lt;Obey$Dir&gt;.Logs</filename>.
+</p>
+</use>
+<related>
+<reference type="sysvar" name="SysLog$Dir"/>
+</related>
+</sysvar-definition>
+</section>
+
+<section title="Service Calls">
+<service-definition name="Reset"
+                    number="27"
+                    description="Clears the remembered desktop task handle">
+<entry>
+<register-use number="1">&hex;27</register-use>
+</entry>
+<exit>
+<register-use number="0" state="preserved"/>
+<register-use number="1" state="preserved"/>
+</exit>
+<use>
+<p>
+SysLog handles <reference type="service" name="Reset"/> by clearing the stored
+Wimp task handle for its desktop helper task. This ensures that the module can
+participate in later desktop startup after a soft reset.
+</p>
+</use>
+<related>
+<reference type="service" name="StartWimp"/>
+<reference type="service" name="StartedWimp"/>
+</related>
+</service-definition>
+
+<service-definition name="StartWimp"
+                    number="49"
+                    description="Requests startup of the desktop SysLog task">
+<entry>
+<register-use number="1">&hex;49</register-use>
+</entry>
+<exit>
+<register-use number="0">Pointer to the command string <userinput>Desktop_SysLog</userinput> if the service is claimed.</register-use>
+<register-use number="1">0 if the service is claimed; otherwise preserved.</register-use>
+</exit>
+<use>
+<p>
+If the SysLog desktop helper is not already running, SysLog claims
+<reference type="service" name="StartWimp"/> and returns the command
+<userinput>Desktop_SysLog</userinput>. The Wimp can then start that helper task
+with <userinput>Wimp_StartTask</userinput>.
+</p>
+</use>
+<related>
+<reference type="command" name="Desktop_SysLog"/>
+<reference type="service" name="StartedWimp"/>
+</related>
+</service-definition>
+
+<service-definition name="StartedWimp"
+                    number="4A"
+                    description="Clears a failed desktop-start placeholder">
+<entry>
+<register-use number="1">&hex;4A</register-use>
+</entry>
+<exit>
+<register-use number="0" state="preserved"/>
+<register-use number="1" state="preserved"/>
+</exit>
+<use>
+<p>
+SysLog uses <reference type="service" name="StartedWimp"/> to recover from a
+desktop startup attempt which claimed <reference type="service" name="StartWimp"/>
+but did not finish initialising. If the saved task handle still contains the
+temporary <userinput>-1</userinput> marker, SysLog resets it to zero so the
+desktop task can be started again later.
+</p>
+</use>
+<related>
+<reference type="service" name="StartWimp"/>
+<reference type="service" name="Reset"/>
+</related>
+</service-definition>
+
+<service-definition name="WimpCloseDown"
+                    number="53"
+                    description="Flushes buffered log output during Wimp shutdown">
+<entry>
+<register-use number="0">Standard <reference type="service" name="WimpCloseDown"/> argument.</register-use>
+<register-use number="1">&hex;53</register-use>
+<register-use number="2">Standard <reference type="service" name="WimpCloseDown"/> task handle argument.</register-use>
+</entry>
+<exit>
+<register-use number="0" state="preserved"/>
+<register-use number="1" state="preserved"/>
+<register-use number="2" state="preserved"/>
+</exit>
+<use>
+<p>
+When the Wimp is closing down a task, SysLog responds to
+<reference type="service" name="WimpCloseDown"/> by flushing all known logs.
+This reduces the chance of losing buffered diagnostic output during desktop
+shutdown or task termination.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_FlushLog"/>
+</related>
+</service-definition>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="SysLog_LogMessage"
+                number="4C880"
+                description="Writes a timestamped log line"
+                processor-mode="SVC">
+<entry>
+<register-use number="0">Pointer to a log name, or a session handle returned by <reference type="swi" name="SysLog_OpenSessionLog"/>.</register-use>
+<register-use number="1">Pointer to the text to log. Copying stops at the first zero byte, line-feed, or carriage return.</register-use>
+<register-use number="2">Message priority from 0 to 255.</register-use>
+</entry>
+<use>
+<p>
+If the target log's threshold is higher than the supplied priority, SysLog
+records a line containing a timestamp, the three-digit priority, indentation
+spaces, and the supplied text. Text longer than 1024 bytes is truncated.
+</p>
+<p>
+If logging has been disabled with <reference type="command" name="SysLog"/>,
+if the threshold excludes the message, or if R0 is zero, the SWI returns
+without error and writes nothing.
+</p>
+</use>
+<example>
+<p><userinput>SYS "SysLog_LogMessage", "MyApp", "Connected", 100</userinput></p>
+</example>
+<related>
+<reference type="swi" name="SysLog_LogUnstamped"/>
+<reference type="swi" name="SysLog_GetLogLevel"/>
+</related>
+</swi-definition>
+
+<swi-definition name="SysLog_GetLogLevel"
+                number="4C881"
+                description="Returns the threshold for a log"
+                processor-mode="SVC">
+<entry>
+<register-use number="0">Pointer to a log name, or a session handle.</register-use>
+</entry>
+<exit>
+<register-use number="0">Current threshold for the log.</register-use>
+</exit>
+<use>
+<p>
+This SWI returns the threshold against which message priorities are compared.
+Messages are logged only when their priority is strictly less than the value
+returned here.
+</p>
+<p>
+Applications can use this SWI to avoid constructing expensive diagnostic text
+that would be discarded immediately.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_SetLogLevel"/>
+<reference type="swi" name="SysLog_LogMessage"/>
+</related>
+</swi-definition>
+
+<swi-definition name="SysLog_FlushLog"
+                number="4C882"
+                description="Flushes one log or all logs to disc"
+                processor-mode="SVC">
+<entry>
+<register-use number="0">Pointer to a log name, a session handle, or 0 to flush every known log.</register-use>
+</entry>
+<use>
+<p>
+SysLog writes any buffered output for the selected log to disc and closes the
+underlying file. Passing zero flushes all logs and finally flushes the
+<filename type="riscos">SysLog</filename> log itself.
+</p>
+</use>
+<related>
+<reference type="command" name="SysLog_Flush"/>
+<reference type="swi" name="SysLog_LogComplete"/>
+</related>
+</swi-definition>
+
+<swi-definition name="SysLog_SetLogLevel"
+                number="4C883"
+                description="Changes the threshold for a log"
+                processor-mode="SVC">
+<entry>
+<register-use number="0">Pointer to a log name, or a session handle.</register-use>
+<register-use number="1">New threshold, normally 0 to 256.</register-use>
+</entry>
+<use>
+<p>
+This SWI changes the threshold stored for the selected log. If the log has
+open session logs, SysLog applies the new threshold to those session logs as
+well.
+</p>
+<p>
+The original SysLog documentation treats this SWI as a debugging aid and
+recommends that distributed applications do not use it to override the user's
+logging choices permanently.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_GetLogLevel"/>
+<reference type="command" name="SysLog"/>
+</related>
+</swi-definition>
+
+<swi-definition name="SysLog_LogUnstamped"
+                number="4C884"
+                description="Writes an unstamped log line"
+                processor-mode="SVC">
+<entry>
+<register-use number="0">Pointer to a log name, or a session handle.</register-use>
+<register-use number="1">Pointer to the text to log.</register-use>
+<register-use number="2">Message priority from 0 to 255.</register-use>
+</entry>
+<use>
+<p>
+This SWI behaves like <reference type="swi" name="SysLog_LogMessage"/> except
+that it writes the supplied text directly, without adding a timestamp,
+priority, or indentation prefix.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_LogMessage"/>
+</related>
+</swi-definition>
+
+<swi-definition name="SysLog_Indent"
+                number="4C885"
+                description="Increments a log's indentation level"
+                processor-mode="SVC">
+<entry>
+<register-use number="0">Pointer to a log name, or a session handle.</register-use>
+</entry>
+<use>
+<p>
+The indentation level affects later calls to <reference type="swi" name="SysLog_LogMessage"/>
+and <reference type="swi" name="SysLog_LogFormatted"/> for the same log. The
+implementation caps the level at 32.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_UnIndent"/>
+<reference type="swi" name="SysLog_NoIndent"/>
+</related>
+</swi-definition>
+
+<swi-definition name="SysLog_UnIndent"
+                number="4C886"
+                description="Decrements a log's indentation level"
+                processor-mode="SVC">
+<entry>
+<register-use number="0">Pointer to a log name, or a session handle.</register-use>
+</entry>
+<use>
+<p>
+If the indentation level is non-zero, SysLog subtracts one from it.
+Otherwise this SWI does nothing.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_Indent"/>
+<reference type="swi" name="SysLog_NoIndent"/>
+</related>
+</swi-definition>
+
+<swi-definition name="SysLog_NoIndent"
+                number="4C887"
+                description="Resets a log's indentation level to zero"
+                processor-mode="SVC">
+<entry>
+<register-use number="0">Pointer to a log name, or a session handle.</register-use>
+</entry>
+<use>
+<p>
+This SWI clears any indentation previously established by
+<reference type="swi" name="SysLog_Indent"/>. Programs which use indentation
+typically call it during startup to ensure a known state.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_Indent"/>
+<reference type="swi" name="SysLog_UnIndent"/>
+</related>
+</swi-definition>
+
+<swi-definition name="SysLog_OpenSessionLog"
+                number="4C888"
+                description="Starts grouped logging for one session"
+                processor-mode="SVC">
+<entry>
+<register-use number="0">Pointer to the parent log name.</register-use>
+<register-use number="1">Priority for the session.</register-use>
+</entry>
+<exit>
+<register-use number="0">0 if the session priority would be filtered out, a pointer to the parent log name if sessions are disabled for that log, or a pointer to a temporary session log name otherwise.</register-use>
+</exit>
+<use>
+<p>
+This SWI begins a new session log. The returned value is intended to be passed
+unchanged to later SysLog SWIs which accept a log name or session handle.
+</p>
+<p>
+When a temporary session is created, SysLog inherits the parent log's current
+threshold, timeout, and maximum size for the temporary log.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_CloseSessionLog"/>
+<reference type="swi" name="SysLog_LogMessage"/>
+</related>
+</swi-definition>
+
+<swi-definition name="SysLog_CloseSessionLog"
+                number="4C889"
+                description="Finishes a session log and merges it into the parent log"
+                processor-mode="SVC">
+<entry>
+<register-use number="0">Session handle returned by <reference type="swi" name="SysLog_OpenSessionLog"/>, or 0.</register-use>
+</entry>
+<use>
+<p>
+If R0 names a temporary session log, SysLog writes an end marker, appends the
+temporary file to the parent log, deletes the temporary file, and discards the
+session log state. If R0 is zero or names an ordinary main log, this SWI does
+nothing.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_OpenSessionLog"/>
+</related>
+</swi-definition>
+
+<swi-definition name="SysLog_LogData"
+                number="4C88A"
+                description="Dumps a block of binary data in hexadecimal and ASCII"
+                processor-mode="SVC">
+<entry>
+<register-use number="0">Pointer to a log name, or a session handle.</register-use>
+<register-use number="1">Message priority.</register-use>
+<register-use number="2">Pointer to the first byte of data.</register-use>
+<register-use number="3">Number of bytes to log.</register-use>
+<register-use number="4">Offset value shown at the start of each line, or -1 to omit the offset field.</register-use>
+</entry>
+<use>
+<p>
+SysLog writes the block as a sequence of stamped lines, eight bytes per line,
+in a format similar to <reference type="command" name="Dump"/>. Non-printable
+bytes appear as full stops in the ASCII area.
+</p>
+<p>
+Blocks larger than 10 KB are rejected with <reference type="error" name="SysLog_DataBlockTooBig"/>.
+This protects the machine from spending excessive time writing what is likely
+to be an accidental dump request.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_LogMessage"/>
+<reference type="error" name="SysLog_DataBlockTooBig"/>
+</related>
+</swi-definition>
+
+<swi-definition name="SysLog_LogFormatted"
+                number="4C88B"
+                description="Formats register values and logs the result"
+                processor-mode="SVC">
+<entry>
+<register-use number="0">Pointer to a log name, or a session handle.</register-use>
+<register-use number="1">Pointer to the format string.</register-use>
+<register-use number="2">Message priority.</register-use>
+<register-use number="3">Pointer to a block containing saved values for R0 to R3, R8 to R12, and R14.</register-use>
+<register-use number="4-7">Immediate values for registers R4 to R7.</register-use>
+</entry>
+<use>
+<p>
+This SWI expands a restricted format language:
+</p>
+<p>
+<list type="unordered">
+<item><p><userinput>%%</userinput> inserts a literal percent sign;</p></item>
+<item><p><userinput>%&lt;reg&gt;a</userinput> inserts an IPv4 address in dotted decimal, taking the register value as a network-byte-order address;</p></item>
+<item><p><userinput>%&lt;reg&gt;c</userinput> inserts a character;</p></item>
+<item><p><userinput>%&lt;reg&gt;d</userinput> inserts a signed decimal integer;</p></item>
+<item><p><userinput>%&lt;reg&gt;e</userinput> inserts the text from <reference type="swi" name="SysLog_ReadErrorMessage"/> for that register value;</p></item>
+<item><p><userinput>%&lt;reg&gt;f</userinput> inserts a file handle in hexadecimal and, where available, the corresponding file name;</p></item>
+<item><p><userinput>%&lt;reg&gt;p</userinput> dereferences a pointer and must be followed by another type character; multiple <userinput>p</userinput> characters add further levels of indirection;</p></item>
+<item><p><userinput>%&lt;reg&gt;s</userinput> inserts a control-terminated string;</p></item>
+<item><p><userinput>%&lt;reg&gt;x</userinput> inserts an unsigned hexadecimal integer; and</p></item>
+<item><p><userinput>%&lt;reg&gt;z</userinput> inserts a zero-terminated string.</p></item>
+</list>
+</p>
+<p>
+Valid register numbers are 0 to 12 and 14. Register 13 is not available.
+Null pointers are explicitly accepted and are logged as
+<userinput>(null)</userinput>.
+</p>
+<p>
+If the format string is malformed, SysLog does not return an error. Instead it
+logs a diagnostic line beginning <userinput>SysLog: Error in format string:</userinput>
+at priority 50.
+</p>
+<p>
+Assembler code normally wraps this SWI in a macro or helper routine which
+saves the relevant registers, points R1 at an in-line format string, and
+passes the saved-register block in R3. The original SysLog documentation
+supplied wrappers for both BBC BASIC assembler and ObjAsm sources, and that
+style remains the normal way to use this SWI from assembler.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_ReadErrorMessage"/>
+<reference type="swi" name="SysLog_LogMessage"/>
+</related>
+</swi-definition>
+
+<swi-definition name="SysLog_ReadErrorMessage"
+                number="4C88C"
+                description="Translates socket-style error numbers into text"
+                processor-mode="SVC">
+<entry>
+<register-use number="0">Error number.</register-use>
+</entry>
+<exit>
+<register-use number="0">Pointer to a static message string.</register-use>
+</exit>
+<use>
+<p>
+This SWI maps the supplied error number to one of SysLog's built-in messages.
+The table covers error 0 and a set of socket-related errors including
+<userinput>Connection timed out</userinput>, <userinput>Connection refused</userinput>,
+and <userinput>No route to host</userinput>. Any number beyond the end of the
+table returns <userinput>Unknown Error</userinput>.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_LogFormatted"/>
+</related>
+</swi-definition>
+
+<swi-definition name="SysLog_LogComplete"
+                number="4C88D"
+                description="Flushes a log and releases its buffer"
+                processor-mode="SVC">
+<entry>
+<register-use number="0">Pointer to a log name.</register-use>
+</entry>
+<use>
+<p>
+This SWI flushes any buffered data for the selected log and then frees the
+buffer associated with it. It is intended for the case where the caller knows
+the log will not be used again for some time, such as application shutdown.
+</p>
+<p>
+If this SWI is not used, SysLog releases idle buffers automatically after ten
+minutes.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_FlushLog"/>
+</related>
+</swi-definition>
+
+<swi-definition name="SysLog_IRQMode"
+                number="4C88E"
+                description="Enables or disables interrupt-safe logging mode"
+                processor-mode="SVC">
+<entry>
+<register-use number="0">0 to disable IRQ mode, non-zero to enable it.</register-use>
+</entry>
+<use>
+<p>
+This SWI increments or decrements SysLog's IRQ-mode nesting count. While the
+count is non-zero, the logging SWIs that normally need filing-system access
+write only to in-memory buffers.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_LogMessage"/>
+<reference type="swi" name="SysLog_LogData"/>
+<reference type="swi" name="SysLog_LogFormatted"/>
+</related>
+</swi-definition>
+</section>
+
+<section title="Error Messages">
+<error-definition name="SysLog_BadLogName"
+                  number="0"
+                  description="The supplied log name is invalid">
+<use>
+<p>
+This error is returned when a caller supplies an empty log name, a name longer
+than ten characters, or a name containing a disallowed leafname character.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_LogMessage"/>
+<reference type="swi" name="SysLog_OpenSessionLog"/>
+</related>
+</error-definition>
+
+<error-definition name="SysLog_CantReadParentLogName"
+                  number="1"
+                  description="A temporary session log does not contain a readable parent log name">
+<use>
+<p>
+This error is reported when <reference type="swi" name="SysLog_CloseSessionLog"/>
+tries to merge a temporary session file whose leading parent-log record cannot
+be read back correctly.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_CloseSessionLog"/>
+</related>
+</error-definition>
+
+<error-definition name="SysLog_DataBlockTooBig"
+                  number="2"
+                  description="A request to log binary data exceeds the 10 KB safety limit">
+<use>
+<p>
+This error is returned by <reference type="swi" name="SysLog_LogData"/> when
+R3 is larger than 10240 bytes.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_LogData"/>
+</related>
+</error-definition>
+
+<error-definition name="SysLog_UnknownOperation"
+                  number="1E6"
+                  description="An unimplemented SysLog SWI offset was called">
+<use>
+<p>
+This error is returned when the SWI decoder is given an offset beyond the set
+of operations implemented by the module.
+</p>
+</use>
+<related>
+<reference type="swi" name="SysLog_LogMessage"/>
+</related>
+</error-definition>
+</section>
+
+<section title="Commands">
+<command-definition name="SysLog"
+                    description="Writes a message, toggles logging globally, or changes a log threshold">
+<syntax>
+<userreplace>log_name</userreplace>
+<userreplace>priority</userreplace>
+<userreplace>message</userreplace>
+</syntax>
+<syntax>
+<text>ON</text>
+</syntax>
+<syntax>
+<text>OFF</text>
+</syntax>
+<syntax>
+<userreplace>log_name</userreplace>
+<userreplace>new_threshold</userreplace>
+</syntax>
+<parameter name="log_name">
+The log to write to or reconfigure.
+</parameter>
+<parameter name="priority">
+Message priority in the range 0 to 255.
+</parameter>
+<parameter name="message">
+Text to log.
+</parameter>
+<parameter name="new_threshold">
+Temporary threshold to apply immediately, normally in the range 0 to 256.
+</parameter>
+<use>
+<p>
+<command>*SysLog</command> has three forms. The message form writes a single
+timestamped line to the named log. The threshold form changes the in-memory
+threshold for that log immediately. The <userinput>ON</userinput> and
+<userinput>OFF</userinput> forms enable or disable SysLog globally.
+</p>
+<p>
+Global disable is not persisted. While disabled, the logging SWIs and command
+forms silently ignore new log messages.
+</p>
+</use>
+<example>
+<command>*SysLog NetApp 90 Link down</command>
+</example>
+<example>
+<command>*SysLog NetApp 256</command>
+</example>
+<example>
+<command>*SysLog OFF</command>
+</example>
+<related>
+<reference type="swi" name="SysLog_LogMessage"/>
+<reference type="swi" name="SysLog_SetLogLevel"/>
+</related>
+</command-definition>
+
+<command-definition name="SysLog_Flush"
+                    description="Flushes logs immediately or changes forced-flush mode">
+<syntax/>
+<syntax>
+<text>ON</text>
+</syntax>
+<syntax>
+<text>OFF</text>
+</syntax>
+<use>
+<p>
+With no parameter, <command>*SysLog_Flush</command> flushes all currently known
+logs to disc. With <userinput>ON</userinput>, SysLog enters forced-flush mode
+and writes each log line to disc immediately after buffering it. With
+<userinput>OFF</userinput>, normal buffered operation resumes.
+</p>
+<p>
+Forced-flush mode is useful while debugging crashes, but it makes logging much
+slower.
+</p>
+</use>
+<example>
+<command>*SysLog_Flush</command>
+</example>
+<example>
+<command>*SysLog_Flush ON</command>
+</example>
+<related>
+<reference type="swi" name="SysLog_FlushLog"/>
+</related>
+</command-definition>
+
+<command-definition name="Desktop_SysLog"
+                    description="Starts the internal desktop helper task">
+<syntax/>
+<use>
+<p>
+This command exists so that SysLog can claim <reference type="service" name="StartWimp"/>
+and ask the desktop to start its helper task. It is not intended to be run
+directly by users; the distributed help text explicitly recommends using
+<command>*Desktop</command> instead.
+</p>
+</use>
+<related>
+<reference type="service" name="StartWimp"/>
+</related>
+</command-definition>
+</section>
+
+<section title="Security Issues">
+<p>
+SysLog writes plain text files containing application-controlled data. Programs
+should therefore avoid logging passwords, long-term secrets, or private user
+content unless the user has explicitly asked for that level of diagnostics.
+</p>
+<p>
+The binary dump and formatted logging SWIs can expose memory contents, pointer
+targets, socket error information, and file names. They are valuable for
+debugging, but they should be treated as diagnostic interfaces rather than as a
+safe audit trail format.
+</p>
+</section>
+
+<section title="Examples">
+<subsection title="Application Startup">
+<p>
+The simplest usage pattern is to choose a stable log name, query the threshold
+if constructing the message would be expensive, and then log the important
+events:
+</p>
+<p>
+<extended-example type='basic'>
+IF SYS("SysLog_GetLogLevel", "MyApp") &gt; 100 THEN
+  SYS "SysLog_LogMessage", "MyApp", "Initialising network stack", 100
+ENDIF
+</extended-example>
+</p>
+</subsection>
+
+<subsection title="Scoped Session Logging">
+<p>
+Session logging lets an application group all the activity for one connection,
+job, or transaction and then merge it back into the main log as a block:
+</p>
+<p>
+<extended-example type='pseudo'>
+session = SysLog_OpenSessionLog("NewsBite", 110)
+SysLog_LogMessage(session, "Connection accepted", 110)
+SysLog_LogData(session, 120, packet, packet_length, 0)
+SysLog_CloseSessionLog(session)
+</extended-example>
+</p>
+</subsection>
+
+<subsection title="Assembler LogFormatted Wrapper">
+<p>
+The usual assembler style is to package <reference type="swi" name="SysLog_LogFormatted"/>
+behind a small macro or helper routine:
+</p>
+<p>
+<extended-example type='asm'>
+STMFD   R13!,{R0-R3,R8-R12,R14}
+ADR     R0,txt_logname
+ADR     R1,%ft90
+MOV     R2,#200
+MOV     R3,R13
+SWI     SysLog_LogFormatted
+B       %ft91
+90
+=       "stricmp: comparing %0z and %1z",0
+ALIGN
+91
+LDMFD   R13!,{R0-R3,R8-R12,R14}
+</extended-example>
+</p>
+<p>
+This keeps the call site short and ensures that the register block passed in
+R3 matches the format-string references.
+</p>
+</subsection>
+
+<subsection title="Using the C Veneer">
+<p>
+The supplied header and veneer object let C code call SysLog without writing
+manual SWI veneers:
+</p>
+<p>
+<extended-example type='c'>
+#include "kernel.h"
+#include "syslog"
+
+if (syslog_getloglevel("MyApp") &gt; 100)
+  syslog_logmessage("MyApp", "Starting up", 100);
+
+syslogf("MyApp", 90, "Connected peer %s on handle %d", host, handle);
+</extended-example>
+</p>
+<p>
+Programs should link against the supplied veneer object that matches their APCS
+requirements. The original distribution provided both a 26-bit/APCS-3 veneer
+and an APCS-32 veneer object.
+</p>
+</subsection>
+
+<subsection title="Representative Options File">
+<p>
+The distributed options file uses one default line and then selective
+overrides:
+</p>
+<p>
+<extended-example type='format'>
+* NoReserve Sessions 125 256
+Termite NoSessions
+NewsBite 125
+NewsBite-d 256 1024
+</extended-example>
+</p>
+<p>
+That example means that most logs inherit a threshold of 125, no reserved
+space, sessions enabled, and a 256 KB maximum size; the listed logs then
+override individual parts of that policy.
+</p>
+</subsection>
+</section>
+</chapter>
+
+<meta>
+<maintainer>
+<email name="Gerph" address="gerph@gerph.org"></email>
+</maintainer>
+<disclaimer>
+<p>
+This PRM-in-XML document is a source-based description of the SysLog module
+interface. The original SysLog software and accompanying documentation were
+written by Jon Ribbens, Tom Hughes, and DoggySoft Ltd.
+</p>
+</disclaimer>
+<history>
+<revision number="0.15" author="Jon Ribbens and Tom Hughes" title="Historic SysLog release notes">
+<change>String termination changed to permit zero-byte and line-feed terminators.</change>
+</revision>
+<revision number="0.16" author="Jon Ribbens and Tom Hughes" title="Historic SysLog release notes">
+<change>Added internal log-forget handling and used it when closing session logs.</change>
+</revision>
+<revision number="0.17" author="Jon Ribbens and Tom Hughes" title="Historic SysLog release notes">
+<change>Allowed carriage return as a string terminator, created the Old directory automatically at startup, and added IRQ mode.</change>
+</revision>
+<revision number="0.18" author="Tom Hughes" title="Historic SysLog release notes">
+<change>Made the SysLog module 26-bit and 32-bit neutral, and added an APCS-32 veneer object.</change>
+</revision>
+<revision number="0.19" author="Tom Hughes" title="Historic SysLog release notes">
+<change>Corrected the APCS-32 veneer so that it behaved as a true APCS-32 veneer.</change>
+</revision>
+<revision number="0.20" author="Jon Ribbens and Tom Hughes" date="16 Jun 2003" title="Historic SysLog release documentation and notes">
+<change>Recorded the SysLog 0.20 interface, rationale, commands, and SWIs in the shipped help and installation files.</change>
+<change>Historic release notes leading up to 0.20 recorded: arbitrary line insertion, revised date-stamp format, write-error backoff, file-close fixes on errors, Indent and UnIndent support, temporary session logs, maximum-size truncation, one-time reading of SysLog$Dir, automatic temporary-log tidy-up, options-file end-of-file fix, allocated SWI chunk and command names, per-log session disabling, default-option lines using *, reserved-space support, two-layer startup for RMEnsure, *SysLog ON and OFF and threshold changing, SysLog_LogData, assembler debugging support, the C veneer, SysLog_ReadErrorMessage, %&lt;reg&gt;p and %&lt;reg&gt;a in SysLog_LogFormatted, corrected %&lt;reg&gt;a byte order, buffer size scaling with log level, ten-minute buffer deallocation, SysLog_LogComplete, threshold changes applying to session logs, improved stray-session tidy-up, and further session fixes.</change>
+</revision>
+<revision number="1" author="Gerph" date="05 Jul 2026" title="PRM-in-XML conversion">
+<change>Converted the historic documentation and the BASIC source into a canonical PRM-in-XML chapter.</change>
+<change>Added implementation-backed details for the options-file timeout field, session-handle behaviour, buffer sizing, automatic stray-session recovery, and IRQ-mode semantics.</change>
+<change>Restored the historic priority-selection guidance, log-naming advice, assembler SysLog_LogFormatted usage pattern, fuller C veneer coverage, and the release notes into the document history.</change>
+</revision>
+</history>
+</meta>
+</riscos-prm>

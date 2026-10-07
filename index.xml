@@ -53,11 +53,15 @@
 
 <section title="3rd Party" dir="3rdparty">
     <page href="cryptrandom">CryptRandom module</page>
+    <page href="exml">eXML module</page>
+    <page href="externaledit">External Edit protocol</page>
+    <page href="syslog">SysLog module</page>
 </section>
 
 <section title="RISC OS 5" dir="riscos5">
     <page href="drivehints">Drive Hints</page>
     <page href="acornssl">AcornSSL module</page>
+    <page href="sounddma2">SoundDMA system information and controllers</page>
 </section>
 
 <section title="RISC OS Select" dir="select">
@@ -69,6 +73,7 @@
     <section title="Desktop" dir="desktop">
         <page href="iconbarfiledrags">Icon bar file drags</page>
         <page href="filters-iconborders">Icon border filters</page>
+        <page href="taskmanager">Task Manager</page>
         <section title="Wimp" dir="wimp">
             <page href="iconpriorities">Iconbar priorities</page>
         </section>

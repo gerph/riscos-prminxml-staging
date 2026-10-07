@@ -1,0 +1,227 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Task Manager">
+<section title="Introduction and Overview">
+<p>
+  The Task Manager is a central component of the RISC OS desktop environment. It provides facilities for monitoring and controlling active tasks, managing memory allocation, and handling system-wide operations such as shutdown and power control.
+</p>
+<p>
+  This chapter documents specific interfaces provided by the Task Manager for handling system acknowledgements and initiating system shutdowns.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Acknowledgements">
+<p>
+  The Task Manager maintains a list of software acknowledgements and licences which are displayed in the system information window. The Task Manager broadcasts <reference type="service" name="TaskManagerAcknowledgements" /> to allow modules and applications to register their own acknowledgements.
+</p>
+<p>
+  When a module receives this service call, it should check R2. If R2 is non-zero, it contains the address of a callback routine provided by the Task Manager. The module should call this routine once for each component it wishes to acknowledge, passing pointers to its title and description strings.
+</p>
+<p>
+  If a module's acknowledgements change (for example, if a licence is registered), it should issue <reference type="service" name="TaskManagerAcknowledgements" /> with R2 = 0. This notifies the Task Manager that it should re-issue the service call to re-cache all acknowledgements.
+</p>
+</subsection>
+
+<subsection title="System Shutdown">
+<p>
+  System shutdown is handled by the <reference type="swi" name="TaskManager_Shutdown" /> SWI. This call manages the process of notifying tasks that the system is closing, closing files, and optionally rebooting or powering off the machine.
+</p>
+<p>
+  The shutdown process typically involves:
+  <list type="ordered">
+    <item><p>Broadcasting <reference type="message" name="PreQuit" /> to all active tasks.</p></item>
+    <item><p>Broadcasting <reference type="message" name="Shutdown" /> to all tasks.</p></item>
+    <item><p>Rejecting media requests via <reference type="upcall" name="1" /> and <reference type="upcall" name="2" />.</p></item>
+    <item><p>Executing PostDesk scripts (on supported versions).</p></item>
+    <item><p>Performing the final hardware action (reboot, power off, or exit to CLI).</p></item>
+  </list>
+</p>
+</subsection>
+</section>
+
+<section title="Service Calls">
+<service-definition name="TaskManagerAcknowledgements"
+                    number="42680"
+                    description="Broadcast to gather or refresh software acknowledgements">
+<entry>
+ <register-use number="1">&hex;42680 (Service Number)</register-use>
+ <register-use number="2">
+  Pointer to callback code, or 0 to notify Task Manager that acknowledgements have changed.
+ </register-use>
+</entry>
+
+<exit>
+ <register-use number="1" state="preserved" />
+</exit>
+
+<use>
+<p>
+  This service call is used to manage the registration of software acknowledgements with the Task Manager.
+</p>
+<p>
+  If R2 is non-zero, the service call is being issued by the Task Manager to gather acknowledgements. Modules receiving this call should call the address in R2 to register their components. Details of this callback can be found in the <reference type="entry" name="Acknowledgement Registration Callback" /> section.
+</p>
+<p>
+  If R2 is zero, the service call is being issued by a module to notify the Task Manager that acknowledgements have changed. The Task Manager will respond by re-issuing the service call with R2 non-zero to re-cache all information.
+</p>
+</use>
+
+<related>
+ <reference type="entry" name="Acknowledgement Registration Callback" />
+</related>
+
+</service-definition>
+</section>
+
+<section title="Entry points">
+<entry-definition name="Acknowledgement Registration Callback"
+                  description="Registers a component's acknowledgement strings"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="SVC"
+                  re-entrant="no">
+<entry>
+ <register-use number="0">
+  Group identifier:
+  <p>
+  <value-table head-number="Value" head-value="Category">
+   <value number="&hex;0000">System Overview (Reserved)</value>
+   <value number="&hex;1000">Required Components (Reserved)</value>
+   <value number="&hex;2000">Subsidiary Components (Reserved)</value>
+   <value number="&hex;3000">Commercial Components</value>
+   <value number="&hex;4000">Freeware / Open Source Components</value>
+   <value number="&hex;5000">User Components</value>
+  </value-table>
+  </p>
+ </register-use>
+ <register-use number="1">Pointer to null-terminated component title string</register-use>
+ <register-use number="2">Pointer to null-terminated acknowledgement details (formatted as 60-character LF-terminated strings)</register-use>
+</entry>
+<exit>
+ <register-use number="0-12" state="preserved" />
+</exit>
+<use>
+<p>
+  This routine is provided by the Task Manager and is called by modules during <reference type="service" name="TaskManagerAcknowledgements" /> (when R2 &ne; 0).
+</p>
+<p>
+  The module should call this routine once for each component it wishes to acknowledge. The Task Manager will copy the strings pointed to by R1 and R2 into its own buffers.
+</p>
+<p>
+  The acknowledgement details string should consist of one or more lines of text, each terminated by a linefeed (ASCII 10). Lines should ideally be no longer than 60 characters.
+</p>
+</use>
+<related>
+ <reference type="service" name="TaskManagerAcknowledgements" />
+</related>
+</entry-definition>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="TaskManager_Shutdown"
+                number="42682"
+                description="Initiates a desktop shutdown"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+
+<entry>
+ <register-use number="0">
+  Shutdown flags:
+  <bitfield-table>
+   <bit number="0" name="No Restart Dialogue" state="set">
+    Do not display the "Restart" confirmation dialogue (equivalent to the <menuoption>Exit</menuoption> menu option).
+   </bit>
+   <bit number="0" name="No Restart Dialogue" state="clear">
+    Display the "Restart" confirmation dialogue.
+   </bit>
+   <bit number="1" name="No PreQuit" state="set">
+    Do not broadcast <reference type="message" name="PreQuit" />.
+   </bit>
+   <bit number="1" name="No PreQuit" state="clear">
+    Broadcast <reference type="message" name="PreQuit" /> to all active tasks.
+   </bit>
+   <bit number="2" name="Portable Power-Down" state="set">
+    Flag in NVRAM/CMOS that the shutdown was due to an exceptional condition (e.g. low battery).
+   </bit>
+   <bit number="2" name="Portable Power-Down" state="clear">
+    Perform a normal shutdown.
+   </bit>
+   <bit number="3" name="Send Shutdown" state="set">
+    Broadcast <reference type="message" name="Shutdown" /> to all tasks.
+   </bit>
+   <bit number="3" name="Send Shutdown" state="clear">
+    Do not broadcast <reference type="message" name="Shutdown" />.
+   </bit>
+   <bit number="4" name="Reject Media" state="set">
+    Reject media requests (<reference type="upcall" name="1" /> and <reference type="upcall" name="2" />).
+   </bit>
+   <bit number="4" name="Reject Media" state="clear">
+    Allow media requests to be processed normally.
+   </bit>
+   <bit number="5" name="Reboot" state="set">
+    Reboot the machine once the shutdown is complete.
+   </bit>
+   <bit number="5" name="Reboot" state="clear">
+    Do not reboot the machine.
+   </bit>
+   <bit number="6" name="Power Off" state="set">
+    Power off the machine (requires supported hardware).
+   </bit>
+   <bit number="6" name="Power Off" state="clear">
+    Do not power off the machine.
+   </bit>
+   <bit number="7" name="Skip PostDesk" state="set">
+    Skip the execution of PostDesk scripts (RISC OS 5.19 and later).
+   </bit>
+   <bit number="7" name="Skip PostDesk" state="clear">
+    Execute PostDesk scripts normally.
+   </bit>
+   <bit number="8-31" state="reserved" />
+  </bitfield-table>
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0-9" state="preserved">
+  Does not return if the shutdown is successful.
+ </register-use>
+</exit>
+
+<use>
+<p>
+  This SWI initiates the process of shutting down the desktop environment. Depending on the flags in R0, it can lead to a reboot, a power-off, or an exit to the command line.
+</p>
+</use>
+
+<related>
+ <reference type="message" name="PreQuit" />
+ <reference type="message" name="Shutdown" />
+</related>
+
+</swi-definition>
+</section>
+
+</chapter>
+
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Charles Ferguson, 2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="CF" date="28 Apr 2026" title="Initial version">
+    <change>Created documentation for TaskManager_Shutdown and Service_TaskManagerAcknowledgements.</change>
+  </revision>
+ </history>
+</meta>
+</riscos-prm>
