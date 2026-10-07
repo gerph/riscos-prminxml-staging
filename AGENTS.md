@@ -6,17 +6,19 @@ This repository holds PRM-in-XML documents (`src/<area>/.../<name>.xml`) and an
 
 ## Adding a new document
 
-1. Lint it alone: `riscos-prminxml -f lint src/<path>.xml`.
-2. Check the language: British English in prose (`licence` as a noun,
+1. New documents use the 1.03 DTD (`-//Gerph//DTD PRM documentation 1.03//EN`,
+   `http://gerph.org/dtd/103/prm.dtd`); do not use 1.02.
+2. Lint it alone: `riscos-prminxml -f lint src/<path>.xml`.
+3. Check the language: British English in prose (`licence` as a noun,
    `-ise`, `behaviour`, `dispatcher`), and run the words through
    `/usr/share/dict/british-english-large`. Fix prose only; never change
    identifiers (SWI, error, message or system variable names) or values
    belonging to another format.
-3. Add a `<page href="...">` to `index.xml` in the section matching the
+4. Add a `<page href="...">` to `index.xml` in the section matching the
    subject (`3rdparty`, `riscos5`, `select/...`, `acorn`). `href` is the path
    under the section `dir`, without `.xml`.
-4. Check there are no trailing spaces in the changed files.
-5. `make lint` and `make output`; check the new files do not appear in the
+5. Check there are no trailing spaces in the changed files.
+6. `make lint` and `make output`; check the new files do not appear in the
    failure list, then commit on a feature branch, naming the files explicitly.
 
 ## Known build noise
