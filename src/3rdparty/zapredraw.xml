@@ -2,18 +2,18 @@
 <!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
                             "http://gerph.org/dtd/102/prm.dtd">
 
-<riscos-prm doc-group="Zap Developers">
+<riscos-prm>
 <chapter title="ZapRedraw">
 <section title="Introduction and Overview">
 
 <p>This document describes ZapRedraw 0.41 (13th November 2001).</p>
 
-<p>This document is in Request-For-Comments release 7; it is <strong>not a 
+<p>This document is in Request-For-Comments release 7; it is <strong>not a
 definitive release</strong>.</p>
 
-<p>ZapRedraw is a module capable of drawing a rectange of text characters on 
-screen. It originates from the text editor, Zap, but is often used in 
-applications where a text display is required, being superior to that natively 
+<p>ZapRedraw is a module capable of drawing a rectangle of text characters on
+screen. It originates from the text editor, Zap, but is often used in
+applications where a text display is required, being superior to that natively
 provided by RISC OS.</p>
 
 <p>It provides the following features:</p>
@@ -21,28 +21,28 @@ provided by RISC OS.</p>
 <p>
 <list>
 
-<item>Redraw may be by direct screen access (henceforth DSA) where the data is 
+<item>Redraw may be by direct screen access (henceforth DSA) where the data is
 poked into the screen memory or by the standard VDU redraw.</item>
 
-<item>Full colour provided (with your own definable palette). Supports up to 32 
+<item>Full colour provided (with your own definable palette). Supports up to 32
 bits per pixel in DSA mode and 24 bit colour in VDU mode.</item>
 
-<item>DSA redraw can handle any size of bitmap characters. Special optimised code 
-is provided for 8 pixel wide characters in all modes. Also 8 &times; 8 and 8 
-&times; 16 character sizes are given priority. Up to 65536 characters can be 
+<item>DSA redraw can handle any size of bitmap characters. Special optimised code
+is provided for 8 pixel wide characters in all modes. Also 8 &times; 8 and 8
+&times; 16 character sizes are given priority. Up to 65536 characters can be
 defined.</item>
 
 <item>VDU redraw mode can handle any font, at any size and aspect ratio.</item>
 
 <item>Support is provided for cursors.</item>
 
-<item>Many extra SWIs perform all the work of creating cached bitmaps, updating 
-them on a mode change etc. SWI's are also provided for creating palettes and 
+<item>Many extra SWIs perform all the work of creating cached bitmaps, updating
+them on a mode change etc. SWIs are also provided for creating palettes and
 other functions related to the redraw.</item>
 
 <item>An example program is provided which can be used as a template.</item>
 
-<item>New font handles concept allows easier handling of cached characters, mode 
+<item>New font handles concept allows easier handling of cached characters, mode
 changing, font sub-styles, and reduces DSA/VDU mode differences.</item>
 
 </list>
@@ -63,8 +63,6 @@ changing, font sub-styles, and reduces DSA/VDU mode differences.</item>
         that information.</fixme></item>
     <item><fixme>The extensions for ZapRedraw_RedrawArea are essentially entrypoints with
         reason codes, so could be restructured to use the entry-definition format.</fixme></item>
-    <item><fixme>References to sections and the like are using the long-form expanded
-        anchors, which isn't correct - I guess in the early PRM-in-XML we didn't have the automatic expansion for named sections.</fixme></item>
     <item><fixme> Related APIs aren't linked at all</fixme></item>
     <item><fixme> Update the documentation with the modern details.</fixme></item>
 </list>
@@ -82,58 +80,58 @@ changing, font sub-styles, and reduces DSA/VDU mode differences.</item>
 
 <section title="Technical Details">
 <subsection title="Pixel co-ordinates">
-<p>Pixel co-ordinates are used wherever possible to prevent rounding errors 
-when OS co-ordinates are not pixel aligned (these errors <strong>do</strong> 
+<p>Pixel co-ordinates are used wherever possible to prevent rounding errors
+when OS co-ordinates are not pixel aligned (these errors <strong>do</strong>
 mess things up).</p>
 
-<p>Pixel co-ordinates are from the top left of the screen with the y axis 
-descending. By a 'pixel' I mean a hardware pixel (this differs from an OS pixel in double-pixel emulation modes - this only crops up in the RISC OS 2 MODE 2 
+<p>Pixel co-ordinates are from the top left of the screen with the y axis
+descending. By a 'pixel' I mean a hardware pixel (this differs from an OS pixel in double-pixel emulation modes - this only crops up in the RISC OS 2 MODE 2
 wimp!).</p>
 </subsection>
 
 <subsection title="Zap redraw block">
-<p>For several SWIs, R1 points to a redraw block of the type described below. 
-The SWI documentation will mention which data in the block is actually used by 
-that SWI (so should be filled in). Each offset in the block is named with a 
-name beginning 'r_'. The BASIC program E-Library inside !ZapFonts contains a 
-procedure to set these variables up should you be using the BASIC assembler. 
-The contents of some offsets depends on which redraw mode is being used (VDU or 
+<p>For several SWIs, R1 points to a redraw block of the type described below.
+The SWI documentation will mention which data in the block is actually used by
+that SWI (so should be filled in). Each offset in the block is named with a
+name beginning 'r_'. The BASIC program E-Library inside !ZapFonts contains a
+procedure to set these variables up should you be using the BASIC assembler.
+The contents of some offsets depends on which redraw mode is being used (VDU or
 DSA), this is indicated by 'VDU:' and 'DSA:'.</p>
 
 <p><offset-table>
   <offset number="0" name="r_flags">Flags word determining the type of redraw:
     <bitfield-table>
       <bit number="0">Clear for DSA mode. Set for VDU redraw mode.</bit>
-      <bit number="1">Set for 'double height mode'. Only valid in DSA mode. 
-Draws each raster twice so actual character height is 2 &times; 
+      <bit number="1">Set for 'double height mode'. Only valid in DSA mode.
+Draws each raster twice so actual character height is 2 &times;
 <sysvar>r_charh</sysvar> and spacing 2 &times; <sysvar>r_linesp</sysvar>.</bit>
-      <bit number="2">Extension routine provided. Only valid in DSA mode. See 
+      <bit number="2">Extension routine provided. Only valid in DSA mode. See
 <reference type="swi" name="ZapRedraw_RedrawArea" />.</bit>
       <bit number="3">Set if using the multiple font protocol. See
 <reference type="swi" name="ZapRedraw_RedrawArea" />.</bit>
-      <bit number="4">Set if it is OK to use the fast rectangle plot in VDU 
+      <bit number="4">Set if it is OK to use the fast rectangle plot in VDU
 redraw mode (ie. output is not redirected to a sprite or a printer.)</bit>
-      <bit number="5">Set if you want ZapRedraw to decide whether to use 
+      <bit number="5">Set if you want ZapRedraw to decide whether to use
 double-height mode (it will set or clear b1 automatically.)</bit>
       <bit number="6">Set if the optional parts of the redraw block are present.
 </bit>
-      <bit number="7">Right-to-left (VDU module only)</bit>
-      <bit number="8">Transparent - colour mask in r_bac is not plotted (VDU 
+      <bit number="7">Right-to-left (VDU mode only)</bit>
+      <bit number="8">Transparent - colour mask in r_bac is not plotted (VDU
 mode only)</bit>
       <bit number="9">Forces ZapRedraw to use 1bpp bitmaps for font data.</bit>
       <bit number="10-31">Reserved - set to zero.</bit>
   </bitfield-table></offset>
-  <offset number="4" name="r_minx">Minimum X of redraw box (pixels from left - 
+  <offset number="4" name="r_minx">Minimum X of redraw box (pixels from left -
 inclusive)</offset>
-  <offset number="8" name="r_miny">Minimum Y of redraw box (pixels from top - 
+  <offset number="8" name="r_miny">Minimum Y of redraw box (pixels from top -
 inclusive)</offset>
-  <offset number="12" name="r_maxx">Maximum X of redraw box (pixels from left - 
+  <offset number="12" name="r_maxx">Maximum X of redraw box (pixels from left -
 exclusive)</offset>
-  <offset number="16" name="r_maxx">Maximum Y of redraw box (pixels from top - 
+  <offset number="16" name="r_maxy">Maximum Y of redraw box (pixels from top -
 exclusive)</offset>
   <offset number="20" name="r_screen">
     <list>
-      <item>DSA: Pointer to screen to write to or 0 to read the current screen 
+      <item>DSA: Pointer to screen to write to or 0 to read the current screen
 address.</item>
       <item>VDU: Ignored.</item>
     </list>
@@ -152,7 +150,7 @@ address.</item>
   <offset number="32" name="r_charw">Width of a character in pixels</offset>
   <offset number="36" name="r_charh">Height of a character in pixels</offset>
   <offset number="40" name="r_caddr"><p><list>
-                                     <item>DSA: Pointer to <reference type="link" href="#category_character_cache_format_r_caddr">character cache</reference></item>
+                                     <item>DSA: Pointer to <reference type="subsection" name="Character cache format (r_caddr)">character cache</reference></item>
                                      <item>VDU: Pointer to font name or 0 for system font</item>
   				     </list></p></offset>
   <offset number="44" name="r_cbpl"><p><list>
@@ -187,17 +185,17 @@ address.</item>
 
 <p>When using direct screen access, the module will expect this block to contain the bitmaps for all the characters it is asked to print. Each character has size <sysvar>r_cbpc</sysvar> so it will expect to find the bitmap for ASCII character 'n' at address <sysvar>char_start</sysvar> = (!<sysvar>r_caddr</sysvar>) + n &times; <sysvar>r_cbpc</sysvar>. The character definition then consists of <sysvar>r_charh</sysvar> rows of <sysvar>r_cbpl</sysvar> each so <sysvar>r_cbpc</sysvar> = <sysvar>r_charh</sysvar> &times; <sysvar>r_cbpl</sysvar>. NB <sysvar>r_cbpl</sysvar> need not be a multiple of 4 so this address need not be word aligned.</p>
 
-<p>The format of a row is the same of that for a sprite file except there is never any left hand side wastage. Ie, the first pixel is aligned to the start of the first word. Each character is <sysvar>r_charw</sysvar> pixels wide and thus requires N = <sysvar>r_charw</sysvar> &lt;&lt; <sysvar>r_bpp</sysvar> bits of storage. There are special cases when N is small:</p>
+<p>The format of a row is the same as that for a sprite file except there is never any left hand side wastage. Ie, the first pixel is aligned to the start of the first word. Each character is <sysvar>r_charw</sysvar> pixels wide and thus requires N = <sysvar>r_charw</sysvar> &lt;&lt; <sysvar>r_bpp</sysvar> bits of storage. There are special cases when N is small:</p>
 
 <p><list>
-<item> <p>If 0 &lt; N =&lt; 8 then <sysvar>r_cbpl</sysvar> = 1 and the top 8-N bits of each byte are wasted.</p></item>
-<item> <p>If 8 &lt;N =&lt; 16 then <sysvar>r_cbpl</sysvar> = 2 and the top 16-N bits of each byte are wasted.</p></item>
-<item> <p>If N &gt; 16 then <sysvar>r_cbpl</sysvar> is aligned to the next multiple of 4 bytes greater or equal to N. (eg 16 &lt; N =&lt; 32 &ge; <sysvar>r_cbpl</sysvar> = 4, 32 &lt; N &le; 64 &ge; <sysvar>r_cbpl</sysvar> = 8 etc).</p></item>
+<item> <p>If 0 &lt; N &le; 8 then <sysvar>r_cbpl</sysvar> = 1 and the top 8-N bits of the byte are wasted.</p></item>
+<item> <p>If 8 &lt; N &le; 16 then <sysvar>r_cbpl</sysvar> = 2 and the top 16-N bits of the row are wasted.</p></item>
+<item> <p>If N &gt; 16 then <sysvar>r_cbpl</sysvar> is aligned to the next multiple of 4 bytes greater or equal to N. (eg if 16 &lt; N &le; 32 then <sysvar>r_cbpl</sysvar> = 4, and if 32 &lt; N &le; 64 then <sysvar>r_cbpl</sysvar> = 8, etc).</p></item>
 </list></p>
-  
+
 <p>The SWI <reference type="swi" name="ZapRedraw_CachedCharSize" /> will calculate the values of <sysvar>r_cbpl</sysvar> and <sysvar>r_cbpc</sysvar> for you from a given size of character.</p>
 
-<p>Only TWO colours can be used in the defn of the character. Set all foreground pixels to 1's and background pixels to 0's. Eg, in a 16 colour mode pixels will be either 1111 or 0000. Unused bits at the end of the words (or bytes) are ignored and so can contain rubbish. The real foreground and background colours are masked in at run time.</p>
+<p>Only TWO colours can be used in the definition of the character. Set all foreground pixels to 1's and background pixels to 0's. Eg, in a 16 colour mode pixels will be either 1111 or 0000. Unused bits at the end of the words (or bytes) are ignored and so can contain rubbish. The real foreground and background colours are masked in at run time.</p>
 
 <p>Examples:</p>
 
@@ -217,15 +215,15 @@ address.</item>
 <p>If it was in a 16 colour mode then there would be one word per row and the first rows would be:
 
 <value-table head-number="Row" head-name="Value" head-value="Binary, low bit first">
-<value number="0" name="&hex;01111110">00001111111111111111111111110000</value>
-<value number="0" name="&hex;00000110">00001111111100000000000000000000</value>
+<value number="0" name="&hex;0FFFFFF0">00001111111111111111111111110000</value>
+<value number="1" name="&hex;00000FF0">00001111111100000000000000000000</value>
 </value-table></p>
-	
+
 <p>In general you have:</p>
 <p>Word 0					Word (N/4)-1</p>
 <p>b0 .... b31    ...................      b0 ..... b31</p>
 <p>pix0 pix1 ......................pix(r_charw-1) 00000</p>
-	
+
 <p>In practice you first cache the font at one bit per pixel (eg use <reference type="swi" name="ZapRedraw_ReadSystemChars" />) and then convert it to 'n' bits per pixel (for the current mode) by use of <reference type="swi" name="ZapRedraw_ConvertBitmap" />.</p>
 
 <p>Although I have said that the foreground colour must be all 1's and the background all 0's this is not strictly true. The data poked into the screen memory is (foreground mask AND bitmap) OR (background mask BIC bitmap). Thus if you have a foreground mask of &hex;FFFFFFFF and a background mask of 0 then the bitmap will be poked directly into the screen so can have any format you like (though character merging and several other features may not work properly). This idea can be used in conjunction with <reference type="swi" name="ZapRedraw_CacheFontChars" /> to create a fast redraw mode for anti aliased fonts (as used in Zap).</p>
@@ -236,7 +234,7 @@ address.</item>
 
 <p>The data for each line consists of a string of bytes giving the characters to print. By character number 'n' will I mean the n'th (n starting from 0) bitmap in your character cache in DSA mode or the character with ASCII code 'n' in VDU redraw mode. The Redraw module does not limit n to the range 0-255 but also allows higher values. Currently you can access 0-65535. Of course, ASCII characters for the codes 0-31 and 256-65535 are not defined. Zap treats these specially - see below.</p>
 
-<p>The byte 0 in the data for a line introduces a control code. Bytes 1-255 just print characters n = 1-255 as normal so you will need to use control codes to access characters &gt; 256. The currently defined control sequences are:</p>
+<p>The byte 0 in the data for a line introduces a control code. Bytes 1-255 just print characters n = 1-255 as normal so you will need to use control codes to access characters &ge; 256. The currently defined control sequences are:</p>
 
 <p><value-table>
   <value number="0,0">Prints character n = 0</value>
@@ -249,7 +247,7 @@ address.</item>
   <value number="0,7,b">Change background colour to b.</value>
   <value number="0,8,f,b,x,y">Cursor merge of characters x,y. This is similar to 0,4 but only works for characters &hex;7F,&hex;100-&hex;105. For &hex;7F, it masks in the block simply by changing the for/bac cols of the current character being printed. For &hex;100+, the square or line is plotted over the top of the character in the background colour b.</value>
   <value number="0,9,S">Substyle change to style S.</value>
-  <value number="0,10,f,b,F">Switch colour to foreground f and background b, and font to substyle S.</value>
+  <value number="0,10,f,b,S">Switch colour to foreground f and background b, and font to substyle S.</value>
 </value-table></p>
 
 <p>Note that sequences with codes 0,3,4 evaluate to one 'screen printable
@@ -312,14 +310,14 @@ SWI <reference type="swi" name="ZapRedraw_CreatePalette" /> is provided to set t
 </subsection>
 
 <category title="Font Handles">
-<p>Font handles are a new concept in ZapRedraw 0.40. The make the process of loading / cacheing fonts much easier, and they also allow transparent access to font substyles in DSA mode in the same manner as in VDU mode. To initialise your font, pass the font name (eg <userinput>08x16.System</userinput>) to <reference type="swi" name="ZapRedraw_FindFont" />, and place the returned font handle in <sysvar>r_caddr</sysvar>. To find the size of the font, the call <reference type="swi" name="ZapRedraw_ReadCharSize" /> is provided. When you have finished with the font, you should call <reference type="swi" name="ZapRedraw_LoseFont" />.</p>
+<p>Font handles are a new concept in ZapRedraw 0.40. They make the process of loading / caching fonts much easier, and they also allow transparent access to font substyles in DSA mode in the same manner as in VDU mode. To initialise your font, pass the font name (eg <userinput>08x16.System</userinput>) to <reference type="swi" name="ZapRedraw_FindFont" />, and place the returned font handle in <sysvar>r_caddr</sysvar>. To find the size of the font, the call <reference type="swi" name="ZapRedraw_ReadCharSize" /> is provided. When you have finished with the font, you should call <reference type="swi" name="ZapRedraw_LoseFont" />.</p>
 
 <p>Font handles take the form &hex;HHHHHHSS</p>
-	
+
 <p>HH is the font handle proper, and SS is the substyle. Thus the lower 8 bits of <sysvar>r_caddr</sysvar> are the initial font substyle to use at the start of the line. They have the same effect as <sysvar>r_for</sysvar> and <sysvar>r_bac</sysvar>. 0,9 and 0,10 control codes may be used to change substyle during the line.</p>
 
-<p>A font handle allocated for VDU mode may be passed directly to <reference type="swi" name="ZapRedraw_RedrawArea" /> in DSA mode. This converts it to anti-aliased bitmaps on demand, exactly 
-as Zap's aa-DSA mode does. The algorhythm used is simple, but gives good results. Substyles are
+<p>A font handle allocated for VDU mode may be passed directly to <reference type="swi" name="ZapRedraw_RedrawArea" /> in DSA mode. This converts it to anti-aliased bitmaps on demand, exactly
+as Zap's aa-DSA mode does. The algorithm used is simple, but gives good results. Substyles are
 ignored, but may be added at a later date.</p>
 
 </category>
@@ -362,7 +360,7 @@ ignored, but may be added at a later date.</p>
 <section title="SWI Calls">
   <swi-definition name="ZapRedraw_RedrawArea"
                   number="48480"
-                  description="This redraws a rectangle of characters on the 
+                  description="This redraws a rectangle of characters on the
                   screen."
                   irqs="undefined"
                   fiqs="undefined"
@@ -371,28 +369,24 @@ ignored, but may be added at a later date.</p>
   <entry>
     <register-use number="1">Pointer to redraw block (as described above). All
 defined offsets in the redraw block are used.
-      <p>In VDU mode <sysvar>r_workarea</sysvar> must be at least 64 bytes + 
+      <p>In VDU mode <sysvar>r_workarea</sysvar> must be at least 64 bytes +
 the amount needed for a sprite of one character - see <reference type="swi"
 name="ZapRedraw_SpriteSize" />.</p>
       <p>If using fonts then the first word of the workarea should contain:
         <list>
           <item>Lower 16 bits:font size to plot at (points)</item>
-          <item>Upper 16 bits:font aspect ratio to use ( = Y / X &times; 100) (or 
+          <item>Upper 16 bits:font aspect ratio to use ( = Y / X &times; 100) (or
 0)</item>
         </list></p>
-      <p>In DSA mode <sysvar>r_workarea</sysvar> must be at least 64 + 
+      <p>In DSA mode <sysvar>r_workarea</sysvar> must be at least 64 +
 <sysvar>r_cbpl</sysvar> bytes (and a whole number of words long).</p>
-      <p>If b2 of the <sysvar>r_flags</sysvar> word is set then you provide an 
+      <p>If b2 of the <sysvar>r_flags</sysvar> word is set then you provide an
 extension routine with the address and private word in R2 and R3 respectively.
 </p>
     </register-use>
-    <register-use number="2">Pointer to an <reference type="link"
-href="#section_extension_routines_to_zapredraw_redrawarea">extension routine
-</reference> (in DSA mode - see above.)
+    <register-use number="2">Pointer to an <reference type="section" name="Extension routines to ZapRedraw_RedrawArea">extension routine</reference> (in DSA mode - see above.)
     </register-use>
-    <register-use number="3">Private word value to pass to the <reference 
-type="link" href="#section_extension_routines_to_zapredraw_redrawarea">
-extension routine</reference> (in DSA mode - see above.)
+    <register-use number="3">Private word value to pass to the <reference type="section" name="Extension routines to ZapRedraw_RedrawArea">extension routine</reference> (in DSA mode - see above.)
     </register-use>
   </entry>
   <exit>
@@ -402,10 +396,10 @@ extension routine</reference> (in DSA mode - see above.)
     <processor-flag name="Z" state="corrupted" />
   </exit>
   <use>
-  <p>This SWI is used to redraw an area of characters on the screen. It 
-provides a mean of extending the redraw routine so that you can trap unknown 
-control codes and add extra functionality to the ones that exist. For example, 
-you may wish to change font on a colour change. Zap's fast font redraw mode 
+  <p>This SWI is used to redraw an area of characters on the screen. It
+provides a means of extending the redraw routine so that you can trap unknown
+control codes and add extra functionality to the ones that exist. For example,
+you may wish to change font on a colour change. Zap's fast font redraw mode
 does this.</p>
   </use>
   <related>
@@ -416,7 +410,7 @@ does this.</p>
     <reference type="swi" name="ZapRedraw_UpdateWindow" />
   </related>
   </swi-definition>
-  
+
   <swi-definition name="ZapRedraw_GetPaletteEntry"
                   number="48481"
                   description="Convert a palette entry into a mask."
@@ -425,20 +419,20 @@ does this.</p>
                   processor-mode="undefined"
                   re-entrant="no">
   <entry>
-  <register-use number="0">The colour number to be poked into the screen. (0 - 
+  <register-use number="0">The colour number to be poked into the screen. (0 -
 &gt;<userinput>num_of_cols</userinput> -1)</register-use>
   <register-use number="1"><sysvar>r_bpp</sysvar> (0-5)</register-use>
   </entry>
   <exit>
-    <register-use number="0">Mask to put in palette table (with colour 
+    <register-use number="0">Mask to put in palette table (with colour
 duplicated to fill the word).</register-use>
     <processor-flag name="N" state="corrupted" />
     <processor-flag name="C" state="corrupted" />
     <processor-flag name="Z" state="corrupted" />
   </exit>
   <use>
-    <p>This SWI takes a colour bitmap and duplicates it to fill a word, 
-creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0 
+    <p>This SWI takes a colour bitmap and duplicates it to fill a word,
+creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
 = 7 and R1 = 2 on entry then R0 = &hex;77777777 on exit.</p>
   </use>
   <related>
@@ -446,8 +440,8 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
     <reference type="swi" name="ZapRedraw_CreatePalette" />
   </related>
   </swi-definition>
-  
-    
+
+
   <swi-definition name="ZapRedraw_RedrawRaster"
                   number="48482"
                   description="Redraws a single raster line."
@@ -486,16 +480,16 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
 <offset number="4">Number of pixels to do from the first character (0 -&gt; charw - 1)</offset>
 <offset number="8">Number of whole characters to do after the first char</offset>
 <offset number="12">Number of pixels to do in the last visible char (0 -&gt; charw - 1)</offset>
-<offset number="16">Undefined</offset>
-<offset number="20">Pointer to <reference type="link" href="#section_extension_routines_to_zapredraw_redrawarea">extension routine</reference> if redraw flags bit 2 set</offset>
-<offset number="24">Private word of <reference type="link" href="#section_extension_routines_to_zapredraw_redrawarea">extension routine</reference> pointer redraw flags bit 2 set</offset>
+<offset number="16">Number of whole characters scrolled off the left of the redraw rectangle (<sysvar>r_scrollx</sysvar> DIV <sysvar>r_charw</sysvar>)</offset>
+<offset number="20">Pointer to <reference type="section" name="Extension routines to ZapRedraw_RedrawArea">extension routine</reference> if redraw flags bit 2 set</offset>
+<offset number="24">Private word for the <reference type="section" name="Extension routines to ZapRedraw_RedrawArea">extension routine</reference> if redraw flags bit 2 set</offset>
 </offset-table></p>
   </use>
   <related>
     <reference type="swi" name="ZapRedraw_RedrawArea" />
   </related>
   </swi-definition>
-  
+
   <swi-definition name="ZapRedraw_ConvertBitmap"
                   number="48483"
                   description="Converts a 1bpp character bitmap into a bitmap for the RedrawArea SWI."
@@ -508,13 +502,13 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
     <value number="r_bpp">To find the number of bits per pixel.</value>
     <value number="r_charw">Width of char in pixels.</value>
     <value number="r_charh">Height of char in pixels.</value>
-    <value number="r_caddr">Address to write the bitmap. Memory at offsets R2 &times; <sysvar>r_cbpc</sysvar> to (R3 + 1) &times; <sysvar>r_bpc</sysvar> must be preserved.</value>
+    <value number="r_caddr">Address to write the bitmap. The characters R2 to R3 are written at offsets R2 &times; <sysvar>r_cbpc</sysvar> to (R3 + 1) &times; <sysvar>r_cbpc</sysvar> from this address, so this memory must be reserved.</value>
     <value number="r_cbpl">Cache line width in bytes (as defined under <sysvar>r_caddr</sysvar> help text.)</value>
     <value number="r_cbpc">Number of bytes per cached character (as defined under <sysvar>r_caddr</sysvar> help text.)</value>
   </value-table></p></register-use>
   <register-use number="2">First character to be converted (eg 0)</register-use>
   <register-use number="3">Last character to be converted (inclusive) (eg 255)</register-use>
-  <register-use number="4">Pointer to source bitmap of the format described under <sysvar>r_caddr</sysvar> but with 1 bit per pixel (ie 2 colour mode format)</register-use>
+  <register-use number="4">Pointer to source bitmap of the format described under <sysvar>r_caddr</sysvar> but with 1 bit per pixel (ie 2 colour mode format). This is the address of the bitmap for character 0, even when R2 is not 0.</register-use>
   </entry>
   <exit>
     <register-use number="0" state="corrupted" />
@@ -523,7 +517,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
     <processor-flag name="Z" state="corrupted" />
   </exit>
   <use>
-    <p>This SWI takes a character bitmap of the form of 1 bit per pixel, (the bit set for foreground/clear for background) and converts it into a bitmap for use by the <reference type="swi" name="ZapRedraw_RedrawArea" /> SWI, by changing each '1' to n '1's and each '0' to n '0's where 'n' is the number of bits per pixel given. It uses the SWI <reference type="swi" name="ZapRedraw_ConvBitmapChar" /> to do this.</p>
+    <p>This SWI takes a character bitmap of the form of 1 bit per pixel, (the bit set for foreground/clear for background) and converts it into a bitmap for use by the <reference type="swi" name="ZapRedraw_RedrawArea" /> SWI, by changing each '1' to n '1's and each '0' to n '0's where 'n' is the number of bits per pixel given. It uses the SWI <reference type="swi" name="ZapRedraw_ConvBitmapChar" /> to do this. If <sysvar>r_bpp</sysvar> is 0 the bitmap is simply copied.</p>
     <p>In addition to corrupting R0 and flags, the <sysvar>r_caddr</sysvar> block is written to.</p>
   </use>
   <related>
@@ -531,7 +525,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
     <reference type="swi" name="ZapRedraw_ConvBitmapChar" />
   </related>
   </swi-definition>
-  
+
   <swi-definition name="ZapRedraw_PrepareDataLine"
                   number="48484"
                   description="Helps prepare the r_data field of the redraw block."
@@ -554,7 +548,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
     <processor-flag name="N" state="corrupted" />
     <processor-flag name="C" state="corrupted" />
     <processor-flag name="Z" state="corrupted" />
-    <register-use number="5">Length of output string (including 0, 2 terminator) Only a subset of the the redraw codes available are used.</register-use>
+    <register-use number="5">Length of output string (including 0, 2 terminator) Only a subset of the redraw codes available are used.</register-use>
   </exit>
   <use>
     <p>This SWI is to help prepare the <sysvar>r_data</sysvar> field of the redraw block. It takes as input the pointer to a line of text character (0 - 255) to be treated as ordinary characters (0 is not a control code). It also takes as input a pointer to a background mask and a foreground mask list, giving the background and foreground colours of each character separately. The output is a line of the format required by <sysvar>r_data</sysvar> with control codes changing the colours and specifying the line end. Control codes in the input string can have their colour set automatically by setting R0 to the colour.</p>
@@ -576,7 +570,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
   <related>
   </related>
   </swi-definition>
-  
+
   <swi-definition name="ZapRedraw_AddCursor"
                   number="48485"
                   description="Adds cursor control codes to a string."
@@ -621,7 +615,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
                   processor-mode="undefined"
                   re-entrant="no">
     <entry>
-      <register-use number="0">n (number of characters to skip or or -1 to move to the end of the string - find its len)</register-use>
+      <register-use number="0">n (number of characters to skip, or -1 to move to the end of the string - find its len)</register-use>
       <register-use number="1">Pointer to the input string (terminated by 0,2)</register-use>
       <register-use number="2">Current foreground colour</register-use>
       <register-use number="3">Current background colour</register-use>
@@ -634,6 +628,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
       <register-use number="1">Start of the next printable character after skipping n. (or string terminator if reached that first).</register-use>
       <register-use number="2">Updated by any colour change control codes.</register-use>
       <register-use number="3">Updated by any colour change control codes. Flags are corrupted.</register-use>
+      <register-use number="4">Updated by any font change control codes.</register-use>
     </exit>
     <use>
     <p>This SWI takes as input a line of the format required by <sysvar>r_data</sysvar> (ie containing ctrl sequences starting with 0) and a number 'n' and returns the start of the (n+1)'th printable character within this line (ie it skips over n printable characters), ignoring colour change control codes etc. Thus on exit it points to a byte 1 - 255 or one of the control sequences 0, 0 or 0, 2 or 0, 3, l, h or 0, 4, f, b, c1, c2 each of which define one printable character. If the offset n is off the end of the line then it will point to the 0, 2 terminator. It also keeps track of the colour changes that take place. NB If n = 0 then it may still be useful - as it will jump over any colour changes before the first character. If R0 &gt; R1 on exit then the character was found, otherwise there were R1 - R0 characters left to skip.</p>
@@ -652,7 +647,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
   <related>
   </related>
   </swi-definition>
-  
+
   <swi-definition name="ZapRedraw_MoveBytes"
                   number="48487"
                   description="This is a fast byte-moving routine."
@@ -677,7 +672,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
   <related>
   </related>
     </swi-definition>
-    
+
   <swi-definition name="ZapRedraw_CachedCharSize"
                   number="48488"
                   description="Works out the size of a character."
@@ -701,7 +696,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
   <related>
   </related>
   </swi-definition>
-  
+
   <swi-definition name="ZapRedraw_ConvBitmapChar"
                   number="48489"
                   description="Converts a character to a bitmap."
@@ -728,7 +723,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
   <related>
   </related>
   </swi-definition>
-  
+
   <swi-definition name="ZapRedraw_CreatePalette"
                   number="4848A"
                   description="Creates the r_palette data block."
@@ -749,7 +744,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
           <value number="r_workarea">Pointer to 128 byte work area to load wimp palette into.</value>
         </value-table></p></register-use>
        <register-use number="2">Pointer to source palette</register-use>
-       <register-use number="3">Pointer to space reserved for destination palette (needs 4 &times; R4 bytes preserved) (source may equal destination)</register-use>
+       <register-use number="3">Pointer to space reserved for destination palette (needs 4 &times; R4 bytes reserved) (source may equal destination)</register-use>
        <register-use number="4">Number of palette entries (eg 16)</register-use>
     </entry>
     <exit>
@@ -761,7 +756,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
   <related>
   </related>
   </swi-definition>
-  
+
   <swi-definition name="ZapRedraw_InsertChar"
                   number="4848B"
                   description="Inserts a character into a string of r_data format."
@@ -872,7 +867,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
 
   <swi-definition name="ZapRedraw_AddVduBitmaps"
                   number="48490"
-                  description="Inserts a character into a string of r_data format."
+                  description="Creates bitmaps for the special VDU redraw characters."
                   irqs="undefined"
                   fiqs="undefined"
                   processor-mode="undefined"
@@ -880,16 +875,16 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
     <entry>
       <register-use number="1">Pointer to redraw block (uses <sysvar>r_charw</sysvar> and <sysvar>r_charh</sysvar> to find the char size) <sysvar>r_workarea</sysvar> must have 64 bytes + room for a character sprite (see <reference type="swi" name="ZapRedraw_SpriteSize" />) reserved.</register-use>
       <register-use number="2">First extra bitmap to create (eg 0)</register-use>
-      <register-use number="3">Last extra bitmap to create (inclusive eg &hex;104)</register-use>
+      <register-use number="3">Last extra bitmap to create (inclusive eg &hex;105)</register-use>
       <register-use number="4">Pointer to bitmaps in 1 bit per pixel form. (space must be reserved for the characters to be created).</register-use>
     </entry>
     <exit>
       <register-use number="0 (and flags)">Corrupted.</register-use>
     </exit>
     <use>
-      <p>If you look at the VDU codes, you will see that characters 0 - &hex;1F, &hex;7F, &hex;100+ are treated specially during a VDU redraw, drawing blocks and squares. The purpose of this SWI is to create bitmaps for these extra characters from a standard bitmap of the normal characters, so you can also use these in a DSA redraw. You specify an interval of characters, and in that interval, it creates bitmaps for the following:<value-table>
+      <p>If you look at the VDU codes, you will see that characters 0 - &hex;1F, &hex;7F, &hex;100+ are treated specially during a VDU redraw, drawing blocks and squares. The purpose of this SWI is to create bitmaps for these extra characters from a standard bitmap of the normal characters, so you can also use these in a DSA redraw. You specify an interval of characters, and in that interval, it creates bitmaps for the following (characters &hex;20-&hex;7E and &hex;80-&hex;FF are left unaltered):<value-table>
 	<value number="&hex;00">Creates bitmap for '0' by copying bitmap &hex;30</value>
-	<value number="&hex;01-&hex;1F">Creates bitmap for 'AB...' by copying bitmaps &hex;41-&hex;5F</value>
+	<value number="&hex;01-&hex;1F">Creates bitmaps for 'A', 'B', ... by copying bitmaps &hex;41-&hex;5F</value>
 	<value number="&hex;7F">Creates a filled in square.</value>
 	<value number="&hex;100">Top bottom and left edge filled [</value>
 	<value number="&hex;101">Top and bottom edges</value>
@@ -898,7 +893,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
 	<value number="&hex;104">Underscore _</value>
 	<value number="&hex;105">Left edge (giving a bar)</value>
 	<value number="&hex;106+">Undefined (currently copies the @ character).</value>
-	</value-table></p>	
+	</value-table></p>
 <p>This means that the bitmaps will then be consistent with the VDU characters
 of these numbers. These bitmaps are also useful as cursors.</p>
     </use>
@@ -908,7 +903,7 @@ of these numbers. These bitmaps are also useful as cursors.</p>
 
   <swi-definition name="ZapRedraw_CacheFontChars"
                   number="48491"
-                  description="Inserts a character into a string of r_data format."
+                  description="Caches a range of characters from an anti-aliased font as bitmaps."
                   irqs="undefined"
                   fiqs="undefined"
                   processor-mode="undefined"
@@ -916,14 +911,14 @@ of these numbers. These bitmaps are also useful as cursors.</p>
     <entry>
       <register-use number="0">Reason code - other registers depend upon reason code.
    <value-table head-number="Reason" head-value="Meaning">
-    <value number="0">
+    <value number="1">
   <reference type="swi" name="ZapRedraw_CacheFontChars" reason="1" use-description="yes" />
     </value>
-    <value number="1">
+    <value number="2">
   <reference type="swi" name="ZapRedraw_CacheFontChars" reason="2" use-description="yes" />
     </value>
    </value-table>
-  </register-use>         
+  </register-use>
     </entry>
     <exit>
       <register-use number="0 (and flags)">Corrupted</register-use>
@@ -954,7 +949,7 @@ of these numbers. These bitmaps are also useful as cursors.</p>
     <value number="r_mode">Mode to cache font in (ie mode sprite defined in).</value>
     </value-table></p></register-use>
   <register-use number="2">Pointer to font name</register-use>
-  <register-use number="3">Font plotting details, including OS offsets:
+  <register-use number="3">Font plotting details:
   <p><bitfield-table>
     <bit number="0-15">Font size to plot at (points)</bit>
     <bit number="16-31">Font aspect ratio to use (= Y / X &times; 100) (or 0)</bit>
@@ -1016,9 +1011,9 @@ of these numbers. These bitmaps are also useful as cursors.</p>
                   re-entrant="no">
     <entry>
       <register-use number="0">Reason code:<p><bitfield-table>
-        <bit number="0-6"><p><list>
-            <item><p>Return sprite size for sprite in current mode and <sysvar>r_bpp</sysvar>.</p></item>
-            <item><p>Return sprite size for a mode 0 sprite (ie assume r_bpp=0)</p></item>
+        <bit number="0-6"><p>Sprite mode to calculate the size for:<list>
+            <item><p>1 : Return sprite size for sprite in current mode and <sysvar>r_bpp</sysvar>.</p></item>
+            <item><p>2 : Return sprite size for a mode 0 sprite (ie assume <sysvar>r_bpp</sysvar> = 0)</p></item>
         </list></p></bit>
         <bit number="7">Clear for first pass, set for second pass.</bit>
       </bitfield-table></p>
@@ -1032,7 +1027,7 @@ of these numbers. These bitmaps are also useful as cursors.</p>
       </list></p></register-use>
     </exit>
     <use>
-      <p>Several SWI's (eg <reference type="swi" name="ZapRedraw_RedrawArea" /> - VDU mode, <reference type="swi" name="ZapRedraw_CacheFontChars" />) need to create a sprite area the size of a single character. This call returns the size required for this sprite (+ palette + mask + save area etc), and thus the amount of workarea that should be reserved. The sprite needs a save area as it appears that <reference type="swi" name="Font_Paint" href="?" /> redirects output to a sprite and thus corrupts the graphics colours. This means that it takes two passes to read the size required for the sprite - the first with bit 7 clear to read the size for the sprite and the second with it set to create the sprite (space now reserved for it) and calculate the save area required via <reference type="swi" name="OS_SpriteOp" reason="62" href="?" />.</p>
+      <p>Several SWIs (eg <reference type="swi" name="ZapRedraw_RedrawArea" /> - VDU mode, <reference type="swi" name="ZapRedraw_CacheFontChars" />) need to create a sprite area the size of a single character. This call returns the size required for this sprite (+ palette + mask + save area etc), and thus the amount of workarea that should be reserved. The sprite needs a save area as it appears that <reference type="swi" name="Font_Paint" href="?" /> redirects output to a sprite and thus corrupts the graphics colours. This means that it takes two passes to read the size required for the sprite - the first with bit 7 clear to read the size for the sprite and the second with it set to create the sprite (space now reserved for it) and calculate the save area required via <reference type="swi" name="OS_SpriteOp" reason="62" href="?" />.</p>
     </use>
     <example><p>
       <command>SYS "ZapRedraw_SpriteSize",&hex;01,redraw_block TO size%</command>
@@ -1205,7 +1200,7 @@ of these numbers. These bitmaps are also useful as cursors.</p>
   <value number="8">Right reduction</value>
   <value number="12">Bottom reduction</value>
 </value-table></p>
-	
+
 <p>All values are in pixels, and are signed integers. In general, the values in this block will all be 0, so you may omit it.</p>
 
 <p>The font name may either be a font as it appears in the ZapFonts directory, or it may be a complete path name of a application-specific font directory.</p>
@@ -1246,7 +1241,7 @@ of these numbers. These bitmaps are also useful as cursors.</p>
       <register-use number="1">Redraw block (for <sysvar>r_caddr</sysvar>, <sysvar>r_linesp</sysvar>, <sysvar>r_magx</sysvar>, <sysvar>r_magy</sysvar>, <sysvar>r_flags</sysvar>)</register-use>
       <register-use number="2">Flags:<p>
         <bitfield-table>
-          <bit number="0">Return values in OS unitsif set, pixels if clear</bit>
+          <bit number="0">Return values in OS units if set, pixels if clear</bit>
           <bit number="1">Add value of <sysvar>r_linesp</sysvar></bit>
           <bit number="2">Use <sysvar>r_flags</sysvar> bits 1 and 5 (double-height flags)</bit>
         </bitfield-table></p></register-use>
@@ -1312,11 +1307,11 @@ of these numbers. These bitmaps are also useful as cursors.</p>
                   processor-mode="undefined"
                   re-entrant="no">
     <entry>
-      <register-use number="0">Wimp window block (suitable for passing to <reference type="swi" name="Wimp_UpdateWindow" href="?" /></register-use>
+      <register-use number="0">Wimp window block (suitable for passing to <reference type="swi" name="Wimp_UpdateWindow" href="?" />)</register-use>
       <register-use number="1">Zap Redraw block (all offsets used)</register-use>
     </entry>
     <exit>
-      <register-use number="0">Corrupt</register-use>
+      <register-use number="0">Corrupted</register-use>
     </exit>
     <use>
       <p>Updates a window in a standard loop using <reference type="swi" name="Wimp_UpdateWindow" href="?" /> and repeated calls to <reference type="swi" name="ZapRedraw_RedrawArea" /> as appropriate.</p>
@@ -1356,14 +1351,14 @@ of these numbers. These bitmaps are also useful as cursors.</p>
 <p>You must not alter the redraw block itself.</p>
 <p>You CANNOT return errors from an extension call.</p>
 
-<subsection title=" R0=0 : Starting a raster line">
+<subsection title="R0=0 : Starting a raster line">
   <p><value-table head-number="Register" head-value="Contents">
     <value number="R1">Pointer to redraw block</value>
     <value number="R3">Pointer to first character</value>
     <value number="R4"><sysvar>r_caddr</sysvar> + <sysvar>r_cbpl</sysvar> &times; row where row (0 ... <sysvar>r_charh</sysvar> - 1) is the current character row being drawn. Or, R4 = 0 if in line spacing.</value>
     <value number="R5">Pointer to address in screen memory of current word being written</value>
     <value number="R6">Bit offset in current word being written</value>
-    <value number="R7">Current word being writen (bits &ge; R6 are clear)</value>
+    <value number="R7">Current word being written (bits &ge; R6 are clear)</value>
     <value number="R9">Foreground / background colour numbers:<p><list>
       <item>foreground : bottom sixteen bits</item>
       <item>background : top sixteen bits.</item>
@@ -1373,26 +1368,26 @@ of these numbers. These bitmaps are also useful as cursors.</p>
   </value-table></p>
 </subsection>
 
-<subsection title=" R0=1 : Foreground and background colours changing">
+<subsection title="R0=1 : Foreground and background colours changing">
   <p><value-table head-number="Register" head-value="Contents">
     <value number="R1">Pointer to redraw block</value>
     <value number="R3">Address of next character after the control code</value>
     <value number="R4"><sysvar>r_caddr</sysvar> + <sysvar>r_cbpl</sysvar> &times; row where row (0 ... <sysvar>r_charh</sysvar> - 1) is the current character row being drawn. Or, R4 = 0 if in line spacing.</value>
     <value number="R5">Pointer to address in screen memory of current word being written</value>
     <value number="R6">Bit offset in current word being written</value>
-    <value number="R7">Current word being writen (bits &ge; R6 are clear)</value>
+    <value number="R7">Current word being written (bits &ge; R6 are clear)</value>
     <value number="R10">New foreground mask (eg &hex;77777777)</value>
     <value number="R11">New background mask (eg &hex;00000000)</value>
   </value-table></p>
 </subsection>
 
-<subsection title=" R0=2 : Reserved">
+<subsection title="R0=2 : Reserved">
 </subsection>
 
-<subsection title=" R0=3 : Reserved">
+<subsection title="R0=3 : Reserved">
 </subsection>
 
-<subsection title=" R0=4 : About to merge characters">
+<subsection title="R0=4 : About to merge characters">
   <p><value-table head-number="Register" head-value="Contents">
     <value number="R1">Pointer to redraw block</value>
     <value number="R2">Character definition table to use for the mask character</value>
@@ -1406,38 +1401,38 @@ of these numbers. These bitmaps are also useful as cursors.</p>
   <p>NB Any changes you make to these registers will be effective for this one character only the normal values being stacked.</p>
 </subsection>
 
-<subsection title=" R0=5 : Reserved">
+<subsection title="R0=5 : Reserved">
 </subsection>
 
-<subsection title=" R0=6 =&gt; Foreground colour changing">
-  <p>As for <reference type="link" href="#subsection__r0=0_:_starting_a_raster_line">R0 = 1</reference></p>
+<subsection title="R0=6 =&gt; Foreground colour changing">
+  <p>As for <reference type="subsection" name="R0=1 : Foreground and background colours changing">R0 = 1</reference></p>
 </subsection>
 
-<subsection title=" R0=7 =&gt; Background colour changing">
-  <p>As for <reference type="link" href="#subsection__r0=0_:_starting_a_raster_line">R0 = 1</reference></p>
+<subsection title="R0=7 =&gt; Background colour changing">
+  <p>As for <reference type="subsection" name="R0=1 : Foreground and background colours changing">R0 = 1</reference></p>
 </subsection>
 
-<subsection title=" R0=8 : About to merge cursors">
-  <p>Registers as for <reference type="link" href="#subsection__r0=4_:_about_to_merge_characters">R0 = 4</reference>.</p>
+<subsection title="R0=8 : About to merge cursors">
+  <p>Registers as for <reference type="subsection" name="R0=4 : About to merge characters">R0 = 4</reference>.</p>
   <p>If R7 &lt; &hex;100 then R10 / R11 will be set to R9 / R8 and next char drawn.</p>
   <p>If R7 &ge; &hex;100 then the characters will be merged with R9 copied into R8.</p>
 </subsection>
 
-<subsection title=" R0=9 : Font change">
-  <p>Registers as for <reference type="link" href="#subsection_r0=1_:_foreground_and_background_colours_changing">R0 = 1</reference></p>
+<subsection title="R0=9 : Font change">
+  <p>Registers as for <reference type="subsection" name="R0=1 : Foreground and background colours changing">R0 = 1</reference></p>
 </subsection>
 
-<subsection title=" R0=10 : Foreground colour, background colour and font change">
-  <p>Registers as for <reference type="link" href="#subsection_r0=1_:_foreground_and_background_colours_changing">R0 = 1</reference></p>
+<subsection title="R0=10 : Foreground colour, background colour and font change">
+  <p>Registers as for <reference type="subsection" name="R0=1 : Foreground and background colours changing">R0 = 1</reference></p>
   <p>Note that if changing font during redraw, then this must be done in an extension routine for DSA redraws.</p>
 </subsection>
 
-<subsection title=" R0>10 : Reserved">
+<subsection title="R0>10 : Reserved">
 </subsection>
 </section>
 
 <section title="Copyright / Contact details">
-<p>The ZapRedraw module is copyright Dominic Symes 1994-1997. Please contact him if you wish to use it in a program other than Zap. See the Zap Copyright file for his address. ZapRedraw and Zap can be obtained from <reference type="link" href="www.zap.uk.eu.org">www.zap.uk.eu.org</reference></p>
+<p>The ZapRedraw module is copyright Dominic Symes 1994-1997. Please contact him if you wish to use it in a program other than Zap. See the Zap Copyright file for his address. ZapRedraw and Zap can be obtained from <reference type="link" href="http://www.zap.uk.eu.org/">www.zap.uk.eu.org</reference></p>
 <p>This manual has been converted from text format to XML by <email name="Andrew Hill" address="drew.hill@tesco.net" />. It is currently in RFC release, and should therefore neither be considered authoritative nor for official release. Many thanks for the RISC OS Documentation Project Group for proof-reading and comments.</p>
 <p>All maintenance to this document should be performed on the XML document, not to its output formats.</p>
 <p>Comments or queries regarding this documentation should be addressed to <email name="Andrew Hill" address="drew.hill@tesco.net" />; comments about ZapRedraw should go to the <email name="Zap DevTeam" address="christian@zap.tartarus.org" />.</p>
@@ -1447,10 +1442,10 @@ of these numbers. These bitmaps are also useful as cursors.</p>
 <!-- MetaData -->
 <meta>
  <maintainer>
-  <email name="Andrew Hill" address="drew.hill@tesco.net" />
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
  </maintainer>
  <disclaimer>
-<p>The ZapRedraw module is copyright Dominic Symes 1994-1997. Please contact him if you wish to use it in a program other than Zap. See the Zap Copyright file for his address. ZapRedraw and Zap can be obtained from <reference type="link" href="www.zap.uk.eu.org">www.zap.uk.eu.org</reference></p>
+<p>The ZapRedraw module is copyright Dominic Symes 1994-1997. Please contact him if you wish to use it in a program other than Zap. See the Zap Copyright file for his address. ZapRedraw and Zap can be obtained from <reference type="link" href="http://www.zap.uk.eu.org/">www.zap.uk.eu.org</reference></p>
 <p>This manual has been converted from text format to XML by <email name="Andrew Hill" address="drew.hill@tesco.net" />. It is currently in RFC release, and should therefore neither be considered authoritative nor for official release. Many thanks for the RISC OS Documentation Project Group for proof-reading and comments.</p>
 <p>All maintenance to this document should be performed on the XML document, not to its output formats.</p>
 <p>Comments or queries regarding this documentation should be addressed to <email name="Andrew Hill" address="drew.hill@tesco.net" />; comments about ZapRedraw should go to the <email name="Zap DevTeam" address="christian@zap.tartarus.org" />.</p>
@@ -1466,6 +1461,13 @@ of these numbers. These bitmaps are also useful as cursors.</p>
    <change>Basic updates to PRM-in-XML 1.02 format, as this was one of the earliest attempts at using
            PRM-in-XML with 1.00, and much has changed and improved.</change>
    <change>Updated to validate.</change>
+  </revision>
+
+  <revision number="RFCs 7b" author="Gerph" date="08 Oct 2026" title="PRM-in-XML 1.03 and corrections">
+   <change>Updated to the PRM-in-XML 1.03 DTD.</change>
+   <change>Corrected the offset name of r_maxy, the 4 bits per pixel cache example, the CacheFontChars reason codes, the description of the work area offset 16, and the R0=6 to R0=10 extension routine references.</change>
+   <change>Corrected the ConvertBitmap description to say that the cache is written rather than preserved, and that the source bitmap starts at character 0.</change>
+   <change>Corrected descriptions copied from other SWIs, spelling, and cross-references.</change>
   </revision>
  </history>
 </meta>
