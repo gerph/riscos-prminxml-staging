@@ -1710,7 +1710,7 @@ Writes a DOCTYPE line at the start of a document, after the
 element. A DTD describes the structure of a document, and the possible
 values for each attribute, so that a validation tool can check the document
 against it; it is also used by the
-<reference type='section' name='XML File Despatcher'>XML File Despatcher</reference>
+<reference type='section' name='XML File Dispatcher'>XML File Dispatcher</reference>
 to identify a document's type when it is double-clicked.
 </p>
 <p>
@@ -1772,7 +1772,7 @@ SYS &quot;eXML_DTD&quot;,xml%,&quot;edition&quot;,id$,url$,,(1 &lt;&lt; 4)
 </example>
 <related>
 <reference type='swi' name='eXML_DecodeDTD'/>
-<reference type='section' name='XML File Despatcher'/>
+<reference type='section' name='XML File Dispatcher'/>
 </related>
 </swi-definition>
 
@@ -2240,7 +2240,7 @@ published anywhere, so they are not documented as full SWI entries here.
 </p>
 </section>
 
-<section title="XML File Despatcher">
+<section title="XML File Dispatcher">
 <p>
 Most files on RISC OS carry a filetype, which lets an application recognise
 its own files and respond when the Filer reports that one has been
@@ -2281,7 +2281,7 @@ application handling several distinct document-types of its own may prefix
 them with a family name and a colon, eg.
 <code type='c'>artworks:config</code>, but should only do this for a format
 that is intended to remain private, rather than public - see also
-<reference type='section' name='XML File Despatcher: Naming Conventions'/> below.
+<reference type='section' name='XML File Dispatcher: Naming Conventions'/> below.
 </p>
 <p>
 For any of this to work, the file must carry RISC OS filetype &hex;F80.
@@ -2291,7 +2291,7 @@ message, or launches a suitable application, as described below.
 </p>
 </section>
 
-<section title="XML File Despatcher: System Variables">
+<section title="XML File Dispatcher: System Variables">
 <p>
 eXML uses system variables of the following form to decide what to launch
 when an XML file is opened:
@@ -2325,10 +2325,10 @@ beginning <code type='c'>XML$@</code> is reserved for future use by eXML.
 </p>
 </section>
 
-<section title="XML File Despatcher: Messages">
+<section title="XML File Dispatcher: Messages">
 <p>
 Before falling back to the <code type='c'>XML$@Run_&lt;doctype&gt;</code>
-system variable, the despatcher broadcasts a User_Message (18) of type
+system variable, the dispatcher broadcasts a User_Message (18) of type
 <reference type='message' name='XMLDataOpen'/>, in a format similar to the
 standard <code type='c'>Message_DataOpen</code> (5) broadcast by the Filer
 when any file is double-clicked. The only difference is that the field at
@@ -2413,7 +2413,7 @@ Sent as a User_Message (17) reply to
 </message-definition>
 </section>
 
-<section title="XML File Despatcher: Naming Conventions">
+<section title="XML File Dispatcher: Naming Conventions">
 <p>
 Choose a document-type carefully, to avoid clashing with another
 application's document-type when a file is loaded automatically. Prefer a
@@ -2507,31 +2507,31 @@ implemented in the running version of the module.
 <use>
 <p>
 Returned when a document-type cannot be established from a DOCTYPE
-declaration, for example when despatching a double-clicked XML file, or
+declaration, for example when dispatching a double-clicked XML file, or
 when decoding a malformed DTD line with
 <reference type='swi' name='eXML_DecodeDTD'/>.
 </p>
 </use>
 <related>
 <reference type='swi' name='eXML_DecodeDTD'/>
-<reference type='section' name='XML File Despatcher'/>
+<reference type='section' name='XML File Dispatcher'/>
 </related>
 </error-definition>
 
 <error-definition name="eXML_Despatch" number="81CD06"
-                  description="The XML File Despatcher could not despatch a double-clicked file">
+                  description="The XML File Dispatcher could not dispatch a double-clicked file">
 <use>
 <p>
 Returned when the
-<reference type='section' name='XML File Despatcher'>XML File
-Despatcher</reference> cannot despatch a double-clicked XML file - for
+<reference type='section' name='XML File Dispatcher'>XML File
+Dispatcher</reference> cannot dispatch a double-clicked XML file - for
 example, no application claimed the
 <reference type='message' name='XMLDataOpen'/> message, and no matching
 <code type='c'>XML$@Run_&lt;doctype&gt;</code> system variable was set.
 </p>
 </use>
 <related>
-<reference type='section' name='XML File Despatcher'/>
+<reference type='section' name='XML File Dispatcher'/>
 <reference type='message' name='XMLDataOpen'/>
 </related>
 </error-definition>
@@ -2667,7 +2667,7 @@ express.
 
  <history>
   <revision number="1" author="Paul Reuvers" date="08 Jun 2020" title="eXML API, version 0.42 (Preliminary Specification, Revision A)">
-   <change>Original published API document, covering the eXML module's SWI calls, the XML File Despatcher, and the module's error messages.</change>
+   <change>Original published API document, covering the eXML module's SWI calls, the XML File Dispatcher, and the module's error messages.</change>
   </revision>
   <revision number="2" author="Charles Ferguson" date="24 September 2026" title="PRM-in-XML conversion">
    <change>Converted the published API document into PRM-in-XML, adding structured SWI, message, system variable and error definitions, and cross-references between them.</change>
