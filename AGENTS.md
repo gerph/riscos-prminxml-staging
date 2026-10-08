@@ -29,20 +29,23 @@ Convert each page to `src/select/<area>/<name>.xml`, one commit per page.
 1. Read the whole page, and list the pages already converted in `src/` first.
    Where a document already exists, compare it with the HTML and add only the
    information which it lacks; do not rewrite it, and leave its history alone.
-2. Keep all of the information. Restructure it (SWI definitions, service
+2. Compare each page with the original documentation text where it is available, since
+   the captured HTML lost some text (for example anything in angle brackets).
+3. Keep all of the information. Restructure it (SWI definitions, service
    definitions with reason codes, tables for layouts and bit fields), but do
    not summarise. Keep the original's rationale, warnings and examples.
-3. Where the original has an evident slip (a copy-pasted description, a
+4. Where the original has an evident slip (a copy-pasted description, a
    duplicated entry number, a misspelt name), correct it and say so in the
    `<change>` of the PRM-in-XML revision. Leave SWI, service and variable names
    as they are written unless they are clearly wrong.
-4. Metadata: maintainer Charles Ferguson; disclaimer '&copy; Gerph, 2013-<year>'
+5. Metadata: maintainer Charles Ferguson; disclaimer '&copy; Gerph, 2006-<year>'
    (the capture footer says 3QD Developments Ltd 2013, which is not carried
-   over); revision 1 'Original documentation (HTML document version 1.03)'
-   dated 3 Nov 2015, then the PRM-in-XML revision.
-5. Check the SWI and service numbers against the HTML, and the entry numbers of
+   over; the original text dates from 2006); revision 1
+   'Original documentation' dated 2006, noting that it was captured as HTML
+   document version 1.03 (3 Nov 2015), then the PRM-in-XML revision.
+6. Check the SWI and service numbers against the HTML, and the entry numbers of
    library chunks for gaps.
-6. Add the page to `index.xml`, then lint, build and commit the XML and
+7. Add the page to `index.xml`, then lint, build and commit the XML and
    `index.xml` together.
 
 Format points which cause lint failures:
