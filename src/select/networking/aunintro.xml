@@ -1,0 +1,205 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="An introduction to AUN">
+<section title="Introduction and Overview">
+<p>
+When Acorn originally released the BBC micro it had the capability to be
+networked using Acorn's own networking system, Econet. This was commonly used
+to share the then-expensive printers and disc drives (both floppy and
+'Winchester' hard drives).
+</p>
+
+<p>
+When the Archimedes series was launched Acorn retained the Econet network
+system, and all the Archimedes series machines (other than the A3010) could be
+upgraded with a plug-in board. This gave access to the same network facilities
+present on the BBC Micro.
+</p>
+
+<p>
+The Acorn Fileserver protocol was used to allow BBC and Archimedes machines to
+access files stored on a fileserver. The user would login with their username
+and password and would be able to use their own area of the fileserver disc. In
+a similar way the Printer Server Protocol allowed a network user to print to a
+printer on a remote machine, sharing with other users.
+</p>
+
+<p>
+Both Acorn and SJ Research produced a range of file server and printer server
+solutions. The most common were the SJ Research MDFS, a stand alone server box
+that connected to an Econet network and offered file and print serving, and the
+Acorn Level 4 fileserver, which allowed an Archimedes machine to act as a file
+server and / or a printer server.
+</p>
+
+<p>
+Several other products made use of the networking abilities of both the BBC and
+Archimedes. These included teletext page servers, terminal connections,
+databases and even games.
+</p>
+
+<p>
+As application and data sizes grew, the original Econet system was pushed to
+its limits. While it was adequate for transferring the relatively small amount
+of data used by the BBC, as the Archimedes started to use megabytes, Econet was
+just too slow.
+</p>
+
+<p>
+Newer networking technologies allowed data to be moved around much quicker than
+on Econet. Whereas an Econet network was limited to around 200kbits a second, an
+Ethernet could run up to 10 megabits a second - 50 times as fast!
+</p>
+
+<p>
+Although ethernet was already available on the Archimedes to talk to TCP/IP
+networks, usually with Unix servers, most users still wanted to be able to run
+all their existing Econet-based applications. Acorn Universal Networking was
+the way this was effected.
+</p>
+
+<p>
+The term "AUN" has had many meanings in the past, but what we today call "AUN"
+in RISC OS Select is a way to allow these Econet-based applications to be run
+over a TCP/IP network (typically Ethernet).
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="What's in AUN?">
+<p>
+AUN in RISC OS Select consists of a number of ROM modules and supporting disc
+files and scripts. These are configured using configuration plugins.
+</p>
+
+<p>
+There are two main aspects to what is provided. There is the AUN system itself
+- the way that Econet-based applications can run - and there are the file and
+print server clients.
+</p>
+</subsection>
+
+<subsection title="Econet Station Numbering">
+<p>
+An Econet network was made up of a number of stations. Two networks could be
+connected by means of a Bridge. Each computer connected was uniquely identified
+by two numbers. The first was the station number, which could be between 1 and
+254, the second was the network number, which could be between 1 and 127.
+</p>
+</subsection>
+
+<subsection title="Translating that to TCP/IP">
+<p>
+AUN uses a TCP/IP network to provide the same facilities as Econet. Because
+applications expect to be able to reference a station using the net and station
+numbers, these must be "mapped" onto IP addresses. This mapping defines what IP
+address ranges are used for an econet network.
+</p>
+
+<p>
+To avoid clashes on machines that have both an ethernet and an econet interface
+the network number of an AUN station must be between 128 and 251.
+</p>
+
+<p>
+The AUN Map file controls the translation between the network number and IP
+address. For example, if your network runs on the private IP range of
+192.168.0.x, you may want to map this to AUN network 128. This will mean the
+machine with the IP 192.168.0.1 has an AUN address of 128.1.
+</p>
+</subsection>
+
+<subsection title="Setting up AUN">
+<p>
+The "AUN" plugin in the !Configure "Networking" section allows the AUN system
+to be set up.
+</p>
+
+<p>
+The first option is "Enable AUN" - this controls whether or not the AUN system
+is activated. If you wish to use any Econet-based network applications over an
+ethernet network you will need to enable this.
+</p>
+
+<p>
+The current AUN network map is shown below this. The buttons at the side are
+used to edit the values in the AUN map. The "Auto-configure AUN maps for local
+interfaces" option provides a quick and easy way of setting up a simple AUN
+system. It will automatically map each local ethernet interface to a AUN
+network, based on that interface's IP address. Often, this will give a fully
+functional AUN system without the need for the AUN Map files.
+</p>
+
+<p>
+The automatic configuration of AUN maps will ignore any link local addresses
+which are allocated to interfaces.
+</p>
+
+<p>
+Finally, the current contents of the AUN Map file can be saved by dragging the
+icon to a filer window, or a saved map loaded by dragging it to the box. This
+allows a map file to be setup on one computer and quickly installed on several
+others.
+</p>
+</subsection>
+
+<subsection title="NetFS">
+<p>
+Earlier we mentioned the file and printer server clients. The "NetFS" plugin
+allows us to use these.
+</p>
+
+<p>
+Level 4, or Advanced Level 4, allows an Archimedes or RiscPC to act as a file
+server to an AUN network, providing a password controlled storage area and
+spooled printer facilities. While these products are not provided by RISC OS
+ltd, the clients to provide access to them are.
+</p>
+
+<p>
+The file server client provides NetFS and a "Net" icon on the iconbar that
+allows connections to be made to servers, the printer server client allows the
+connection of "Net" to be selected in !Printers, allowing print jobs to be sent
+to printer server machines which share one or more printers.
+</p>
+
+<p>
+To enable these clients, the "Use NetFS and NetPrint" option should be enabled.
+The file server and print server options allow the default file and printer
+servers to be set. The default file server will appear in the logon box when the
+"Net" icon is clicked.
+</p>
+
+<p>
+The "Use ArthurLib" option allows Archimedes and BBC machines to have separate
+"Library" directories on the fileserver. It's usually left on.
+</p>
+</subsection>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+ </revision>
+ </history>
+
+</meta>
+</riscos-prm>
