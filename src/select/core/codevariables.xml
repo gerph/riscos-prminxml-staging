@@ -1,0 +1,87 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Code variables">
+<section title="Introduction and Overview">
+<p>
+Code variables have been able to take a workspace parameter since Select 1. However, an 'unset' of a code variable would be ignored unless the unset was explicitly requesting that the code variable be deleted.
+</p>
+<p>
+With Select 4 an 'unset' of a code variable will set the variable's value to a null string (0 length). This is unlikely to cause issues with most applications and should help variables which have been changed from being normal variables to code variables. However, it does now mean that the unset operation can now return errors due to the null string not being valid. A typical example of a variable that cannot have a null string would be the Inet$Hostname variable.
+</p>
+<p>
+As a side effect of this, the <userinput>*Unset</userinput> command will now return errors if the error is not 'no such variable'. This ensures that errors during the unset are now visible.
+</p>
+<p>
+For reference, the workspace parameter to code variables is supplied in R5 on creating the code variable with <reference type="swi" name="OS_SetVarVal" />, and will be passed to the code variable in R12.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_SetVarVal"
+                number="24"
+                description="Set a system variable to a value"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to variable name, possibly wildcarded</register-use>
+ <register-use number="1">Pointer to new value</register-use>
+ <register-use number="2">Length of value, or -1 to delete</register-use>
+ <register-use number="3">Pointer to last name, or 0 for first call</register-use>
+ <register-use number="4">Variable type to use:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">String</value>
+ <value number="1">Number</value>
+ <value number="2">Macro</value>
+ <value number="3">Expanded</value>
+ <value number="4">Literal string</value>
+ <value number="5">Reserved</value>
+ <value number="16">Code variable</value>
+</value-table></register-use>
+ <register-use number="5">Workspace to pass to code in R12 (only if R4 = 16)</register-use>
+</entry>
+<exit>
+ <register-use number="3">New pointer to name</register-use>
+ <register-use number="4">Variable type created if evaluated expression</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to set a system variable to a value. See PRM 1-311 for more details. The extension from the documented API is the use of a workspace pointer in R5 for code variables. Attempting to delete a code variable will now have the same effect as setting the value to a null string unless the variable type to use is set to 16.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Added the missing full stop at the end of the OS_SetVarVal description.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
