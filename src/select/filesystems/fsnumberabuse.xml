@@ -1,0 +1,126 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Filesystem registrant abuse">
+<section title="Introduction">
+<p>
+A number of filing systems have abused the allocations of filing system numbers, filing system prefix names, filing system module names, and filing system filer names. This causes serious problems for users who wish to use both systems within a single environment. Vendors have been made aware of this problem, and have been asked to obtain alternative allocations such that such components can coexist peacefully.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Background">
+<p>
+Duplication of filing system numbers causes problems for fault identification (error numbers may be returned by multiple filing systems), for FileSwitch registration (only a single filing system may exist with a given number), and for filing system identification (Filer, for example, uses the filing system number as a hash to locate candidate filers during upcall operations).
+</p>
+<p>
+Duplication of filing system prefix names causes problems with path specification (a filing system prefix should only apply to a single filing system) and may cause undesirable effects dependent on filing system registration order (the most recently registered filing system's prefix will take precedence). Persistent filenames (such as those used within a boot sequence) will be non-deterministic if duplicate filing systems have existed on a system.
+</p>
+<p>
+Duplicated module names cannot coexist within the system. The initialisation of a module with the same name as an existing filing system module will result in the first module being finalised, potentially with data loss from open files, depending on the filing system.
+</p>
+<p>
+Duplicated filing system filer modules will result in one of the pair of filing systems filers being terminated. Depending on the filing system filer's support for module finalisation whilst a module task exists, this may cause unexpected aborts, or less desirable behaviour.
+</p>
+<p>
+In addition to this, the abusers of these filing system numbers expose problems caused by the special case handling by FileSwitch of those filing systems.
+</p>
+<p>
+During the development of RISC OS 3, a number of filing systems, registered to legitimate owners, were found to not behave correctly under the new interfaces introduced by that OS. The filing systems were unable to handle path names which include an explicit root ('$') specifier as part of their path. The FileSwitch module was updated to include a special table of filing systems which were known to fail and to allow them to function.
+</p>
+<p>
+Certain of the filing system numbers which have been reused are members of the set of filing systems which are in the special table. The effect of this is that the filing systems which abuse the operations receive special treatment which they do not need and which causes them to behave poorly.
+</p>
+<p>
+Vendors have been resistant to obtaining valid registrations, and it has been necessary to introduce alternative measures to ensure that these filing systems behave correctly. Removing the entries from that table is not a suitable solution as this would mean that the legitimate registrant was disadvantaged to the benefit of the abuser. Instead, the Filing System Extra Information word (offset &amp;2C in the Filing System Information Block) has a new bit (bit 4) allocated to indicate that the filing system does not require the special case to be applied. Either usurper filing systems or fixed versions of the legitimate filing systems may set this bit to indicate that they do not wish to have the special table applied to them.
+</p>
+<p>
+The list of filing systems which are special cased by FileSwitch is listed below :
+</p>
+<p><value-table head-number="Number" head-value="Filing system">
+<value number="1">Tape1200</value>
+<value number="2">Tape300</value>
+<value number="3">Rom</value>
+<value number="6">Telesoft</value>
+<value number="7">IEEE</value>
+<value number="9">Reserved</value>
+<value number="10">Vfs</value>
+<value number="16">acacia_ramfs</value>
+<value number="22">rfs</value>
+<value number="24">RISCiXFS</value>
+<value number="25">DigiTape</value>
+<value number="27">TVFS</value>
+<value number="28">ScanFS</value>
+<value number="30">Fax</value>
+<value number="31">Z88</value>
+<value number="32">SCSIDeskFS</value>
+<value number="34">Serial2</value>
+<value number="35">DFSDeskFS</value>
+<value number="36">DayIBMFS</value>
+<value number="38">RISCardFS</value>
+<value number="39">pcfs</value>
+<value number="40">BBScanFS</value>
+<value number="41">BroadcastLoaderUtils</value>
+<value number="42">ChunkFS</value>
+<value number="43">MSDOSFS</value>
+<value number="44">NoRiscFS</value>
+<value number="48">NexusFilerFS</value>
+<value number="49">IDEFS</value>
+<value number="50">CCPrintFS</value>
+<value number="51">VideoDigitiserFS</value>
+<value number="52">SoundDigitiserFS</value>
+<value number="55">VCMNetFS</value>
+<value number="56">ArcFS</value>
+<value number="57">NexusPrintFS</value>
+<value number="58">PIA</value>
+<value number="59">RSDosFS</value>
+<value number="60">dbFS</value>
+<value number="121">MenonFS</value>
+<value number="128">SPSTFS</value>
+</value-table></p><p>
+FileCore will set the Filing System Extra Information Word bit to indicate that they should always be exempt from the special table. FileCore has always been able to handle paths in a manner compatible with the contemporary FileSwitch. Filing systems which are members of this table and which are implemented as FileCore filing systems will automatically have this bit set for them.
+</p>
+<p>
+It should be obvious from this description that it is vital that unique registrations be made and honoured by developers.
+</p>
+</subsection>
+
+<subsection title="New 'extra filing system information word' bit">
+<p>
+As described above, a new bit has been added to the extra filing system information word in order to indicate that the filing system should not be constrained by the special case code.
+</p>
+<p><bitfield-table>
+ <bit number="4">Filing system does not wish to be special cased by FileSwitch</bit>
+</bitfield-table></p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the title 'Fileystem' to 'Filesystem' and 'This causes a serious problems' to 'serious problems'. The comma splice 'Vendors have been resistant ..., it has been necessary' was joined with 'and'.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
