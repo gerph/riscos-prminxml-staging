@@ -1,0 +1,100 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Dynamic areas">
+<section title="Introduction and Overview">
+<p>
+The following reason codes are passed in R0 to <reference type="swi" name="OS_DynamicArea" /> :
+</p>
+<p><value-table head-number="Reason" head-value="Operation">
+<value number="0">Create (PRM 5a-53)</value>
+<value number="1">Remove (PRM 5a-56)</value>
+<value number="2">Read information (PRM 5a-57)</value>
+<value number="3">Enumerate (PRM 5a-58)</value>
+<value number="4">Renumber (PRM 5a-59)</value>
+<value number="5">Return available space (<reference type="document" href="shrinkabledas" name="Shrinkable dynamic areas" />)</value>
+<value number="6">Read change information (for internal use only)</value>
+<value number="7">Enumerate with information (for internal use only)</value>
+<value number="8">Limit maximum area size (<reference type="document" href="clamps" name="Clamps" />)</value>
+<value number="9">Claim region of sparse area (<reference type="document" href="sparsedas" name="Sparse Dynamic Areas" />)</value>
+<value number="10">Release region of sparse area (<reference type="document" href="sparsedas" name="Sparse Dynamic Areas" />)</value>
+<value number="11">Lock area (<reference type="document" href="lockeddas" name="Lockable Dynamic Areas" />)</value>
+<value number="12">Unlock area (<reference type="document" href="lockeddas" name="Lockable Dynamic Areas" />)</value>
+<value number="13">Resize locked area (<reference type="document" href="lockeddas" name="Lockable Dynamic Areas" />)</value>
+<value number="14">Describe heap area (<reference type="document" href="heapdas" name="Dynamic areas with automatic heap extension" />)</value>
+<value number="15">Claim space in heap area (<reference type="document" href="heapdas" name="Dynamic areas with automatic heap extension" />)</value>
+<value number="16">Release block in heap area (<reference type="document" href="heapdas" name="Dynamic areas with automatic heap extension" />)</value>
+<value number="17">Resize block in heap area (<reference type="document" href="heapdas" name="Dynamic areas with automatic heap extension" />)</value>
+<value number="18">Read size of block in heap area (<reference type="document" href="heapdas" name="Dynamic areas with automatic heap extension" />)</value>
+<value number="19">Change domain state of area (<reference type="document" href="domaindas" name="Domain-based dynamic areas" />)</value>
+</value-table></p></section>
+
+<section title="Technical Details">
+<subsection title="Creation flags">
+<p>
+For OS_DynamicArea 0, the following flags are used :
+</p>
+<p><bitfield-table>
+ <bit number="0-3">Access permissions (PRM 5a-54, PRM 1-384)</bit>
+ <bit number="4">Area is not bufferable (PRM 5a-54)</bit>
+ <bit number="5">Area is not cacheable (PRM 5a-54)</bit>
+ <bit number="6">Area is doubly mapped (PRM 5a-54)</bit>
+ <bit number="7">Area is not user resizeable (PRM 5a-54)</bit>
+ <bit number="8">Area requires specific pages of memory (PRM 5a-54)</bit>
+ <bit number="9">Area is shrinkable (<reference type="document" href="shrinkabledas" name="Shrinkable dynamic areas" />)</bit>
+ <bit number="10">Area is sparse (<reference type="document" href="sparsedas" name="Sparse Dynamic Areas" />)</bit>
+ <bit number="11">Area is application bound (reserved for future expansion)</bit>
+ <bit number="12">Area is in DMAable memory (<reference type="document" href="dmaabledas" name="DMA-able dynamic areas" />)</bit>
+ <bit number="13">Area is locked (<reference type="document" href="lockeddas" name="Lockable Dynamic Areas" />)</bit>
+ <bit number="14">Area is a heap area (<reference type="document" href="heapdas" name="Dynamic areas with automatic heap extension" />)</bit>
+ <bit number="15">Area requires specific physical pages (<reference type="document" href="physicaldas" name="Physical Mapping of Dynamic Areas" />)</bit>
+ <bit number="16">Area handles aborts (<reference type="document" href="aborttrapping" name="Abort-Trapping dynamic areas" />)</bit>
+ <bit number="17">Area is in a domain (<reference type="document" href="domaindas" name="Domain-based dynamic areas" />)</bit>
+ <bit number="18">Area is not user visible (<reference type="document" href="invisibledas" name="Non-User-Visible Dynamic Areas" />)</bit>
+ <bit number="19">Area supplies a fixed list of pages (<reference type="document" href="fixedpagedas" name="Fixed page dynamic areas" />)</bit>
+ <bit number="20-31">Reserved for future expansion</bit>
+</bitfield-table></p>
+</subsection>
+
+<subsection title="Dynamic area handler reason codes">
+<p>
+The dynamic area handler has the following reason codes :
+</p>
+<p><value-table head-number="Reason" head-value="Handler operation">
+<value number="0">PreGrow (PRM 5a-42, <reference type="document" href="physicaldas" name="Physical Mapping of Dynamic Areas" />)</value>
+<value number="1">PostGrow (PRM 5a-43)</value>
+<value number="2">PreShrink (PRM 5a-44)</value>
+<value number="3">PostShrink (PRM 5a-44)</value>
+<value number="4">TestShrink (<reference type="document" href="shrinkabledas" name="Shrinkable dynamic areas" />)</value>
+<value number="5">Abort (<reference type="document" href="aborttrapping" name="Abort-Trapping dynamic areas" />)</value>
+</value-table></p></subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
