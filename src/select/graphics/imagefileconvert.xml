@@ -1,0 +1,339 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="ImageFileConvert">
+<section title="Introduction">
+<p>
+The ImageFileConvert module provides an interface for converting between different image formats through a simple defined interface. Whilst this interface may not be perfectly suited to all image formats, it can be extended through flagged operations to provide greater flexibility and to allow more functional conversions to be made.
+</p>
+<p>
+Because ImageFileConvert and ImageFileRender complement one another it is recommended that users of either familiarise themselves with the other.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Flags common to output type 'Sprite'">
+<p>
+Because Sprite is a common type to convert to a number of flags are defined as being used for all conversions.
+</p>
+<p><bitfield-table>
+ <bit number="0">Create a sprite, rather than a sprite file (this option is provided by the ImageFileConvert module)</bit>
+ <bit number="1-7">Reserved</bit>
+</bitfield-table></p>
+</subsection>
+
+<subsection title="Flags common to output type 'JPEG'">
+<p>
+Because JPEG is a common type to convert to a number of flags are defined as being used for all conversions.
+</p>
+<p><bitfield-table>
+ <bit number="0">Output JPEG will be monochrome (otherwise it will be colour)</bit>
+ <bit number="1-3">Quality control:
+  <value-table head-number="Value" head-value="Quality">
+   <value number="0">75% (the default level)</value>
+   <value number="1">12%</value>
+   <value number="2">25%</value>
+   <value number="3">37%</value>
+   <value number="4">50%</value>
+   <value number="5">62%</value>
+   <value number="6">75%</value>
+   <value number="7">88%</value>
+  </value-table>
+ </bit>
+ <bit number="4-7">Reserved</bit>
+</bitfield-table></p>
+<p>
+The duplication of 75% in both 0 and 6 is to allow users to leave the flags unset and get a sensible default conversion quality.
+</p>
+</subsection>
+
+<subsection title="Flags common to input type 'Sprite'">
+<p>
+Although sprite is a common filetype to convert from none of the flags are reserved for all conversions.
+</p>
+<p><bitfield-table>
+ <bit number="8-15">Reserved</bit>
+</bitfield-table></p>
+</subsection>
+
+<subsection title="Operations common to the output type 'Sprite'">
+<p>
+The following operation is provided by <reference type="swi" name="ImageFileConvert_MiscOp" /> for conversions to the output type 'Sprite'.
+</p>
+<p><extended-example type="format">
+<userinput>On entry:</userinput><br/>
+<userinput>  R4 = &amp;400 (Read information)</userinput><br/>
+<userinput>  R5-R9 undefined</userinput>
+</extended-example></p>
+<p>
+On exit:
+</p>
+<p><offset-table>
+ <offset number="R0">Width in pixels of image</offset>
+ <offset number="R1">Height in pixels of image</offset>
+ <offset number="R2">Bits per pixel in the image</offset>
+ <offset number="R3">Image flags (see below)</offset>
+ <offset number="R4">X DPI</offset>
+ <offset number="R5">Y DPI</offset>
+</offset-table></p>
+<p>
+The image flags in R3 are:
+</p>
+<p><bitfield-table>
+ <bit number="0">Image has a palette (if &lt;=8bpp)</bit>
+ <bit number="1">Image is colour (otherwise image is greyscale)</bit>
+ <bit number="2">Image has alpha channel or mask</bit>
+ <bit number="3-5">Interlace type:
+  <value-table head-number="Value" head-value="Meaning">
+   <value number="0">No interlacing</value>
+   <value number="1">Adam7 interlacing</value>
+   <value number="2">Vertical interlacing</value>
+   <value number="3-7">Reserved</value>
+  </value-table>
+ </bit>
+ <bit number="6-31">Reserved</bit>
+</bitfield-table></p>
+<p>
+This operation reads information about the image which is common to most bitmap-type operations.
+</p>
+</subsection>
+
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="ImageFileConvert_Convert"
+                number="56840"
+                description="Convert an image from one format to another"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags for operation:
+  <bitfield-table>
+   <bit number="0-7">Reserved for options common to output filetype</bit>
+   <bit number="8-15">Reserved for options common to input filetype</bit>
+   <bit number="16-23">Reserved for options specific to the input/output pair</bit>
+   <bit number="24-31">Reserved</bit>
+  </bitfield-table></register-use>
+ <register-use number="1">Conversion requested:
+  <bitfield-table>
+   <bit number="0-11">Destination filetype</bit>
+   <bit number="12-15">Reserved, must be 0</bit>
+   <bit number="16-25">Source filetype</bit>
+   <bit number="26-31">Reserved, must be 0</bit>
+  </bitfield-table></register-use>
+ <register-use number="2">Pointer to input image data</register-use>
+ <register-use number="3">Length of input image data</register-use>
+ <register-use number="4">Pointer to output image buffer, or 0 to read size</register-use>
+ <register-use number="5">Size of output image buffer, or 0 to read size</register-use>
+ <register-use number="6">Background colour, or -1 for default (may be ignored by some converters)</register-use>
+ <register-use number="7-9">Passed to conversion process</register-use>
+</entry>
+<exit>
+ <register-use number="5">Size of output image buffer required, or -1 if not known (if R4 = 0 on entry), size of output image buffer used (if R4 not 0 on entry)</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to convert an image from one format to another.
+</p>
+</use>
+<related>
+<reference type="swi" name="ImageFileConvert_MiscOp" />
+</related>
+</swi-definition>
+
+<swi-definition name="ImageFileConvert_MiscOp"
+                number="56841"
+                description="Miscellaneous operations on a conversion"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flag bits:
+  <bitfield-table>
+   <bit number="0-7">Reserved for options common to output filetype</bit>
+   <bit number="8-15">Reserved for options common to input filetype</bit>
+   <bit number="16-23">Reserved for options specific to the input/output pair</bit>
+   <bit number="24-31">Reserved</bit>
+  </bitfield-table></register-use>
+ <register-use number="1">Conversion requested:
+  <bitfield-table>
+   <bit number="0-11">Destination filetype</bit>
+   <bit number="12-15">Reserved, must be 0</bit>
+   <bit number="16-25">Source filetype</bit>
+   <bit number="26-31">Reserved, must be 0</bit>
+  </bitfield-table></register-use>
+ <register-use number="2">Pointer to input image data</register-use>
+ <register-use number="3">Length of input image data</register-use>
+ <register-use number="4">Operation type:
+  <value-table head-number="Range" head-value="Meaning">
+   <value number="&amp;000-&amp;3FF">Reserved for generic operations on all conversions</value>
+   <value number="&amp;400-&amp;7FF">Reserved for operations specific to the output type</value>
+   <value number="&amp;800-&amp;BFF">Reserved for operations specific to the input type</value>
+   <value number="&amp;C00-&amp;FFF">Reserved for operations specific to the input/output pair</value>
+   <value number="Other">Reserved for future expansion</value>
+  </value-table></register-use>
+ <register-use number="5-9">Misc op parameters</register-use>
+</entry>
+<exit>
+ <register-use number="0-9">Updated by conversion module</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to provide miscellaneous operations to obtain information about the conversion process.
+</p>
+</use>
+<related>
+<reference type="swi" name="ImageFileConvert_Convert" />
+</related>
+</swi-definition>
+
+<swi-definition name="ImageFileConvert_Register"
+                number="56843"
+                description="Register a new converter"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags (reserved, must be 0)</register-use>
+ <register-use number="1">Pointer to definition (all will be copied):
+  <offset-table>
+   <offset number="0">API version (100)</offset>
+   <offset number="4">Converter flags (bits 0-31 reserved, must be 0)</offset>
+   <offset number="8">Converter type:
+    <bitfield-table>
+     <bit number="0-11">Destination filetype</bit>
+     <bit number="12-15">Reserved, must be 0</bit>
+     <bit number="16-25">Source filetype</bit>
+     <bit number="26-31">Reserved, must be 0</bit>
+    </bitfield-table>
+   </offset>
+   <offset number="12">Pointer to name of converter in the form &lt;name&gt;&lt;tab&gt;&lt;version x.xx&gt;&lt;tab&gt;&lt;author&gt;</offset>
+   <offset number="16">Workspace value for R12</offset>
+   <offset number="20">Pointer to conversion routine</offset>
+   <offset number="24">Pointer to miscop routine</offset>
+  </offset-table></register-use>
+</entry>
+<exit>
+ <register-use number="1">API version (even if an error occurs)</register-use>
+ <register-use number="0,2-9">Preserved</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to register a new converter.
+</p>
+</use>
+<related>
+<reference type="swi" name="ImageFileConvert_Deregister" />
+</related>
+</swi-definition>
+
+<swi-definition name="ImageFileConvert_Deregister"
+                number="56844"
+                description="Deregister a converter"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags (reserved, must be 0)</register-use>
+ <register-use number="1">Filetype pair</register-use>
+ <register-use number="2">Pointer to name to be copied, in the format &lt;name&gt;&lt;tab&gt;&lt;version x.xx&gt;&lt;tab&gt;&lt;author&gt;</register-use>
+</entry>
+<exit>
+ <register-use number="0-2">Preserved</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to deregister a converter.
+</p>
+</use>
+<related>
+<reference type="swi" name="ImageFileConvert_Register" />
+</related>
+</swi-definition>
+
+<swi-definition name="ImageFileConvert_EnumerateConverters"
+                number="56845"
+                description="Enumerate the registered converters"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags (reserved, must be 0)</register-use>
+ <register-use number="1">Last filetype pair, or -1 for the first call</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to renderer definition (read only)</register-use>
+ <register-use number="1">This filetype pair, or -1 if no more</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to enumerate the currently registered converters.
+</p>
+</use>
+<related>
+<reference type="swi" name="ImageFileConvert_ConverterInfo" />
+</related>
+</swi-definition>
+
+<swi-definition name="ImageFileConvert_ConverterInfo"
+                number="56846"
+                description="Read information on a conversion"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags (reserved, must be 0)</register-use>
+ <register-use number="1">Filetype pair</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to renderer definition (read only)</register-use>
+ <register-use number="1">Pointer to renderer name</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read information on a conversion. If no conversion can be performed for the requested types, an error will be returned.
+</p>
+</use>
+<related>
+<reference type="swi" name="ImageFileConvert_EnumerateConverters" />
+</related>
+</swi-definition>
+
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Captured in the original HTML as part of the ConvertSprite page, and separated into its own document.</change>
+    <change>Corrected the module name 'ImageFileFileConvert' to 'ImageFileConvert', the field label 'biys' to 'bits',.</change>
+    <change>The image flag 'Image has a palette (if On exit 8bpp)', where the capture had lost the text '&lt;=8bpp', was restored from the original documentation text.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
