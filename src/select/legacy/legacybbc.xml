@@ -1,0 +1,85 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="LegacyBBC module">
+<section title="Introduction and Overview">
+<p>
+Since 32bit ARM systems became available one of the main features of RISC OS has been its backwards compatibility with other earlier versions of the operating system and back to its BBC heritage. This principle has been followed through to versions of RISC OS up to Select. One of the ways in which system calls have been deprecated has been to move them from the core of the system to a subsidiary module where they do not affect the main operation.
+</p>
+<p>
+The LegacyBBC module provides a number of system calls which are no longer supported by the core components of RISC OS. It is expected that modern applications do not require this module to be present.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="OS_Byte operations">
+<p>
+The following table describes the OS_Byte operations provided by the LegacyBBC module, and describes the modern alternative :
+</p>
+<p><value-table head-number="OS_Byte" head-name="Operation" head-value="Modern alternative">
+<value number="&amp;80" name="Read ADVAL values, mouse position or buffer space">Use Joystick_Read, OS_Mouse, or Buffer_GetInfo.</value>
+<value number="&amp;82" name="Read machine high order address">Obsolescent.</value>
+<value number="&amp;83" name="Read high water mark">Obsolescent.</value>
+<value number="&amp;8B" name="Set file system options (*Opt)">Use OS_FSControl 10.</value>
+<value number="&amp;8F" name="Issue service call">Use OS_ServiceCall.</value>
+<value number="&amp;9C" name="Update 6850-compatible serial state">Use OS_SerialOp.</value>
+<value number="&amp;9D" name="Perform BPUT over Tube">Use OS_BPut.</value>
+<value number="&amp;A0" name="Read BBC-compatible VDU variables">Use OS_ReadVduVariables.</value>
+</value-table></p>
+</subsection>
+
+<subsection title="OS_Word operations">
+<p>
+The following table describes the OS_Word operations provided by the LegacyBBC module, and describes the modern alternative :
+</p>
+<p><value-table head-number="OS_Word" head-name="Operation" head-value="Modern alternative">
+<value number="&amp;00" name="Read line from input source">Use OS_ReadLine.</value>
+<value number="&amp;07" name="Perform SOUND operation.">Use Sound_ControlPacked or Sound_Control.</value>
+<value number="&amp;09" name="Read colour of point from screen.">Use OS_ReadPoint.</value>
+</value-table></p>
+</subsection>
+
+<subsection title="*Commands">
+<p>
+*Commands within RISC OS are conventionally of the form <userinput>*&lt;command&gt;&lt;space&gt;&lt;parameters&gt;</userinput>. However, a small number of commands will function without a space separator. This provides compatibility back to applications written for BBC systems. The core command line processor no longer supports such commands, but to allow them to function as previously, the LegacyBBC module provides an interface to allow commands in this form to be used. To avoid the requirement for the LegacyBBC module, such commands should be issued with a space separating the command name and its parameters.
+</p>
+<p>
+The following commands are handled by the LegacyBBC module :
+</p>
+<p><value-table head-number="Command" head-value="Meaning">
+<value number="*FX">Issue OS_Byte call.</value>
+<value number="*Key">Program function key (sets Key$&lt;number&gt;).</value>
+<value number="*Opt">Set filing system operation.</value>
+<value number="*TV">Modify monitor positioning and interlace.</value>
+</value-table></p></subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected 'provide a number of system calls' to 'provides' and 'not require this module' to 'do not require this module'.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
