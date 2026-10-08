@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Wimp_Extend 258">
+<section title="Introduction and Overview">
+<p>
+This call reads the colour mapping translation which the Wimp uses when rendering a sprite.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="Wimp_Extend"
+                number="400FB"
+                reason="102"
+                reasonname="Wimp_Extend_ReadColourMap"
+                description="Read colourmap translation for rendering sprite"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">258 (reason code)</register-use>
+ <register-use number="1">Flags:
+  <bitfield-table>
+ <bit number="0-20">Reserved, must be 0</bit>
+ <bit number="21">Translation is for selected item</bit>
+ <bit number="22">Translation is for faded item</bit>
+ <bit number="23">Translation is for when pointer over item (not implemented)</bit>
+ <bit number="24-27">Wimp foreground colour for icon (if not in validation)</bit>
+ <bit number="28-31">Wimp background colour for icon (if not in validation)</bit>
+</bitfield-table></register-use>
+ <register-use number="2">Window handle, or -1 to use grey 1 as background colour</register-use>
+ <register-use number="3">Pointer to validation string to use, or -1 for none</register-use>
+ <register-use number="4">Background colour &amp;BBGGRR00, or -1 for window colour</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to colourmap descriptor:
+  <offset-table>
+ <offset number="0">Workspace for translation function</offset>
+ <offset number="4">Pointer to translation function</offset>
+</offset-table></register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the colourmap translation function for a sprite operation. It should be used where a sprite (or other object) needs to be rendered using the same colour mapping as the Wimp would use. In general it may be better to use Wimp_PlotIcon, but where this is not feasible - for example where additional colour mapping is required, or the user wishes to cache results - this call can be used to obtain the relevant colour mapping function.
+</p>
+<p>
+The descriptor returned is valid until the next Wimp icon, sprite or window operation, or another call to this function. It is recommended therefore that it only be used by the foreground application and never by transient callback code.
+</p>
+<p>
+The validation string may contain 'C' or 'T' validations to indicate the state of the image being rendered.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
