@@ -1,0 +1,137 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="InverseTable">
+<section title="Introduction and Overview">
+<p>
+Inverse table provides 8bpp translation tables for graphical applications. As converting between 8bpp values and providing a mechanism to 'blend' between these is time consuming, the InverseTable module provides core functions to calculate the tables involved.
+</p>
+<p>
+The module will generate two tables :
+</p>
+<p><list>
+<item><p>A RGB to colour number lookup table</p></item>
+<item><p>A colour number to RGB lookup table</p></item>
+</list></p><p>
+Because producing a full range RGB table would be a little extreme (requiring 16 M of RAM to store it) the tables are generated at 5 bit accuracy. Applications requiring greater accuracy than this in 8bpp modes may wish to use alternate means to perform their blending.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Table layout">
+<p>
+The RGB to Colour Number lookup table is a table of 32768 byte values which correspond to the relevant colour. To calculate the index into the table of the colour number closest an RGB value the RGB value should first be quantised to 5 bits per component. The values should then be laid out as follows :
+</p>
+<p><bitfield-table>
+ <bit number="0-4">Red</bit>
+ <bit number="5-9">Green</bit>
+ <bit number="10-14">Blue</bit>
+</bitfield-table></p>
+<p>
+The resulting value can then be used as an index into the RGB to colour number table.
+</p>
+<p>
+The colour number to RGB lookup table is a table of 256 4-byte wide word values. Because the tables are used for speed, rather than for space, the values are not packed. The value read follows the same bit layout described above.
+</p>
+</subsection>
+
+<subsection title="Example">
+<p><extended-example type="basic">
+<userinput>REM Fade a colour to half its brightness via the inverse tables</userinput><br/>
+<userinput>REM colour% is a colour number</userinput><br/>
+<userinput>:</userinput><br/>
+<userinput>SYS "InverseTable_Calculate" TO rgbtable%,colourtable%</userinput><br/>
+<userinput>rgb%=rgbtable%!(colour%*4)</userinput><br/>
+<userinput>:</userinput><br/>
+<userinput>REM Now transform the colour (halve it and clear the shifted bits)</userinput><br/>
+<userinput>rgb%=rgb%&gt;&gt;1</userinput><br/>
+<userinput>rgb%=rgb% AND NOT ((1&lt;&lt;4) OR (1&lt;&lt;9))</userinput><br/>
+<userinput>REM We now have :</userinput><br/>
+<userinput>REM   %0BBBB0GGGG0RRRR</userinput><br/>
+<userinput>:</userinput><br/>
+<userinput>colour%=colourtable%?rgb%</userinput><br/>
+<userinput>REM colour% is the half brightness value</userinput>
+</extended-example></p></subsection>
+
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="InverseTable_Calculate"
+                number="4BF40"
+                description="Calculate inverse tables for the current destination"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+</entry>
+<exit>
+ <register-use number="0">Pointer to 5,5,5 RGB lookup table (colour number to RGB)</register-use>
+ <register-use number="1">Pointer to colour number lookup table (RGB to colour number)</register-use>
+</exit>
+<use>
+<p>
+This SWI calculates a suitable pair of tables for the current destination (screen, or sprite). The tables are guaranteed to be static until the next mode change service is issued. Where necessary, the tables will be recalculated. This may take a number of seconds and so the hourglass will be displayed whilst this takes place. Pre-calculated tables may be used by the module for certain common palettes (presently, only the standard 256 colour palette is catered for in this manner). Where the table is already calculated, InverseTable will return the table values without recalculating them. Recalculation will be forced if the palette changes. Recalculation may take around two seconds on a StrongARM based machine, or around seven on an ARM 610 based machine.
+</p>
+</use>
+<related>
+<reference type="swi" name="InverseTable_SpriteTable" />
+</related>
+</swi-definition>
+
+<swi-definition name="InverseTable_SpriteTable"
+                number="4BF41"
+                description="Calculate inverse tables for an arbitrary sprite"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to 5,5,5 RGB lookup table (colour number to RGB) (1024 bytes)</register-use>
+ <register-use number="1">Pointer to colour number lookup table (RGB to colour number) (32768 bytes)</register-use>
+ <register-use number="2">Sprite area to use, or mode number (equivalent to parameter R0 to <reference type="swi" name="ColourTrans_ReadPalette" />)</register-use>
+ <register-use number="3">Sprite pointer to use (equivalent to parameter R1 to <reference type="swi" name="ColourTrans_ReadPalette" />)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to 5,5,5 RGB lookup table (colour number to RGB)</register-use>
+ <register-use number="1">Pointer to colour number lookup table (RGB to colour number)</register-use>
+</exit>
+<use>
+<p>
+This SWI calculates a suitable pair of tables for an arbitrary sprite. If the table has not been cached, it will be recalculated. If the table has been cached, R0 and R1 on exit may differ from those passed in. Where the destination is the current mode, it is strongly recommended that you call <reference type="swi" name="InverseTable_Calculate" /> rather than this SWI as this will retain a cache of the table data.
+</p>
+</use>
+<related>
+<reference type="swi" name="InverseTable_Calculate" />
+</related>
+</swi-definition>
+
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Captured in the original HTML as the final section of the Image File Render page, and separated into its own document.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
