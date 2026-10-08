@@ -94,6 +94,7 @@
         <page href="netl">NetI changes</page>
         <page href="aunintro">An introduction to AUN</page>
         <page href="mimemap">The MimeMap module</page>
+        <page href="internetfiltering">Internet module packet filtering</page>
         <page href="addresscollisions">Internet address collision</page>
         <page href="linkstatus">DCI Driver Link Status</page>
         <page href="routerdiscovery">RouterDiscovery</page>

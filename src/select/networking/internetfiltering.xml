@@ -1,0 +1,233 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Internet module packet filtering">
+<section title="Introduction and Overview">
+<p>
+The Internet module provides an interface for packet filtering, allowing
+clients to capture packets on entry and before output. This can be used for a
+number of purposes, ranging from auditing through diagnostic logging, to
+address translation.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Filter mask">
+<p>
+The filter mask is a simple 4bit hash of the protocol number as supplied in the
+packet. To accept a protocol the relevant bit must be set within the mask word.
+The bit to use is calculated thus:
+</p>
+
+<p><extended-example type="pseudo">
+<userinput>(protocol EOR (protocol&gt;&gt;4)) AND 15</userinput>
+</extended-example></p>
+
+<p>
+The lower 16 bits of the mask relate to input packets. The upper 16 bits of the
+mask relate to output packets.
+</p>
+
+<p>In C, the masks for the filters are defined thus:</p>
+
+<p><extended-example type="c">
+<userinput>#define IPF_PROTOMASK_INPUT(proto)  (1 &lt;&lt; (((proto^(proto&gt;&gt;4)) &amp; 15)+0) )</userinput><br/>
+<userinput>#define IPF_PROTOMASK_OUTPUT(proto) (1 &lt;&lt; (((proto^(proto&gt;&gt;4)) &amp; 15)+16))</userinput>
+</extended-example></p>
+
+<p>
+It is therefore possible to receive packets for protocols other than those
+requested. Clients should act appropriately in such circumstances.
+</p>
+</subsection>
+
+<subsection title="Filter code">
+<p>
+The packet filter code is called with the entry and exit conditions given in
+<reference type="entry" name="Packet filter code" />.
+</p>
+
+<p>
+On input, the filter is called after the Internet module has performed its
+initial checks on the packet for IP header validity, including the checksum.
+The filter is called immediately prior to the built in firewall filter.
+</p>
+
+<p>
+On output, the filter is called before the Internet module calculates the IP
+header checksum. The filter is called immediately prior to the built in
+firewall filter.
+</p>
+
+<p>
+On interface addition and removal, the MBuf chain pointer in R2 is invalid, as
+is the protocol number.
+</p>
+
+<p>
+For the packet filtering reason codes (input and output packets), the
+following fields within the IP packet will be in network byte order:
+</p>
+
+<p><extended-example type="c">
+<userinput>ip_id, ip_len, ip_off</userinput>
+</extended-example></p>
+
+<p>
+In addition, the IP checksum will not be valid. For input packets the checksum
+has been checked, and for output packets it will be added if the packet is to
+be transmitted. The MBuf chain may be modified as necessary by the filter. If
+the control of the chain is to be taken by the filter, the returned MBuf chain
+pointer should be 0.
+</p>
+
+<p>
+The protocol number may be used to perform a reject, or faster filtering
+operation.
+</p>
+</subsection>
+
+<subsection title="Interface description block">
+<p>
+The interface description block is used to provide a means by which the filter
+can filter specific interfaces more rapidly. The interface blocks will remain
+static once added and may be used to check for specific interfaces as
+necessary. Two special reason codes, documented above, are used to notify
+filters of the existence of interfaces. The interface description block takes
+the following format:
+</p>
+
+<p><offset-table>
+<offset number="0" name="Interface name">0-terminated interface name (eg 'eh')</offset>
+<offset number="16" name="Unit number">Unit number</offset>
+<offset number="20" name="Internal interface number">Internal interface number</offset>
+<offset number="24" name="Output function">Pointer to function to call to output packets on interface</offset>
+</offset-table></p>
+
+<p>
+The internal interface number may be used for filtering purposes as a faster
+reject than comparing the name and unit. The function for outputting packets
+allows drivers to output packets outside of the filter routines.
+</p>
+
+<p>The API of this function is not yet defined.</p>
+</subsection>
+
+<subsection title="Example code">
+<p>
+A skeleton example filter module can be supplied on request. Contact your
+supplier for more details.
+</p>
+</subsection>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="Internet_Filter"
+                number="41223"
+                description="Register or deregister a packet filter"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Reason code:
+  <value-table head-number="Reason" head-value="Meaning">
+   <value number="0">Deregister filter</value>
+   <value number="1">Register filter</value>
+  </value-table>
+ </register-use>
+ <register-use number="1">Address family to filter for (must be AF_INET)</register-use>
+ <register-use number="2">Protocol hash mask for acceptable packets</register-use>
+ <register-use number="3">Pointer to address to call</register-use>
+ <register-use number="4">Private word to pass in R12</register-use>
+</entry>
+<use>
+<p>
+This SWI is used to register, or deregister a filter with the Internet module.
+The module checks all packets to be sent or received against the mask supplied.
+If it matches part of the mask, the filter will be called with the packet, and
+may act upon it.
+</p>
+</use>
+<related>
+<reference type="entry" name="Packet filter code" />
+</related>
+</swi-definition>
+</section>
+
+<section title="Entry points">
+<entry-definition name="Packet filter code"
+                  description="Entry point of a packet filter registered with Internet_Filter"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="0">Reason code:
+  <value-table head-number="Reason" head-value="Meaning">
+   <value number="0">Input packet</value>
+   <value number="1">Output packet</value>
+   <value number="2">Added interface</value>
+   <value number="3">Removed interface</value>
+  </value-table>
+ </register-use>
+ <register-use number="1">Pointer to interface description block</register-use>
+ <register-use number="2">Pointer to MBuf chain (reason code 0 and 1 only)</register-use>
+ <register-use number="3">Protocol number (reason code 0 and 1 only)</register-use>
+ <register-use number="12">Private word given when the filter was registered</register-use>
+</entry>
+<exit>
+ <register-use number="0">Return reason:
+  <bitfield-table>
+   <bit number="0-7">Type:
+    <value-table head-number="Type" head-value="Meaning">
+     <value number="0">Pass on (packet is acceptable)</value>
+     <value number="1">Drop silently (packet is not acceptable)</value>
+     <value number="2">Drop with ICMP error</value>
+     <value number="3">Drop with TCP-RST</value>
+    </value-table>
+   </bit>
+   <bit number="16-23">ICMP code number (for type 2 only)</bit>
+   <bit number="24-31">ICMP type number (for type 2 only)</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="2">Updated pointer to MBuf chain</register-use>
+</exit>
+<use>
+<p>
+This is the routine registered with <reference type="swi" name="Internet_Filter" />.
+It is called for each input and output packet which matches the mask, and when
+interfaces are added or removed.
+</p>
+</use>
+<related>
+<reference type="swi" name="Internet_Filter" />
+</related>
+</entry-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+ </revision>
+ </history>
+
+</meta>
+</riscos-prm>
