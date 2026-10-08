@@ -1,0 +1,218 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Teletext">
+<section title="Introduction">
+<p>
+Acorn systems have, traditionally, always included a teletext mode. When RISC OS was introduced this was no longer provided by a hardware controller but was instead provided by a software implementation within the Kernel. This implementation has now been removed and is provided by a new module, 'VideoTTX'. This provides, through the same vectored interface as the other graphics abstractions, an independent implementation of the teletext mode.
+</p>
+<p>
+With this abstraction it is now possible to provide a greater range of teletext-like modes and higher quality within those modes. The VideoTTX module provides a simple implementation of the teletext system. Other claimants of the vector may provide more advanced, or more efficient implementations.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Special characters">
+<p>
+Within Teletext mode the following character sequences are interpreted specially, affecting all characters that follow them :
+</p>
+<p><value-table head-number="Code" head-value="Meaning">
+<value number="&amp;80-&amp;87">Characters are text and are coloured according to the low nibble</value>
+<value number="&amp;88">Flash characters</value>
+<value number="&amp;89">Non-flash characters</value>
+<value number="&amp;8A,&amp;8B">Not implemented</value>
+<value number="&amp;8C">Double height</value>
+<value number="&amp;8D">Normal height</value>
+<value number="&amp;8E,&amp;8F">Not implemented</value>
+<value number="&amp;90-&amp;97">Characters are graphics and are coloured according to the low nibble</value>
+<value number="&amp;98">Concealed characters (cancelled by text colour change)</value>
+<value number="&amp;99">Graphics characters are solid</value>
+<value number="&amp;9A">Graphics characters are separated</value>
+<value number="&amp;9C">Reset background colour to black</value>
+<value number="&amp;9D">Set background colour to current foreground colour</value>
+<value number="&amp;9E">Set graphics character hold mode</value>
+<value number="&amp;9F">Clear graphics character hold mode</value>
+</value-table></p><p>
+The colours within teletext mode are based on the primary and secondary colours created by the binary addition of the red (bit 0), green (bit 1) and blue (bit 2) components. The following colours are therefore available :
+</p>
+<p><value-table head-number="Value" head-value="Colour">
+<value number="0">Black</value>
+<value number="1">Red</value>
+<value number="2">Green</value>
+<value number="3">Yellow</value>
+<value number="4">Blue</value>
+<value number="5">Magenta</value>
+<value number="6">Cyan</value>
+<value number="7">White</value>
+</value-table></p><p>
+Double height characters are usually represented by the same character being present in both the upper and lower cells of the double height character. If the two characters are not the same, or the colours of those characters differ, the display will have undefined results. Graphics characters cannot be double height.
+</p>
+</subsection>
+
+<subsection title="Differences in character set">
+<p>
+The text character codes differ in their representation from the more commonly used ASCII character set. The following changes should be noted :
+</p>
+<p><value-table head-number="Code" head-value="Display">
+<value number="[">is displayed as a left arrow (actually an arrow-head under the current implementation)</value>
+<value number="\">is displayed as a 1/2 symbol</value>
+<value number="]">is displayed as a right arrow (actually an arrow-head under the current implementation)</value>
+<value number="^">is displayed as an up arrow (actually as a dagger under the current implementation)</value>
+<value number="_">is displayed as a long hyphen</value>
+<value number="`">is displayed as a pound (£)</value>
+<value number="{">is displayed as a 1/4 symbol</value>
+<value number="|">is displayed as a vertical equals symbol (actually as a single bar under the current implementation)</value>
+<value number="}">is displayed as a 3/4 symbol</value>
+<value number="~">is displayed as a division symbol</value>
+<value number="127">is undefined (actually as a cross symbol under the current implementation)</value>
+</value-table></p><p>
+Characters with bit 7 set are almost identical to those with bit 7 clear (with the exception of the codes above which will be treated specially). The following changes should be noted for the related characters with bit 7 set (differences from the above) :
+</p>
+<p><value-table head-number="Code" head-value="Display">
+<value number="#">is displayed as a pound (£)</value>
+<value number="_">is displayed as a hash (#)</value>
+<value number="`">is displayed as a long hyphen</value>
+</value-table></p></subsection>
+
+<subsection title="Graphics characters">
+<p>
+Graphics characters are composed of parts of the character set. Each graphic symbol is a 2x3 grid, constructed from the bits of the characters :
+</p>
+<p><extended-example type="format">
+<userinput>+---+---+</userinput><br/>
+<userinput>| 0 | 1 |</userinput><br/>
+<userinput>+---+---+</userinput><br/>
+<userinput>| 2 | 3 |</userinput><br/>
+<userinput>+---+---+</userinput><br/>
+<userinput>| 4 | 6 |</userinput><br/>
+<userinput>+---+---+</userinput>
+</extended-example></p><p>
+Graphics character processing is only applied to codes in the range &amp;20-&amp;3F and &amp;60-&amp;7F. This means that the block of characters in the range &amp;40-&amp;5F, which includes the upper case text characters, are rendered as text. By default, graphics characters are non-separated and are rendered as solid, joining to the character beside them. After the 'separated graphics' have been selected, the cells of the character will be separated from the surrounding cells by the background colour of the character.
+</p>
+<p>
+The control characters described above are usually rendered as if they contained a space character. In 'hold mode', however, the last graphic character rendered will be used in place of the control character.
+</p>
+</subsection>
+
+<subsection title="Selecting a teletext mode">
+<p>
+Only a single teletext mode is defined by default - mode 7. This provides the standard 40x25 character teletext mode as expected by most applications. However, specialist applications may select any mode they wish to use as a teletext mode through a mode specifier block with the mode flags set to 6 (gap mode and teletext). If a particular number of characters is required within the teletext mode these can also be passed within the mode specifier to as mode variables 1 (ScrLCol) and 2 (ScrBRow). If the number of characters specified cannot be met, the closest number which can will be selected. Whilst any colour depth is possible for teletext modes, it is not necessary to select more than 256 colours. Usually only 16 colours would be necessary, but the restrictions on most modern graphic hardware means that 16 colour modes are unsuitable. By default, mode 7 now uses 640x480 in 256 colours (under earlier versions of the operating system it used 320x250 in 16 colours).
+</p>
+<p>
+The mode string parser used by OS components has been extended to allow teletext modes to be selected (although these are obviously not usable within the Desktop). The new TX and TY parameters can be used to change the number of characters in the display. The T parameter selects a teletext mode with a given number of colours. Consult the <reference type="document" href="osscreenmode" name="OS_ScreenMode changes" /> document for more details.
+</p>
+</subsection>
+
+<subsection title="Controlling the teletext mode">
+<p>
+The features of teletext mode can be controlled by VDU commands. Only a limited feature set is currently controllable, although a number have been reserved for future expansion. VDU 23,18 is reserved for teletext control operations. The following operations are available, and are described in the VDU Codes section :
+</p>
+<p>
+<reference type="vdu" name="VDU 23,18,1" />, <reference type="vdu" name="VDU 23,18,2" /> and <reference type="vdu" name="VDU 23,18,16" /> are described in the VDU Codes section below.
+</p>
+</subsection>
+
+<subsection title="Limitations">
+<p>
+The only limitation imposed by teletext mode is that RISC OS may no longer be configured to start in such modes. If MODE 7 is configured for startup the system will default to a suitable mode for the configured monitor type.
+</p>
+</subsection>
+
+</section>
+
+<section title="VDU Codes">
+<vdu-definition name="VDU 23,18,1" description="Set the display update flags">
+<syntax>VDU 23,18,1,flags|</syntax>
+<use>
+<p>
+Sets the update flags for the display. Two bits are currently defined :
+</p>
+<p><bitfield-table>
+ <bit number="0">Suspend all automatic display update</bit>
+ <bit number="1">Update display after every character</bit>
+</bitfield-table></p>
+<p>
+It is expected that teletext modes will be slower than regular modes. These options allow the configuration of alternate display update methods. When both bits are cleared, the update of the display will happen periodically when the system is idle (that is, on a transient callback). This improves performance in general use but may be unsuitable for animations or for behaviour which expects to be outside transient callbacks for a significant period of time. Setting bit 1 will cause the display to update after every character is output. This has a significant performance impact, but ensures that output is immediately reflected on the display. Setting bit 0 will cause no updates to be issued for any character output. This can be used to ensure that display updates are instantaneous. Flashing teletext states will not be updated whilst the updates are suspended.
+</p>
+</use>
+</vdu-definition>
+
+<vdu-definition name="VDU 23,18,2" description="Set the reveal state flags">
+<syntax>VDU 23,18,2,flags|</syntax>
+<use>
+<p>
+Sets the reveal state flags for the display. Only a single bit is currently defined :
+</p>
+<p><bitfield-table>
+ <bit number="0">Reveal concealed text</bit>
+</bitfield-table></p>
+</use>
+</vdu-definition>
+
+<vdu-definition name="VDU 23,18,16" description="Set the display quality flags">
+<syntax>VDU 23,18,16,flags|</syntax>
+<use>
+<p>
+Sets the display quality flags for the display. Only a single bit is currently defined :
+</p>
+<p><bitfield-table>
+ <bit number="0">Render high quality text</bit>
+</bitfield-table></p>
+</use>
+</vdu-definition>
+
+<vdu-definition name="VDU 23,0,8" description="Previously controlled the interlace modes">
+<syntax>VDU 23,0,8,...</syntax>
+<use>
+<p>
+This will now be passed to the Unknown VDU23 vector. Previously this controlled the interlace modes for the current mode.
+</p>
+</use>
+</vdu-definition>
+
+<vdu-definition name="VDU 23,0,9" description="Previously programmed the cursor end position">
+<syntax>VDU 23,0,9,...</syntax>
+<use>
+<p>
+This is now passed on to the Unknown VDU23 vector. Previously it would erroneously attempt to program the end position of the cursor, when it should have been programming the scanlines per character (through the 6845 controller chip).
+</p>
+</use>
+</vdu-definition>
+
+<p>
+For reference, the VDU 23,0 codes implemented in the current version of RISC OS are:
+</p>
+<p><value-table head-number="Code" head-value="Meaning">
+<value number="10">Set cursor start (<reference type="vdu" name="VDU 23,0,10" />): bits 0-4 are the start line; bits 5-6 select the blink state (00 = No blink (cursor on), 01 = No blink (cursor off), 10 = Fast flash, 11 = Slow flash)</value>
+<value number="11">Set cursor end (<reference type="vdu" name="VDU 23,0,11" />)</value>
+</value-table></p>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the control code table: the entry for clearing the graphics character hold mode was given as &amp;9E (the same as setting hold mode); it is &amp;9F.</change>
+    <change>The VDU code changes are given as VDU definitions.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
