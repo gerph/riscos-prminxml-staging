@@ -1,0 +1,410 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="ScrollList">
+<section title="Introduction and Overview">
+<p>
+The scrolling list gadget has been extended since its original release. These changes have been made to provide a much more functional gadget and to improve its performance where larger numbers of rows are used.
+</p>
+<p>
+Significant changes :
+</p>
+<p><list>
+<item><p>It is now possible to display item data within aligned columns.</p></item>
+<item><p>Row selection can now follow the methods used by standard RISC OS option, or radio icons.</p></item>
+<item><p>Static headings can be applied to the scrolling list.</p></item>
+<item><p>Scroll bars on the gadget can be controlled.</p></item>
+</list></p><p>
+For information on the particular version of the gadget which supports these new features you should consult the change summaries.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Adding aligned column data">
+<p>
+Previous versions of the ScrollList gadget only allowed single lines of text and a sprite to be placed within the list. The items have been extended to allow columns to be used. Each column should be separated by a tab (code 9, C escape '\t') character. By default these columns will be automatically sized to the widest text within that column.
+</p>
+</subsection>
+
+<subsection title="Row selection methods">
+<p>
+In order to fit better with the standard RISC OS selection methods for options the gadget allows 'icon-style' selection. This means that the rows of the list will be preceded by the standard 'option' or 'radio' icons, just as they would within normal dialogue boxes. The selection methods employed by this style matches with that of the standard RISC OS selection method.
+</p>
+<p>
+In order to use this method of selection bit 1 of the scrolling list flags should be set. When enabled, bit 0 (multiple selections) indicates whether radio or option icons should be used. The relevant icon is added to the start of the row, before any sprite.
+</p>
+</subsection>
+
+<subsection title="Display only lists">
+<p>
+In order to allow the gadget to purely display information a new flag has been allocated. When bit 2 is set, the display list will never act upon selections of rows within the gadget.
+</p>
+</subsection>
+
+<subsection title="Column headings">
+<p>
+Column headings are placed at the top of the gadget and will be present no matter where the gadget is scrolled to. The specification of column headings is identical to that of the text items, using tab characters to separate columns. To remove the column headings, a null string should be used.
+</p>
+<p>
+The headings are set with <reference type="tboxmethod" name="ScrollList_SetHeadingText" /> and read with <reference type="tboxmethod" name="ScrollList_GetHeadingText" />.
+</p>
+</subsection>
+
+<subsection title="Column properties">
+<p>
+In order to allow more control over the columns, a pair of new methods - ScrollList_SetColumnProperties and ScrollList_GetColumnProperties - are provided. These allow information about the columns to be set and read. When dealing with column properties, column 0 is the 'sprite' column, column 1 is the first column of text, column 2 is the second column of text, etc.
+</p>
+<p>
+Column widths can be selected using property type 0. By default no column widths are specified. This state can be restored by using '0' as the number of columns specified. The width of each column is specified in OS units. Any column given a width of 0 will be effectively removed from the list. Any column given a width of -1 will be automatically sized by the gadget (as normal). Any column not described by the column data (that is, any column higher than that specified by the 'number of columns') will be treated as having a width of 0 - removed from the list.
+</p>
+</subsection>
+
+<subsection title="Scrolling list colours">
+<p>
+In order to allow the gadget to be tailored to the users' requirements the colour selection has been improved. ScrollList gadgets which have been faded now follow more closely the fading scheme used by the WindowManager. The colour methods have been extended to provide more control over the list's appearance.
+</p>
+</subsection>
+
+<subsection title="Scrollbar disposition flags">
+<p>
+To ensure that the ScrollList is functional regardless of its size it is now possible to directly control the use of the scrollbars upon the gadget. Previous versions of the gadget would always provide a vertical scrollbar, allowing the length of the list to be traversed, but preventing 'long' rows from being visible if they extended beyond the window bounds. The gadget has changed to allow the disposition of the scrollbars to be controlled. There are three possible dispositions for the scrollbars - 'optional', 'on' and 'off'.
+</p>
+<p><list>
+<item><p>When set to 'optional', the scrollbar will be used only if it is necessary to make parts of the ScrollList accessible to the user. No scrollbar will be present if the list is fully visible.</p></item>
+<item><p>When set to 'on', the scrollbar will be used regardless of the content of the gadget.</p></item>
+<item><p>When set to 'off', the scrollbar will never be used.</p></item>
+</list></p><p>
+The default state of the gadget now is that both scrollbars are optional. Effectively this means that most pre-existing uses of the ScrollList gadget will lose their vertical scrollbar unless it is necessary for the rows to be accessible. Some lists may, additionally, gain a horizontal scrollbar, allowing previously inaccessible sections of the gadget to become visible.
+</p>
+</subsection>
+
+<subsection title="Gadget flags summary">
+<p>
+The flags have been updated, as described above, and are now provided as follows :
+</p>
+<p><bitfield-table>
+ <bit number="0">Multiple selections are allowed</bit>
+ <bit number="1">Icon selection method should be used</bit>
+ <bit number="2">Gadget is for display only</bit>
+ <bit number="3-4">Vertical scrollbar disposition:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Scrollbar will be added if the list requires one</value>
+ <value number="1">Scrollbar will always be added</value>
+ <value number="2">Scrollbar will never be added</value>
+ <value number="3">Invalid</value>
+</value-table></bit>
+ <bit number="5-6">Horizontal scrollbar disposition:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Scrollbar will be added if the list requires one</value>
+ <value number="1">Scrollbar will always be added</value>
+ <value number="2">Scrollbar will never be added</value>
+ <value number="3">Invalid</value>
+</value-table></bit>
+ <bit number="7-23">Reserved for future gadget use</bit>
+ <bit number="24-29">Reserved for future window use</bit>
+ <bit number="30">Gadget appears 'in the background' (has no effect upon this gadget)</bit>
+ <bit number="31">Gadget is faded</bit>
+</bitfield-table></p>
+<p>
+These bits may be set on the gadget within the ResEd editor, or manipulated once the gadget has been loaded using the ScrollList_SetState method. Core window bits (bits 24-31) should be manipulated using the Gadget_SetState method.
+</p>
+</subsection>
+
+<subsection title="Gadget physical size">
+<p>
+In order to allow users to size the ScrollList gadget to allow all the items to be visible, the ScrollList_CountItems method has been extended. It now allows other information about the gadget to be read.
+</p>
+</subsection>
+
+<subsection title="Indented items">
+<p>
+It is possible to indent items within the scrolling list through extra flags on the ScrollList_AddItem method. The indent consists of 32 OS units per indent and can be used to differentiate items.
+</p>
+</subsection>
+
+</section>
+
+<section title="Toolbox Methods">
+<tboxmethod-definition name="ScrollList_SetHeadingText"
+                    number="ScrollList_Base + 14"
+                    description="Set the column headings">
+<entry>
+ <register-use number="0">Flags (reserved, must be 0)</register-use>
+ <register-use number="1">Window object id</register-use>
+ <register-use number="2">ScrollList_Base + 14</register-use>
+ <register-use number="3">Gadget component_id</register-use>
+ <register-use number="4">Pointer to new text to use for the column headings</register-use>
+</entry>
+<exit>
+</exit>
+<use>
+<p>
+Sets the text of the column headings. See the Column headings section.
+</p>
+</use>
+<declaration type="prototype">
+<extended-example type="c">
+<userinput>extern _kernel_oserror *scrolllist_set_heading_text ( unsigned int flags,</userinput><br/>
+<userinput>       ObjectId window,ComponentId scrolllist,const char *new_text );</userinput>
+</extended-example>
+</declaration>
+<related>
+</related>
+</tboxmethod-definition>
+
+<tboxmethod-definition name="ScrollList_GetHeadingText"
+                    number="ScrollList_Base + 15"
+                    description="Read the column headings">
+<entry>
+ <register-use number="0">Flags (reserved, must be 0)</register-use>
+ <register-use number="1">Window object id</register-use>
+ <register-use number="2">ScrollList_Base + 15</register-use>
+ <register-use number="3">Gadget component_id</register-use>
+ <register-use number="4">Pointer to buffer for text (or NULL)</register-use>
+ <register-use number="5">Size of buffer</register-use>
+ <register-use number="6">Index</register-use>
+</entry>
+<exit>
+ <register-use number="5">Size of buffer required (if R4 was 0) else buffer pointed at by R4 contains text, R5 holds number of bytes written to buffer</register-use>
+</exit>
+<use>
+<p>
+Reads the text of the column headings.
+</p>
+</use>
+<declaration type="prototype">
+<extended-example type="c">
+<userinput>extern _kernel_oserror *scrolllist_get_heading_text ( unsigned int flags,</userinput><br/>
+<userinput>                        ObjectId window, ComponentId scrolllist,</userinput><br/>
+<userinput>                        char *buffer, int size, int *nbytes );</userinput>
+</extended-example>
+</declaration>
+<related>
+</related>
+</tboxmethod-definition>
+
+<tboxmethod-definition name="ScrollList_SetColumnProperties"
+                    number="ScrollList_Base + 20"
+                    description="Set the properties of the columns">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+ <bit number="0-7">Property type:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Column widths</value>
+ <value number="1-255">Reserved</value>
+</value-table></bit>
+ <bit number="8-31">Reserved, must be 0</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Window object id</register-use>
+ <register-use number="2">ScrollList_Base + 20</register-use>
+ <register-use number="3">Gadget component_id</register-use>
+ <register-use number="4">Number of columns specified</register-use>
+ <register-use number="5">Pointer to data describing the properties</register-use>
+</entry>
+<exit>
+</exit>
+<use>
+<p>
+Sets the properties of the columns. This call is not presently implemented.
+</p>
+</use>
+<declaration type="prototype">
+<extended-example type="c">
+<userinput>extern _kernel_oserror *scrolllist_set_column_properties</userinput><br/>
+<userinput>           ( unsigned int flags, ObjectId window, ComponentId scrolllist,</userinput><br/>
+<userinput>            int number_of_columns, unsigned long *data_list );</userinput>
+</extended-example>
+</declaration>
+<related>
+</related>
+</tboxmethod-definition>
+
+<tboxmethod-definition name="ScrollList_SetColour"
+                    number="ScrollList_Base + 8"
+                    description="Set the colours of the list">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+ <bit number="0">Use desktop colours rather than real colours (in the form &amp;BBGGRR00)</bit>
+ <bit number="1">Set heading colours, rather than item colours</bit>
+ <bit number="2-31">Reserved, must be 0</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Window object id</register-use>
+ <register-use number="2">ScrollList_Base + 8</register-use>
+ <register-use number="3">Gadget component_id</register-use>
+ <register-use number="4">Colour value for foreground text (in the form &amp;BBGGRR00 unless bit 0 of R0 is set)</register-use>
+ <register-use number="5">Colour value for background in the form &amp;BBGGRR00 unless bit 0 of R0 set</register-use>
+</entry>
+<exit>
+ <register-use number="1-9">Preserved</register-use>
+</exit>
+<use>
+<p>
+Sets the colours used by the list.
+</p>
+</use>
+<declaration type="prototype">
+<extended-example type="c">
+<userinput>extern _kernel_oserror *scrolllist_set_colour(unsigned int flags,</userinput><br/>
+<userinput>                        ObjectId object_id, ComponentId component_id,</userinput><br/>
+<userinput>                        unsigned int foreground, unsigned int background);</userinput>
+</extended-example>
+</declaration>
+<related>
+</related>
+</tboxmethod-definition>
+
+<tboxmethod-definition name="ScrollList_GetColour"
+                    number="ScrollList_Base + 9"
+                    description="Read the colours of the list">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+ <bit number="0">Reserved, must be 0</bit>
+ <bit number="1">Read heading colours rather than item colours</bit>
+ <bit number="2-31">Reserved, must be 0</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Window object id</register-use>
+ <register-use number="2">ScrollList_Base + 9</register-use>
+ <register-use number="3">Gadget component_id</register-use>
+</entry>
+<exit>
+ <register-use number="0">Colour value (in the form &amp;BBGGRR00) of foreground</register-use>
+ <register-use number="1">Colour value (in the form &amp;BBGGRR00) of background</register-use>
+</exit>
+<use>
+<p>
+Reads the colours used by the list.
+</p>
+</use>
+<declaration type="prototype">
+<extended-example type="c">
+<userinput>extern _kernel_oserror *scrolllist_get_colour(unsigned int flags,</userinput><br/>
+<userinput>                    ObjectId object_id, ComponentId component_id,</userinput><br/>
+<userinput>                    unsigned int *foreground, unsigned int *background);</userinput>
+</extended-example>
+</declaration>
+<related>
+</related>
+</tboxmethod-definition>
+
+<tboxmethod-definition name="ScrollList_CountItems"
+                    number="ScrollList_Base + 12"
+                    description="Count the items or read the physical size of the list">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+ <bit number="0-7">Type of information requested:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Count number of rows</value>
+ <value number="1">Count number of columns (not implemented)</value>
+ <value number="2">Read width necessary to make all columns visible</value>
+ <value number="3">Read height necessary to make all rows visible</value>
+ <value number="4-255">Reserved</value>
+</value-table></bit>
+ <bit number="8-31">Reserved, must be 0</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Window object id</register-use>
+ <register-use number="2">ScrollList_Base + 12</register-use>
+ <register-use number="3">Gadget component_id</register-use>
+</entry>
+<exit>
+ <register-use number="0">Result value</register-use>
+</exit>
+<use>
+<p>
+Reads information about the list. <fixme>This method and ScrollList_AddItem are both given as ScrollList_Base + 12; one of the offsets needs to be confirmed.</fixme>
+</p>
+</use>
+<declaration type="prototype">
+<extended-example type="c">
+<userinput>extern _kernel_oserror * scrolllist_count_items(unsigned int flags,</userinput><br/>
+<userinput>                        ObjectId object_id, ComponentId component_id,</userinput><br/>
+<userinput>                        unsigned int *items);</userinput>
+</extended-example>
+</declaration>
+<related>
+</related>
+</tboxmethod-definition>
+
+<tboxmethod-definition name="ScrollList_AddItem"
+                    number="ScrollList_Base + 12"
+                    description="Add an item to the list">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+ <bit number="0-1">Type of sprite to use:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Wimp sprite pool</value>
+ <value number="1">User sprite area</value>
+ <value number="2">Sprite is a pointer to sprite</value>
+ <value number="3">Invalid, do not use</value>
+</value-table></bit>
+ <bit number="2">Sprite should be half size</bit>
+ <bit number="3">Make added item visible</bit>
+ <bit number="4-7">Indentation level</bit>
+ <bit number="8-31">Reserved, must be 0</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Window object id</register-use>
+ <register-use number="2">ScrollList_Base + 12</register-use>
+ <register-use number="3">Gadget component_id</register-use>
+ <register-use number="4">Pointer to text string to add</register-use>
+ <register-use number="5">Pointer to sprite area</register-use>
+ <register-use number="6">Pointer to sprite name (or pointer to sprite if sprite type in R0 bits 0-1 is 2)</register-use>
+ <register-use number="7">Index to add at</register-use>
+</entry>
+<exit>
+ <register-use number="0-7">Preserved</register-use>
+</exit>
+<use>
+<p>
+Adds an item to the list. The indent consists of 32 OS units per indent and can be used to differentiate items.
+</p>
+</use>
+<declaration type="prototype">
+<extended-example type="c">
+<userinput>extern _kernel_oserror *scrolllist_add_item ( unsigned int flags,</userinput><br/>
+<userinput>                                                 ObjectId window,</userinput><br/>
+<userinput>                                                 ComponentId scrolllist,</userinput><br/>
+<userinput>                                                 const char *text,</userinput><br/>
+<userinput>                                                 const void *sprite_area,</userinput><br/>
+<userinput>                                                 const char *sprite_name,</userinput><br/>
+<userinput>                                                 int index</userinput><br/>
+<userinput>                                               );</userinput>
+</extended-example>
+</declaration>
+<related>
+</related>
+</tboxmethod-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the method heading 'ScrollList_GetColumnProperties', whose entry registers and C veneer are those of ScrollList_SetColumnProperties, and the missing 'for' in 'to differentiated items'.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
