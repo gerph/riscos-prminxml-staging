@@ -1,0 +1,109 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="FileCore">
+<section title="Introduction and Overview">
+<p>
+FileCore has been updated to provide access to larger discs and to avoid limitations of the earlier interfaces.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="FileCore_DiscOp64"
+                number="4054C"
+                description="Perform a disc operation using 64-bit disc addresses"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="1">Flags:
+  <bitfield-table>
+ <bit number="0-3">Reason code (see FileCore_DiscOp)</bit>
+ <bit number="4-7">Options (see FileCore_DiscOp)</bit>
+ <bit number="8-31">Reserved, must be 0</bit>
+</bitfield-table></register-use>
+ <register-use number="2">Pointer to disc address buffer:
+  <offset-table>
+ <offset number="0">Drive and flags:
+   <bitfield-table>
+ <bit number="0-7">Drive number (only drives 0-7 supported)</bit>
+ <bit number="8-31">Reserved, must be 0</bit>
+</bitfield-table></offset>
+ <offset number="4">Disc byte address (low 32 bits)</offset>
+ <offset number="8">Disc byte address (high 32 bits)</offset>
+</offset-table></register-use>
+ <register-use number="3">Pointer to buffer to use</register-use>
+ <register-use number="4">Length of buffer</register-use>
+ <register-use number="5">Pointer to alternative disc record, or 0 if unused</register-use>
+ <register-use number="6">Cache handle, if relevant to the reason code</register-use>
+ <register-use number="8">Pointer to FileCore instance private word</register-use>
+</entry>
+<exit>
+ <register-use number="1-2">Preserved (the block at R2 is updated to the next disc byte address)</register-use>
+ <register-use number="3">Pointer to end of used buffer</register-use>
+ <register-use number="4">Number of bytes not transferred</register-use>
+</exit>
+<use>
+<p>
+This SWI is an extended form of FileCore_DiscOp which avoids limited 26bit interfaces. It is implemented internally within FileCore using the existing calls, thus the limitations are identical to those of the FileCore_DiscOp and FileCore_SectorOp calls. Future versions of the module may remove these limitations.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="FileCore_Features"
+                number="4054D"
+                description="Read the feature set of the FileCore module"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+</entry>
+<exit>
+ <register-use number="0">Feature flags:
+  <bitfield-table>
+ <bit number="0">FileCore modules should use new error scheme</bit>
+ <bit number="1-31">Reserved</bit>
+</bitfield-table></register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the feature set of the FileCore module. If it returns an error, the feature flags should be assumed to be 0. At present FileCore does not support the extended error scheme and bit 0 will be clear. The scheme will be documented in a future release.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
