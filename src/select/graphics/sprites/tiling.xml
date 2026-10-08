@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Tiled sprite plotting">
+<section title="Introduction and Overview">
+<p>
+From version 1.73 onward of SpriteExtend a new reason code has been added to OS_SpriteOp (and the variants which use this) to tile a sprite across the graphics window. This operation allows a single system call to be used to render a large number of images. It allows tiled area fills to be accelerated better than it would be for multiple sprite operations.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_SpriteOp"
+                number="2E"
+                reason="41"
+                reasonname="OS_SpriteOp_TileSpriteScaled"
+                description="Tile sprite scaled"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">65 + 0, &amp;100 or &amp;200 as for other SpriteOps</register-use>
+ <register-use number="1">Pointer to sprite area</register-use>
+ <register-use number="2">Pointer to sprite name, or pointer to sprite dependant on R0</register-use>
+ <register-use number="3">X origin (bottom left of sprite)</register-use>
+ <register-use number="4">Y origin (bottom left of sprite)</register-use>
+ <register-use number="5">Plot action (as for OS_SpriteOp 52)</register-use>
+ <register-use number="6">Pointer to scale factors, or 0 for 1:1 scaling</register-use>
+ <register-use number="7">Pointer to pixel translation table, or 0 if none</register-use>
+</entry>
+<exit>
+ <register-use number="0-7">Preserved</register-use>
+</exit>
+<use>
+<p>
+This reason code is used to tile the sprite specified across the graphics window. The origin supplied in R3 and R4 will be used as the location of the bottom left corner of the sprites. The origin may be located within the graphics window, or outside it and will be bounded to the window.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
