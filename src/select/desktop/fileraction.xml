@@ -1,0 +1,159 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="FilerAction update">
+<section title="Introduction and Overview">
+<p>
+FilerAction now includes a flag on its options to force it to never invoke proxy tasks. This flag should be used by proxy clients who wish to start FilerAction tasks to perform tasks on their behalf.
+</p>
+<p>
+This facility is required by 'delete trapping' proxies (for example, a rubbish bin) which wish to use FilerAction to perform deletions on the objects within the bin itself.
+</p>
+<p>
+FilerAction under RISC OS Select also provides the ability to 'proxy' requests for other users. This can be used to replace the functionality of the standard FilerAction utility with another, user supplied, application. The major use of this is to provide a means for user provision of an updated 'Find' utility. However, this functionality might also be used to provide an automatic waste-basket facility, or a more graphical count utility.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Options">
+<p>
+A full list of the options as supplied in +24 of the message block is as follows :
+</p>
+<p><bitfield-table>
+ <bit number="0">Verbose (display a window showing progress)</bit>
+ <bit number="1">Confirm (request user confirmation on actions)</bit>
+ <bit number="2">Force (override locking)</bit>
+ <bit number="3">Newer (apply copies on where the source is more recent than the destination)</bit>
+ <bit number="4">Recurse (step into directories during operation)</bit>
+ <bit number="5">Confirm deletes (for delete operations, always request confirmation, ignoring bit 1)</bit>
+ <bit number="6">Faster (start up in 'fast' mode)</bit>
+ <bit number="7">Never proxy (perform the action without invocation of proxies)</bit>
+</bitfield-table></p>
+</subsection>
+
+<subsection title="Proxying FilerAction messages">
+<p>
+In this mode, FilerAction becomes a 'proxy' for the extended tools. Known messages sent to the FilerAction task will be passed to their opposite (usually this means that messages from the Filer go to FilerAction as a proxy, and from there on to the extended tool). The reason that this - somewhat indirect - method is used, is to provide support for older applications. Applications unaware of the existence of the new tools will be able to benefit from the new operation of FilerAction, and the method of launching such tools remains backwards compatible for all clients.
+</p>
+<p>
+To provide a tool that replaces the functionality of FilerAction you must first set a system variable to inform it of the existence of that tool. Generally, this will take the form :
+</p>
+<p><extended-example type="shell">
+<userinput>*Set Alias$@FilerAction_&lt;operation&gt; /&lt;Obey$Dir&gt;.!Run</userinput>
+</extended-example></p><p>
+Operation is one of :
+</p>
+<p><value-table head-number="Operation" head-value="Meaning">
+<value number="Copy">Copy a number of objects from one directory to another</value>
+<value number="Rename">Move a number of objects from one directory to another by trying a rename first then doing a copy/delete if that fails</value>
+<value number="Delete">Delete a number of objects in a particular directory</value>
+<value number="Access">Set the access of a number of objects to a given value</value>
+<value number="SetType">Set the file type of a number of objects to a given value</value>
+<value number="Count">Count the file sizes of the selected objects</value>
+<value number="Move">Move a number of objects from one directory by copying them then deleting the source</value>
+<value number="CopyLocal">Copy a single object to a different name in the same directory</value>
+<value number="Stamp">Stamp the selected objects with the time when they get stamped</value>
+<value number="Find">Find an object with a given name.</value>
+</value-table></p><p>
+These mirror the operations that FilerAction currently provides. Additional operations will be given similarly descriptive names.
+</p>
+<p>
+The extended tool will be launched using this command, and you should be prepared to either support multiple invocations by starting new applications, or by receiving multiple requests and servicing them.
+</p>
+<p>
+Before issuing the command, FilerAction will broadcast a <reference type="message" name="FilerAction" /> (&amp;405). Tools which are able to service the request should reply to this message. Any tool unable to service the request (because it does not handle that form of request, or because it is busy with another request) should ignore the message. If the message is replied to, FilerAction will treat that task as a client. If it bounces, FilerAction will issue the above command to start the tool.
+</p>
+<p>
+Once started, messages will be sent to the extended tool in exactly the same manner as FilerAction receives them. This means that a Message_FilerSelectionDirectory will arrive first, followed by multiple Message_FilerAddSelection, and then finally a Message_FilerAction. The recommended way of implementing this protocol is as follows :
+</p>
+<p><extended-example type="pseudo">
+<userinput>parent_Task=-1</userinput><br/>
+<userinput>state=Idle</userinput><br/>
+<userinput>WHILE running</userinput><br/>
+<userinput>  receive message</userinput><br/>
+<userinput>  CASE message OF</userinput><br/>
+<userinput>    WHEN Message_FilerAction:</userinput><br/>
+<userinput>      CASE state OF</userinput><br/>
+<userinput>        WHEN Idle:</userinput><br/>
+<userinput>          IF messageblock.operationtype = one_we_understand THEN</userinput><br/>
+<userinput>            state=Starting</userinput><br/>
+<userinput>            parent_Task=messageblock.taskhandle</userinput><br/>
+<userinput>            SYS "Wimp_SendMessage",17,messageblock,parent_Task</userinput><br/>
+<userinput>          ELSE</userinput><br/>
+<userinput>            ignore it</userinput><br/>
+<userinput>          ENDIF</userinput><br/>
+<userinput>        WHEN Starting:</userinput><br/>
+<userinput>          state=Processing</userinput><br/>
+<userinput>          do whatever stuff we need to</userinput><br/>
+<userinput>      ENDCASE</userinput><br/>
+<userinput>    WHEN Message_FilerSelectionDirectory:</userinput><br/>
+<userinput>      IF state = Starting THEN</userinput><br/>
+<userinput>        remember the directory</userinput><br/>
+<userinput>      ENDIF</userinput><br/>
+<userinput>    WHEN Message_FilerAddSelection:</userinput><br/>
+<userinput>      IF state = Starting THEN</userinput><br/>
+<userinput>        process the names</userinput><br/>
+<userinput>      ENDIF</userinput><br/>
+<userinput>    WHEN Message_FilerControlAction:</userinput><br/>
+<userinput>      IF state = Processing THEN</userinput><br/>
+<userinput>        act upon control command; code 0 will always be handled for</userinput><br/>
+<userinput>        you, because FilerAction knows what you can do</userinput><br/>
+<userinput>      ENDIF</userinput><br/>
+<userinput>  ENDCASE</userinput><br/>
+<userinput>  IF finished_processing THEN</userinput><br/>
+<userinput>    state=Idle</userinput><br/>
+<userinput>    either:</userinput><br/>
+<userinput>      quit normally</userinput><br/>
+<userinput>    or:</userinput><br/>
+<userinput>      send message_TaskShutdown (&amp;400C3) to parent_Task</userinput><br/>
+<userinput>  ENDIF</userinput><br/>
+<userinput>ENDWHILE</userinput>
+</extended-example></p><p>
+Implementing the protocol defined in the PRMs for FilerAction clients is sufficient to get an initial implementation running. Adding the simple state machine on top of this will protect against multiple tool invocations getting confused.
+</p>
+<p>
+You will need to handle PreQuit requests as you would in a normal application, as FilerAction cannot do this for you.
+</p>
+</subsection>
+
+<subsection title="Possible extended tools">
+<p>
+There is only limited scope for extended tools, but of some of the things that might be implemented are :
+</p>
+<p><list>
+<item><p>Delete handler which attempts to relocate files to a temporary location for later recovery.</p></item>
+<item><p>Graphical count, displaying the distribution of filetypes - figures, bar chart, pie chart, synthesised music based on frequency distribution... whatever takes your fancy.</p></item>
+<item><p>Accumulating 'Find' tool, displaying results in a throwback-like window.</p></item>
+<item><p>Graphical copy tool, with lots of flying documents and silly animations</p></item>
+</list></p></subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the message name 'Message_FilerSelectedDirectory' to Message_FilerSelectionDirectory, as used by the recommended implementation, 'existance' to 'existence', and the missing closing bracket of the 'Newer' option. The bit numbers of the options and the ends of the Rename operation and the list of possible tools, which the captured HTML had lost, were restored from the original documentation text.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
