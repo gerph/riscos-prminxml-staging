@@ -1,0 +1,99 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Toolbox Gadgets">
+<section title="Introduction and Overview">
+<p>
+The Window module has been extended with Window 1.85 to track the focus of gadgets and to list the gadgets known to the system.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Changes with Window 1.85">
+<subsubsection title="Focus tracking">
+<p>
+In order to allow the tracking of the focus the Window module will now issue a new event, Window_GadgetLostFocus when the focus moves from a gadget. This facility is necessary for the implementation of the new Number Range input mechanism.
+</p>
+<p>
+Window_GadgetLostFocus is toolbox event &amp;82891. The event does not contain any data except the toolbox header.
+</p>
+<p><extended-example type="c">
+<userinput>#define Window_GadgetLostFocus        (Window_SWIChunkBase + 17)</userinput><br/>
+<userinput>typedef struct</userinput><br/>
+<userinput>{</userinput><br/>
+<userinput>        ToolboxEventHeader            hdr;</userinput><br/>
+<userinput>} WindowGadgetLostFocusEvent;</userinput>
+</extended-example></p><p>
+It may be necessary for external gadgets losing the focus to issue this event should they lose the focus. Gadgets which are provided entirely through Wimp icons within the parent Window should be automatically tracked by the Window module and the necessary event raised. Gadgets which are provided through nested windows will need to issue the event when the focus is lost (as indicated by Wimp Event Caret Lost). Gadgets which are not provided through nested windows or through icons may need to detect the focus being lost in some other manner.
+</p>
+<p>
+Failure by external Gadgets to issue this message may prevent applications from detecting focus loss from their gadgets. It is not expected that the Window or other Toolbox modules will suffer from this lack at this time.
+</p>
+</subsubsection>
+
+<subsubsection title="Gadget information">
+<p>
+For the benefit of gadget developers it is now possible to list the gadgets currently known to the system through the command <userinput>*Window_Gadgets</userinput>. This will list the gadget identifiers, together with their size, as registered with the Window module.
+</p>
+</subsubsection>
+
+</subsection>
+
+</section>
+
+<section title="Toolbox Events">
+<tboxmessage-definition name="Window_GadgetLostFocus"
+                    number="82891"
+                    description="The focus has moved from a gadget">
+<use>
+<p>
+This event is issued by the Window module when the focus moves from a gadget. The event does not contain any data except the toolbox header.
+</p>
+</use>
+<related>
+</related>
+</tboxmessage-definition>
+</section>
+
+<section title="Commands">
+<command-definition name="Window_Gadgets"
+                    description="List the gadgets known to the Window module">
+<syntax><text>Window_Gadgets</text></syntax>
+<use>
+<p>
+Lists the gadget identifiers, together with their size, as registered with the Window module.
+</p>
+</use>
+<related>
+</related>
+</command-definition>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>The Gadget handlers and Gadget registration sections of the original HTML page are now separate documents.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
