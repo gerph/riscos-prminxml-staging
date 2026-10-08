@@ -17,7 +17,7 @@ reconfiguring the interface.
 <section title="Service calls">
 <service-definition name="InternetStatus"
                     number="B0"
-                    reasonnumber="8"
+                    reason="8"
                     description="Duplicate Internet address detected">
 <entry>
  <register-use number="0">8 (subreason code)</register-use>
@@ -29,8 +29,9 @@ reconfiguring the interface.
 </entry>
 
 <exit>
- <register-use number="0-5" state="preserved"/>
- <register-use number="0">0 to claim service when duplicate address has been resolved, or preserved to shut down the Internet module</register-use>
+ <register-use number="0" state="preserved"/>
+ <register-use number="1">0 to claim service when duplicate address has been resolved, or preserved to shut down the Internet module</register-use>
+ <register-use number="2-5" state="preserved"/>
 </exit>
 
 <use>

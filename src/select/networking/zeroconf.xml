@@ -73,7 +73,7 @@ and had the following differences from the released RFC:
                     reasonname="ZeroConfAddressAcquired"
                     description="Address has been acquired by the ZeroConf module">
 <entry>
- <register-use number="0">32 (sub-reason code></register-use>
+ <register-use number="0">32 (sub-reason code)</register-use>
  <register-use number="1">&hex;B0 (reason code)</register-use>
  <register-use number="2">Pointer to zero-terminated aliased interface name</register-use>
  <register-use number="3">IP address assigned to the interface</register-use>
@@ -108,7 +108,7 @@ This service should never be claimed.
                     reasonname="ZeroConfAddressLost"
                     description="Address has been lost by the ZeroConf module">
 <entry>
- <register-use number="0">33 (sub-reason code></register-use>
+ <register-use number="0">33 (sub-reason code)</register-use>
  <register-use number="1">&hex;B0 (reason code)</register-use>
  <register-use number="2">Pointer to zero-terminated aliased interface name</register-use>
  <register-use number="3">IP address that was assigned to the interface</register-use>

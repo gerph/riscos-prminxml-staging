@@ -29,7 +29,7 @@ log.
                     description="Response received for BootP/DHCP request">
 
 <entry>
- <register-use number="0">4 (sub-reason code></register-use>
+ <register-use number="0">4 (sub-reason code)</register-use>
  <register-use number="1">&hex;B0 (reason code)</register-use>
  <register-use number="2">Pointer to zero-terminated interface name</register-use>
  <register-use number="3">Pointer to Device Information Block for interface</register-use>
@@ -76,7 +76,7 @@ in due course.
                     description="DHCPOffer has been received">
 
 <entry>
- <register-use number="0">5 (sub-reason code></register-use>
+ <register-use number="0">5 (sub-reason code)</register-use>
  <register-use number="1">&hex;B0 (reason code)</register-use>
  <register-use number="2">Pointer to zero-terminated interface name</register-use>
  <register-use number="3">Pointer to Device Information Block for interface</register-use>
@@ -128,7 +128,7 @@ will wait for another offer to be made.
                     description="DHCP address has been configured on an interface">
 
 <entry>
- <register-use number="0">48 (sub-reason code></register-use>
+ <register-use number="0">48 (sub-reason code)</register-use>
  <register-use number="1">&hex;B0 (reason code)</register-use>
  <register-use number="2">Pointer to zero-terminated interface name</register-use>
  <register-use number="3">IP address assigned to interface</register-use>
@@ -169,7 +169,7 @@ This service should never be claimed.
                     description="DHCP address has been removed from an interface">
 
 <entry>
- <register-use number="0">49 (sub-reason code></register-use>
+ <register-use number="0">49 (sub-reason code)</register-use>
  <register-use number="1">&hex;B0 (reason code)</register-use>
  <register-use number="2">Pointer to zero-terminated interface name</register-use>
  <register-use number="3">IP address that was assigned to interface</register-use>
