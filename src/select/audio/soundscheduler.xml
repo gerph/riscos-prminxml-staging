@@ -1,0 +1,132 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="SoundScheduler changes for 32bit">
+<section title="Introduction and Overview">
+<p>
+In order to allow the SoundScheduler to function within a 32bit executable space, a rationalisation has been necessary for the interfaces. The normal, PRM documented, functioning of the interfaces remains unchanged. The undocumented interfaces, however, have required a minor restructuring to allow the full address space to be used as intended.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Sound_QSchedule">
+<p>
+This SWI may take R1 as a pointer to a function to be executed at the scheduled time. This is not documented, and the address must not have the mask <userinput>&amp;xFxxxxxx</userinput> due to the documented SWI interface. As this interface was previously undocumented, and cannot be used with the full address space, it is recommended that clients continue to not use it.
+</p>
+</subsection>
+
+<subsection title="Using the new interface">
+<p>
+Clients wishing to use the new API should first attempt to use <reference type="swi" name="Sound_QSchedule32" /> with the correct parameters. If R1 returns <userinput>&amp;FC000003</userinput> then the operation was successful. If R1 returns any other value, the Scheduler module is not capable of the operation and the client must fall back to the old style <userinput>Sound_QSchedule</userinput> operation.
+</p>
+</subsection>
+
+<subsection title="Sound_QRemove">
+<p>
+This SWI is not documented in the PRMs and the following description assumes that clients understand the API in use.
+</p>
+<p>
+The parameters returned are in internal format which has changed to reflect the <reference type="swi" name="Sound_QSchedule32" /> interface, rather than the <userinput>Sound_QSchedule</userinput> interface.
+</p>
+</subsection>
+
+<subsection title="Sound_QInterface">
+<p>
+This SWI is not documented in the PRMs and the following description assumes that clients understand the API in use.
+</p>
+<p>
+The parameters returned are those for the old style interface. The new style interface has been provided without modification to the API for <userinput>Sound_QInterface</userinput>. The instruction pointed to by R1 will be a branch if the new interface is available. This can be identified by <userinput>(R1 AND &amp;FF000000) = &amp;EA000000</userinput>. If this condition is met, then the address R1+4 may be called with parameters as for the <reference type="swi" name="Sound_QSchedule32" /> API.
+</p>
+</subsection>
+
+<subsection title="Compatibility with earlier software">
+<p>
+As mentioned earlier, the interfaces for <userinput>Sound_QRemove</userinput>, <userinput>Sound_QInterface</userinput> and the function pointer interface in <userinput>Sound_QSchedule</userinput> are not documented and clients using them should be aware of the consequences of doing so. Where possible the API for such undocumented use has been retained such that code should require no modification.
+</p>
+<p>
+New clients may use the old style interface where they are not interested in the function pointer API. The updated QSchedule32 API is merely more flexible for clients wishing to use the, now documented, function pointer API.
+</p>
+<p>
+Note that undefined SoundScheduler SWIs have never returned errors with V set. They merely return with parameters preserved.
+</p>
+</subsection>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="Sound_QSchedule32"
+                number="401C8"
+                description="Schedule a sound SWI or function call on the event queue, for use in 32bit address spaces"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Time (as for <reference type="swi" name="Sound_QSchedule" />)</register-use>
+ <register-use number="1">Schedule type:
+  <value-table head-number="Bits 0-1" head-value="Meaning">
+   <value number="0">Call <userinput>Sound_ControlPacked</userinput>, otherwise R1 is a function to call. Bits 2-31 are reserved.</value>
+   <value number="1">Bits 2-7 control the operation to perform: 0 calls the SWI given in bits 8-31; 1-63 are reserved for future expansion. Bits 8-31 are reserved.</value>
+   <value number="2">Reserved, do not use</value>
+   <value number="3">Reserved, do not use</value>
+  </value-table>
+ </register-use>
+ <register-use number="2">Data for SWI/function call</register-use>
+ <register-use number="3">Data for SWI/function call</register-use>
+</entry>
+<exit>
+ <register-use number="0">0 for success, negative if there is an error</register-use>
+ <register-use number="1">&amp;FC000003 if this API is present on this version of the SoundScheduler module</register-use>
+</exit>
+<use>
+<p>
+This SWI is similar to <reference type="swi" name="Sound_QSchedule" /> except that
+it provides a documented mechanism to schedule a call to a client-supplied function
+that may be anywhere within the entire address range of the system.
+</p>
+
+<p>
+Clients wishing to use the new API should first attempt to use this SWI with the
+correct parameters. If R1 returns <userinput>&amp;FC000003</userinput> then the
+operation was successful. If R1 returns any other value, the Scheduler module is
+not capable of the operation and the client must fall back to the old style
+<userinput>Sound_QSchedule</userinput> operation.
+</p>
+
+<p>
+<fixme>The original wording for a schedule type with bits 0-1 clear reads 'call Sound_ControlPacked otherwise R1 is a function to call'; which condition selects the function call is not stated.</fixme>
+</p>
+</use>
+<related>
+<reference type="swi" name="Sound_QSchedule" />
+</related>
+</swi-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>The SWI number (&amp;401C8) was added from the system SWI definitions; the original did not give it.</change>
+    <change>The original stated the condition for calling Sound_ControlPacked as 'If bit 0-1 = 0'; the wording is retained and flagged as unclear.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>

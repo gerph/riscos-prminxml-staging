@@ -111,6 +111,10 @@
         <page href="imagefilerender">Image file renderer</page>
         <page href="videov">Video drivers</page>
     </section>
+    <section title="Audio" dir="audio">
+        <page href="soundscheduler">SoundScheduler changes for 32bit</page>
+        <page href="ratetracker">RateTracker</page>
+    </section>
     <section title="Programmer" dir="programmer">
         <page href="aif">AIF module</page>
         <page href="extendedc">Extended C functions</page>
