@@ -1,0 +1,612 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="OS_ReadSysInfo">
+<section title="Introduction and Overview">
+<p>
+The OS_ReadSysInfo SWI has been extended and modified since the calls documented in the PRMs. The full list of OS_ReadSysInfo reason codes currently supported is :
+</p>
+<p><value-table head-number="Reason" head-value="Meaning">
+<value number="0">Read configured screen size</value>
+<value number="1">Read configured mode, monitor type and sync</value>
+<value number="2">Read chip presence and unique machine ID</value>
+<value number="3">Read features mask for 82C710-compatible chip family</value>
+<value number="4">Read machine ethernet address</value>
+<value number="5">Read raw unique ID</value>
+<value number="6">Read kernel values</value>
+<value number="7">Read last abort details</value>
+<value number="8">Read platform class</value>
+<value number="9">Read ROM information</value>
+<value number="10">Read Operating System version</value>
+<value number="11">Read debug information</value>
+</value-table></p></section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_ReadSysInfo"
+                number="58"
+                reason="0"
+                reasonname="OS_ReadSysInfo_ScreenSize"
+                description="Read configured screen size"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">0</register-use>
+</entry>
+<exit>
+ <register-use number="0">0</register-use>
+</exit>
+<use>
+<p>
+This SWI no longer returns any configured screen size details. The screen size is managed entirely at the discretion of the video driver modules. Originally this SWI returned the size of the configured screen memory in bytes.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ReadSysInfo"
+                number="58"
+                reason="1"
+                reasonname="OS_ReadSysInfo_ModeMonitorSync"
+                description="Read configured mode, monitor type and sync"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">1</register-use>
+</entry>
+<exit>
+ <register-use number="0">Configured mode</register-use>
+ <register-use number="1">Configured monitor type</register-use>
+ <register-use number="2">Configured sync</register-use>
+</exit>
+<use>
+<p>
+This SWI reads the configured mode, monitor type and sync type as previously. Whilst the values are configurable, it is recommended that they be set to Auto except where this is a problem. The automatic detection of monitor type will be performed by the video hardware as necessary.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ReadSysInfo"
+                number="58"
+                reason="2"
+                reasonname="OS_ReadSysInfo_HardwareConfig"
+                description="Read chip presence and unique machine ID"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">2</register-use>
+</entry>
+<exit>
+ <register-use number="0">Hardware configuration word 0:
+  <bitfield-table>
+ <bit number="0-7">Special functions chip type:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">None</value>
+ <value number="1">IOEB</value>
+</value-table></bit>
+ <bit number="8-15">I/O controller chip type:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">IOC</value>
+ <value number="1">IOMD</value>
+ <value number="255">Undefined</value>
+</value-table></bit>
+ <bit number="16-23">Memory controller chip type:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">MEMC1/MEMC1a</value>
+ <value number="1">IOMD</value>
+ <value number="255">Undefined</value>
+</value-table></bit>
+ <bit number="24-31">Video controller chip type:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">VIDC1a</value>
+ <value number="1">VIDC20</value>
+ <value number="255">Undefined</value>
+</value-table></bit>
+</bitfield-table></register-use>
+ <register-use number="1">Hardware configuration word 1:
+  <bitfield-table>
+ <bit number="0-7">I/O chip type:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">None</value>
+ <value number="1">82C710/711, or SMC'665 or similar</value>
+</value-table></bit>
+ <bit number="8-31">Reserved</bit>
+</bitfield-table></register-use>
+ <register-use number="2">Hardware configuration word 2:
+  <bitfield-table>
+ <bit number="0-7">LCD controller type:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">None</value>
+ <value number="1">A4 controller</value>
+ <value number="2">'Stork' controller</value>
+</value-table></bit>
+ <bit number="8-15">IOMD type:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">IOMD</value>
+ <value number="1">IOMDL</value>
+ <value number="255">None</value>
+</value-table></bit>
+ <bit number="16-23">VIDC20 type:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">VIDC20</value>
+ <value number="1">VIDC2L</value>
+ <value number="255">None</value>
+</value-table></bit>
+ <bit number="24">IIC bus speed (unset = 100kHz, set = 400kHz)</bit>
+ <bit number="25">IO clock state when idling (unset = running, set = stopped)</bit>
+ <bit number="26-31">Reserved</bit>
+</bitfield-table></register-use>
+ <register-use number="3">Unique machine ID word 0</register-use>
+ <register-use number="4">Unique machine ID word 1</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read information on the hardware used within the system. In many cases this will be determined by the hardware drivers rather than the Kernel, and it is therefore prudent to interrogate the specific hardware driver modules rather than the Kernel. The Kernel restricts itself, in general, to those tasks which it is vital to perform for system start up and management. The operation of the hardware devices outside of this is the domain of the hardware drivers and correspondingly many of the fields may appear as 'undefined'.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ReadSysInfo"
+                number="58"
+                reason="3"
+                reasonname="OS_ReadSysInfo_IOChipFeatures"
+                description="Read features mask for 82C710-compatible chip family"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">3</register-use>
+</entry>
+<exit>
+ <register-use number="0">Basic features mask:
+  <bitfield-table>
+ <bit number="0-3">IDE interface:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Absent</value>
+ <value number="1">Present</value>
+</value-table></bit>
+ <bit number="4-7">Floppy disc interface:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Absent</value>
+ <value number="1">Present</value>
+</value-table></bit>
+ <bit number="8-11">Parallel port:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Absent</value>
+ <value number="1">Present, original device number assignment</value>
+ <value number="2">Present, alternate device number assignment</value>
+</value-table></bit>
+ <bit number="12-15">1st serial port:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Absent</value>
+ <value number="1">Present, original device number assignment</value>
+ <value number="2">Present, alternate device number assignment</value>
+</value-table></bit>
+ <bit number="16-19">2nd serial port:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Absent</value>
+ <value number="1">Present, original device number assignment</value>
+ <value number="2">Present, alternate device number assignment</value>
+</value-table></bit>
+ <bit number="20-23">Chip configuration type:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">No chip present, or largely incompatible</value>
+ <value number="1">82C710</value>
+ <value number="2">82C711</value>
+ <value number="3">SMC'665</value>
+ <value number="4">SMC'669</value>
+ <value number="5">UMC'669</value>
+</value-table></bit>
+ <bit number="24-31">Reserved</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Extra features mask:
+  <bitfield-table>
+ <bit number="0-3">IDE interface features (all reserved)</bit>
+ <bit number="4-7">Floppy interface features (all reserved)</bit>
+ <bit number="8-11">Parallel port features:
+   <bitfield-table>
+ <bit number="8">Fast parallel present</bit>
+ <bit number="9-11">Reserved</bit>
+</bitfield-table></bit>
+ <bit number="12-15">1st serial port features:
+   <bitfield-table>
+ <bit number="12">FIFOs available</bit>
+ <bit number="13-15">Reserved</bit>
+</bitfield-table></bit>
+ <bit number="16-19">2nd serial port features:
+   <bitfield-table>
+ <bit number="16">FIFOs available</bit>
+ <bit number="17-19">Reserved</bit>
+</bitfield-table></bit>
+ <bit number="20-23">Chip configuration (all reserved)</bit>
+ <bit number="24-31">Reserved</bit>
+</bitfield-table></register-use>
+ <register-use number="2-4">0</register-use>
+</exit>
+<use>
+<p>
+This SWI has been updated to reflect the modern usage of the hardware IO chips used in RISC OS systems to date. It will return 0 in all fields for non-82C710-compatible chipsets. See PRM 1-723 and PRM 5a-221 for more details.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ReadSysInfo"
+                number="58"
+                reason="4"
+                reasonname="OS_ReadSysInfo_EthernetAddress"
+                description="Read machine ethernet address"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">4</register-use>
+</entry>
+<exit>
+ <register-use number="0">Ethernet MAC address word 0, or 0 if not known</register-use>
+ <register-use number="1">Ethernet MAC address word 1, or 0 if not known</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the machine's ethernet address. It should only be used within constrained environments where only a single ethernet network interface is available. This SWI was introduced to allow simpler expansion of systems with only a single network interface. It is recommended that network drivers should only use their own unique MAC address in preference to this value.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ReadSysInfo"
+                number="58"
+                reason="5"
+                reasonname="OS_ReadSysInfo_RawMachineID"
+                description="Read raw machine ID"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">5</register-use>
+</entry>
+<exit>
+ <register-use number="0">Raw machine ID word 0</register-use>
+ <register-use number="1">Raw machine ID word 1</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the raw machine ID as read from the system hardware. No interpretation should be placed upon the value by clients.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ReadSysInfo"
+                number="58"
+                reason="6"
+                reasonname="OS_ReadSysInfo_KernelValues"
+                description="Read kernel values"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">6</register-use>
+ <register-use number="1">Pointer to list of kernel values to read, or 0 to read a single value</register-use>
+ <register-use number="2">Pointer to block to fill in with values, or (if R1 = 0) the single kernel value to read</register-use>
+</entry>
+<exit>
+ <register-use number="2">Block at R2 filled in, or (if R1 was 0) the value of the single item</register-use>
+</exit>
+<use>
+<p>
+This SWI can be used to obtain information about the Kernel's internal variables which it chooses to export. The variables are subject to change and may have caveats on their use. They are only expected to be used by components where the operation required is not supported by defined interfaces. In such cases, using the information provided by OS_ReadSysInfo 6 is preferred over using hard-coded values. Using information provided by more structured interfaces which the OS provides is preferred over using OS_ReadSysInfo 6.
+</p>
+<p>
+The following values are defined. Strictly they are reserved for internal use, but are provided for completeness.
+</p>
+<p><value-table head-number="Value" head-value="Meaning">
+<value number="0">Address of OS page table</value>
+<value number="1">Pointer to number of highest OS page table entry</value>
+<value number="2">Value of page table PPL value for unavailable pages</value>
+<value number="3">Address of physical memory table</value>
+<value number="4">Address of cache cleaner flip-flop</value>
+<value number="5">Address of pointer to internal ticker chain</value>
+<value number="6">Address of pointer to ROM module chain</value>
+<value number="7">Address of pointer to internal dynamic area list</value>
+<value number="8">Address of application space dynamic area node</value>
+<value number="9">Address of pointer to module chain</value>
+<value number="10">Number of entries in SWI hash table</value>
+<value number="11">Address of SWI hash table</value>
+<value number="12">Address of I/O system type flags</value>
+<value number="13">Address of L1 page table (obsolete, see SystemDAs)</value>
+<value number="14">Address of L2 page table (obsolete, see SystemDAs)</value>
+<value number="15">Address of top of UND mode stack (obsolete, see SystemDAs)</value>
+<value number="16">Address of top of SVC mode stack (obsolete, see SystemDAs)</value>
+<value number="17">Address of start of system heap</value>
+<value number="18">Address of Kernel MessageTrans block</value>
+<value number="19">Address of error semaphore</value>
+<value number="20">Address of OS_PrettyPrint dictionary (obsolete, see OS_PrettyPrint)</value>
+<value number="21">Timer 0 latch value</value>
+<value number="22">FastTickerV counts per second</value>
+<value number="23">Address of vector claimants table</value>
+<value number="24">Number of vectors supported</value>
+<value number="25">Address of top of IRQ mode stack (obsolete, see SystemDAs)</value>
+<value number="26">Address of SWI dispatch table</value>
+<value number="27">Address of branch back to OS after SWIs</value>
+</value-table></p><p>
+Any item may return an error, or the value 0 when being read to indicate that it is unavailable.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ReadSysInfo"
+                number="58"
+                reason="7"
+                reasonname="OS_ReadSysInfo_LastAbort"
+                description="Read last abort details"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">7</register-use>
+</entry>
+<exit>
+ <register-use number="0">Preserved</register-use>
+ <register-use number="1">32-bit PC of last abort</register-use>
+ <register-use number="2">32-bit PSR of last abort</register-use>
+ <register-use number="3">Fault address of last abort</register-use>
+</exit>
+<use>
+<p>
+This SWI returns the details about the last failing abort. The fault address is the same as the 32bit PC for a pre-fetch abort. For a data abort, it contains the address whose access caused the abort. Aborts which are handled by other components may occur, and do not update these details. Such aborts are handled by the <reference type="swi" name="OS_AbortTrap" /> interface, or the DynamicArea abort handlers. See the abort trapping and dynamic area documents for more details.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ReadSysInfo"
+                number="58"
+                reason="8"
+                reasonname="OS_ReadSysInfo_PlatformClass"
+                description="Read platform class"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">8</register-use>
+</entry>
+<exit>
+ <register-use number="0">Platform class:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Unknown</value>
+ <value number="1">RiscPC</value>
+ <value number="2">A7000</value>
+ <value number="3">A7000+ (including RiscStation)</value>
+ <value number="4">Allocated to Phoebe</value>
+ <value number="5">Allocated to Pace abstracted kernel based systems</value>
+ <value number="6">Allocated to VirtualRPC</value>
+ <value number="7">A9</value>
+</value-table></register-use>
+ <register-use number="1">Platform feature flags:
+  <bitfield-table>
+ <bit number="0">Supports podule devices</bit>
+ <bit number="1">Supports PCI devices</bit>
+ <bit number="2">Supports additional processors</bit>
+ <bit number="3">Allocated for external use</bit>
+ <bit number="4">Operating system is RAM loaded</bit>
+</bitfield-table></register-use>
+ <register-use number="2">Platform feature support. Bits set in line with values in R0 if feature defined</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read details about the platform upon which the OS is running.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ReadSysInfo"
+                number="58"
+                reason="9"
+                reasonname="OS_ReadSysInfo_ROMInfo"
+                description="Read ROM information"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">9</register-use>
+ <register-use number="1">Item to return:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">OS name</value>
+ <value number="1">Release part number</value>
+ <value number="2">Build date</value>
+ <value number="3">Dealer name</value>
+ <value number="4">User name</value>
+ <value number="5">User address</value>
+ <value number="6">Printable OS description</value>
+ <value number="7+">Reserved</value>
+</value-table></register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to requested string or 0 if item is not defined</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read details about the ROM build and details. It may be used to read additional information about the system in order to provide diagnostics. It is important that privacy concerns be addressed if such information is distributed, particularly if the user name and address fields are to be exported.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ReadSysInfo"
+                number="58"
+                reason="A"
+                reasonname="OS_ReadSysInfo_OSVersion"
+                description="Read OS version"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">10</register-use>
+</entry>
+<exit>
+ <register-use number="0">OS version number * 100</register-use>
+ <register-use number="1">Kernel version number * 100</register-use>
+ <register-use number="2">SystemInit version number and system type:
+  <bitfield-table>
+ <bit number="0-15">Version number</bit>
+ <bit number="16-31">Init type:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">RiscPC</value>
+ <value number="1+">Reserved</value>
+</value-table></bit>
+</bitfield-table></register-use>
+ <register-use number="3">Reserved (0)</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the version number of the Operating System and Kernel. In order to differentiate between the OS as a whole and the Kernel itself, this SWI provides a mechanism for reading the version number of both.
+</p>
+<p>
+The operating system version is contained within the help string for the UtilityModule. This describes the system as a whole. It should be used when checking for the general level of compatibility is required.
+</p>
+<p>
+The Kernel version has, in the past, only been returned by the return from <userinput>OS_Byte 0</userinput> as part of the error report. This interface defines a mechanism by which the version can be obtained without needing to parse a free-format string.
+</p>
+<p>
+The SystemInit version number and system type are returned by the initialisation code and indicate the basic loader which is used to enter the Operating System.
+</p>
+<p>
+The value returned in R3 will be defined in a future version of this call, and should not be interpreted by software.
+</p>
+<p>
+This SWI call is available from Kernel 9.03.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ReadSysInfo"
+                number="58"
+                reason="B"
+                reasonname="OS_ReadSysInfo_DebugFunctions"
+                description="Read debug information"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">11</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to function for debug character output</register-use>
+ <register-use number="1">Pointer to function for debug character input</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the diagnostic functions provided by the SystemInit code in order to debug the system. Usually this is a simple serial I/O stream which is managed by the SystemInit code, although other mechanisms may be employed dependent on hardware. The functions are expected to be called from a privileged mode, although operation in non-privileged modes is at the discretion of the SystemInit code. Both routines expect a small amount of stack to be available.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+<section title="Entry Points">
+<entry-definition name="DebugOutput"
+                  description="Debug character output function"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="SVC"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="0">Character to write to debug stream</register-use>
+</entry>
+<exit>
+ <register-use number="0-3">Corrupted, as is the PSR</register-use>
+</exit>
+<use>
+<p>
+Writes a character to the debug stream. The address of the routine is read with OS_ReadSysInfo 11.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ReadSysInfo" reason="B" />
+</related>
+</entry-definition>
+
+<entry-definition name="DebugInput"
+                  description="Debug character input function"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="SVC"
+                  re-entrant="undefined">
+<entry>
+</entry>
+<exit>
+ <register-use number="0">Character read from debug stream, or -1 if no character available</register-use>
+ <register-use number="1-3">Corrupted, as is the PSR</register-use>
+</exit>
+<use>
+<p>
+Reads a character from the debug stream. The address of the routine is read with OS_ReadSysInfo 11.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ReadSysInfo" reason="B" />
+</related>
+</entry-definition>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the stray bracket in the heading of reason 0, '82710-compatible' to '82C710-compatible' and 'dependant' to 'dependent'. The reason code names (such as OS_ReadSysInfo_OSVersion) are descriptive labels for the reason codes and not names defined by the operating system.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
