@@ -1,0 +1,548 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="DCI4 Statistic Interface">
+<section title="Introduction">
+<p>
+The maintenance of statistics such as "packets transmitted" for a network
+interface can greatly assist the system administrator (or user) in a variety of
+circumstances.
+</p>
+
+<p>
+Traditionally, support for such statistics gathering has been irregular and
+generally limited to direct screen printing. This specification provides a more
+controlled method of presenting statistics to the user, and permits a single
+generic display program to cope with all compliant modules.
+</p>
+
+<p>The following characterise the intentions of this interface specification:</p>
+
+<subsection title="Plus points">
+<p><list>
+<item><p>Simplicity of implementation</p></item>
+<item><p>Single generic statistics display program</p></item>
+<item><p>No essential central information that needs frequent updating</p></item>
+<item><p>Information is for presentation to humans primarily</p></item>
+<item><p>Atomic operations without any latching mechanisms</p></item>
+<item><p>Well behaved with multiple gatherers</p></item>
+<item><p>Well behaved if a supplier unexpectedly disappears</p></item>
+<item><p>Virtually stateless communication</p></item>
+</list></p>
+</subsection>
+
+<subsection title="Minus points">
+<p><list>
+<item><p>Not re-entrant - callbacks or user mode code only</p></item>
+<item><p>Restrictive string model</p></item>
+<item><p>Polled interface, rather than event driven</p></item>
+<item><p>Only simple flat structure to statistics</p></item>
+<item><p>Only really suitable for human display</p></item>
+</list></p>
+</subsection>
+</section>
+
+<section title="Technical Details">
+<subsection title="Basics of operation">
+<p>
+A piece of software that wishes to offer statistics is termed a "supplier". A
+piece of software that obtains statistics from a supplier and presents them to
+the user is termed a "gatherer", and the operation it performs is often
+referred to as "enumerating the statistics". There are typically more suppliers
+than gatherers in a system.
+</p>
+
+<p>
+As part of its normal operations, a supplier maintains a set of statistics. A
+gatherer, typically upon user invocation, enumerates the available suppliers,
+enumerates the statistics supplied by each supplier and then presents this
+information to the user. More dynamic presentation is also possible. A supplier
+is passive (other than its normal operations), whilst the gatherer actively
+seeks out the information to be presented.
+</p>
+
+<p>
+The first stage of enumeration (determining what suppliers are present) is
+performed with a service call, and the second stage (determining what
+statistics are available and their values) is performed through a SWI whose SWI
+number is obtained during the first stage of enumeration. This SWI number is
+used for all stages of operation apart from enumeration itself.
+</p>
+
+<p>
+Each statistic has a number of different pieces of information associated with
+it, forming its description, and a value. The description provides the
+necessary information to access and manipulate the value, including the number
+of bytes of storage required for the value, its type, format and desired
+presentation. The data types supported are boolean, integer and string. An
+unused data type also provides for padding.
+</p>
+
+<p>
+Descriptions and statistics are read in ranges from a lower statistic number to
+an upper statistic number, inclusive. The first statistic of any supplier is
+zero. The highest statistic number of a supplier is obtained when the SWI
+number for a supplier is obtained. A range is always processed atomically by
+the supplier, ensuring consistent values and presentation to a gatherer when so
+required. A supplier indicates the volatility of its statistics and typically
+attempts to group statistics into ranges of the same volatility.
+</p>
+</subsection>
+
+<subsection title="Enumerating suppliers">
+<p>
+The suppliers are enumerated with
+<reference type="service" name="StatisticEnumerate" />. Each supplier allocates
+a small structure from the RMA, initialises it and links it into the linked
+list whose head is pointed to by R0. Whether the supplier adds an entry at the
+head or tail of the list does not matter. If a gatherer requires any specific
+order, then it should explicitly sort the suppliers list itself. A gatherer
+should not cache SWI values across invocations of suppliers, as a module might
+choose a dynamic SWI numbering scheme if it offers multiple effective
+suppliers.
+</p>
+
+<p>In C, the structure is defined as follows:</p>
+<p><extended-example type="c">
+<userinput>typedef struct spctl</userinput><br/>
+<userinput>{</userinput><br/>
+<userinput>  struct spctl    *next;         /* Next structure in list */</userinput><br/>
+<userinput>  unsigned int     i_version;    /* Interface version */</userinput><br/>
+<userinput>  unsigned long    features;     /* Combination of SF_ values */</userinput><br/>
+<userinput>  unsigned int     swinumber;    /* The SWI SA_DESCRIBE/SA_READ use */</userinput><br/>
+<userinput>  unsigned int     max_stat;     /* Highest stat number (inclusive) */</userinput><br/>
+<userinput>  unsigned int     type;         /* Acorn assigned supplier type */</userinput><br/>
+<userinput>  unsigned int     s_version;    /* Supplier version */</userinput><br/>
+<userinput>  char            *module;       /* Module name (short one) */</userinput><br/>
+<userinput>  char            *title;        /* Title string - short */</userinput><br/>
+<userinput>  char            *description;  /* Descriptive string - long */</userinput><br/>
+<userinput>  unsigned char    reset[8];     /* Unique for each invocation */</userinput><br/>
+<userinput>} dci4_spctl;</userinput>
+</extended-example></p>
+<p>and its fields are:</p>
+<p><offset-table>
+<offset number="0" name="next">Pointer to the next structure in the list. This field is used to construct the linked list of suppliers for the enumeration operation. A value of zero indicates the end of the list.</offset>
+<offset number="4" name="i_version">The DCI4 Statistic Interface version that the supplier is implemented against. This is version 101.</offset>
+<offset number="8" name="features">A bitset of flags defining optional aspects of a supplier. Values are detailed elsewhere.</offset>
+<offset number="12" name="swinumber">The SWI number through which all other communication with the supplier is performed.</offset>
+<offset number="16" name="max_stat">The highest statistic number, inclusive, that the supplier provides. This implies a supplier must always supply at least one statistic.</offset>
+<offset number="20" name="type">This field is available to provide some classification of suppliers. It is the only centrally administered resource in this specification, and its use is optional. The currently defined values are given below.</offset>
+<offset number="24" name="s_version">This is the version number of the supplier module itself (as opposed to the version number of an interface it conforms to). It is provided for the convenience of the user.</offset>
+<offset number="28" name="module">Pointer to the supplier's module title (as opposed to its help string).</offset>
+<offset number="32" name="title">Pointer to a short descriptive string to identify the supplier to the user. The gatherer only contracts to print at least the first twenty characters of this string.</offset>
+<offset number="36" name="description">Pointer to a longer description of the supplier that should convey its purpose to the user. The gatherer only contracts to print at least the first fifty characters of this string.</offset>
+<offset number="40" name="reset[8]">This 8 byte field is initialised with a unique value each time the supplier is initialised. It permits the gatherer to spot a supplier that has just re-initialised. The time and date at which the supplier initialises are recommended values to write here. The gatherer performs an 8 byte equality test and otherwise assumes no further format information about these bytes.</offset>
+</offset-table></p>
+<p>The supplier types currently defined are (expressed in C):</p>
+<p><extended-example type="c">
+<userinput>#define SPT_GENERAL_SUPPLIER 0  /* Use this if no other suitable type */</userinput><br/>
+<userinput>#define SPT_NETWORK_PROTOCOL 1  /* A DCI4 protocol module */</userinput><br/>
+<userinput>#define SPT_NETWORK_DRIVER   2  /* A DCI4 device driver module */</userinput><br/>
+<userinput>#define SPT_MBUF_MANAGER     3  /* The DCI4 mbuf manager module */</userinput>
+</extended-example></p>
+<p>
+When a gatherer has finished interacting with a supplier, it should free the
+allocated structure back into the RMA.
+</p>
+</subsection>
+
+<subsection title="Communicating with a supplier">
+<p>
+Apart from the enumeration phase, all communication with a supplier is
+performed through the single SWI number obtained during the enumeration phase.
+The action performed by this "statistic SWI" is controlled by R0 on entry,
+which contains an action code. The defined action codes are:
+</p>
+<p><extended-example type="pseudo">
+<userinput>SA_DESCRIBE      0</userinput><br/>
+<userinput>SA_READ          1</userinput>
+</extended-example></p>
+<p>
+SA_DESCRIBE obtains descriptions of statistics, whilst SA_READ obtains the
+actual values of statistics. It is necessary to first obtain the description of
+a statistic before reading it, as the description is the only way the gatherer
+can obtain the size of the statistic value and know how much buffer space to
+allocate.
+</p>
+
+<p>
+The register usage for both SA_DESCRIBE and SA_READ is very similar. In
+essence, both these actions enumerate information about a range of statistics
+into the buffer supplied. This is performed atomically, where necessary, by the
+supplier. In both cases, the operation starts from the first statistic and
+proceeds in steps of one and stops once the last statistic has been processed.
+Output is placed into the buffer supplied. If this buffer is not big enough for
+the requested range of statistics, then processing will stop when it is no
+longer possible to write all the necessary information for a statistic (ie if
+the buffer supplied is not big enough, the number of unused bytes will be less
+than the size of a statistic description). Return values of the number of
+statistics processed and the number of bytes of the buffer used are returned.
+The buffer must be word aligned in memory.
+</p>
+</subsection>
+
+<subsection title="Statistic descriptions">
+<p>Each statistic is described with a fixed sized buffer, described in C as follows:</p>
+<p><extended-example type="c">
+<userinput>typedef struct stdesc</userinput><br/>
+<userinput>{</userinput><br/>
+<userinput>  int           type;          /* ST_ series */</userinput><br/>
+<userinput>  unsigned int  format;        /* SxF_ series */</userinput><br/>
+<userinput>  unsigned int  presentation;  /* SxP_ series */</userinput><br/>
+<userinput>  unsigned int  size;          /* Measured in bytes */</userinput><br/>
+<userinput>  unsigned int  volatility;    /* SV_ series */</userinput><br/>
+<userinput>  char         *name;          /* String is static */</userinput><br/>
+<userinput>  unsigned int  name_tag;      /* See specification */</userinput><br/>
+<userinput>  unsigned int  spare;         /* Unused. Always zero */</userinput><br/>
+<userinput>} dci4_stdesc;</userinput>
+</extended-example></p>
+<p>and its fields are:</p>
+<p><offset-table>
+<offset number="0" name="type">The type of statistic (the ST_ series, given below).</offset>
+<offset number="4" name="format">A value indicating the format of the value. The range of values is specific to each type (all the integer types share a common set of formats and presentations for convenience). Depending upon the type in question, this value may be an enumeration, a bitset of flags or a combination of both (none of the currently defined formats mix enumeration and flag bitsets).</offset>
+<offset number="8" name="presentation">How the supplier would like the value to be presented. A gatherer may choose to ignore this value, but only at the risk of presenting the user with incoherent information.</offset>
+<offset number="12" name="size">The number of bytes the statistic wishes reserved in the buffer for an SA_READ operation. It is always a multiple of four bytes. It is sometimes larger than the actual value necessary.</offset>
+<offset number="16" name="volatility">How volatile a statistic is (the SV_ series, given below).</offset>
+<offset number="20" name="name">Pointer to the name of the statistic. It is a short descriptive string that the gatherer contracts to display at least the first twenty characters of. The string itself is static, zero byte terminated and contained with the supplier module.</offset>
+<offset number="24" name="name_tag">This value, together with the information contained in the dci4_spctl structure and a ISV/IHV supplied data file permit the gatherer to obtain a description of a statistic. The precise mechanism has yet to be determined.</offset>
+<offset number="28" name="spare">This field is reserved for future use and will be zero.</offset>
+</offset-table></p>
+<p>The possible values of the type field are:</p>
+<p><extended-example type="c">
+<userinput>#define ST_UNUSED           0</userinput><br/>
+<userinput>#define ST_BOOLEAN          1</userinput><br/>
+<userinput>#define ST_STRING           2</userinput><br/>
+<userinput>#define ST_INTEGER8         3</userinput><br/>
+<userinput>#define ST_INTEGER16        4</userinput><br/>
+<userinput>#define ST_INTEGER32        5</userinput><br/>
+<userinput>#define ST_INTEGER64        6</userinput><br/>
+<userinput>#define ST_ADDRESS          7</userinput><br/>
+<userinput>#define ST_TIME             8</userinput>
+</extended-example></p>
+<p>The three possible values of the volatility field are:</p>
+<p><extended-example type="c">
+<userinput>#define SV_STATIC           0       /* Constant per invocation */</userinput><br/>
+<userinput>#define SV_VARIABLE         1       /* Unlikely to have changed in 5 minutes */</userinput><br/>
+<userinput>#define SV_VOLATILE         2       /* Can change very rapidly */</userinput>
+</extended-example></p>
+</subsection>
+
+<subsection title="Statistic types">
+<subsubsection title="ST_UNUSED">
+<p>
+ST_UNUSED is used by a supplier to reserve a statistic number. Such a statistic
+always has a value occupying zero bytes, and hence can always be enumerated, no
+matter how many bytes are left in the caller supplied buffer. A statistic with a
+type of ST_UNUSED should always be skipped over when printing and enumerating -
+none of the fields beyond the type and size fields are valid for unused
+statistics.
+</p>
+</subsubsection>
+
+<subsubsection title="ST_BOOLEAN">
+<p>
+ST_BOOLEAN values are single bit boolean values. A variety of different
+presentation methods may be selected by the supplier in order to maximise
+coherence between the description and the presentation of a boolean value. Only
+the least significant bit of a boolean type has a defined value.
+</p>
+
+<p>The formats which this type uses are:</p>
+<p><value-table head-number="Format" head-value="Meaning">
+<value number="SBF_NORMAL (0)">The value supplied is 0 if boolean 'false' and any other value for boolean 'true'.</value>
+<value number="SBF_INVERTED (1)">The boolean state is inverted, 0 if boolean 'true' and any other value for boolean 'false'.</value>
+</value-table></p>
+<p>The presentations which this type uses are:</p>
+<p><value-table head-number="Presentation" head-value="Meaning">
+<value number="SBP_ON_OFF (0)">The strings 'on' and 'off' will be used.</value>
+<value number="SBP_YES_NO (1)">The strings 'yes' and 'no' will be used.</value>
+<value number="SBP_TRUE_FALSE (2)">The strings 'true' and 'false' will be used.</value>
+<value number="SBP_ALWAYS_NEVER (3)">The strings 'always' and 'never' will be used.</value>
+<value number="SBP_ONE_ZERO (4)">The strings '1' and '0' will be used.</value>
+</value-table></p>
+</subsubsection>
+
+<subsubsection title="ST_STRING">
+<p>
+ST_STRING values are string values. Currently, strings are defined using a zero
+byte as a terminator character (later versions may well introduce counted
+length strings as well). A supplier is required to be able to place an upper
+length value on all strings so that sufficient space may be allocated within
+the caller supplied buffer for the SA_READ operation.
+</p>
+
+<p>The formats which this type uses are:</p>
+<p><value-table head-number="Format" head-value="Meaning">
+<value number="SSF_ZEROTERM (0)">This is the only defined format, indicating that the string is zero-terminated.</value>
+</value-table></p>
+<p>The presentations which this type uses are:</p>
+<p><value-table head-number="Presentation" head-value="Meaning">
+<value number="SSP_LITERAL (0)">The string should be presented as supplied.</value>
+</value-table></p>
+</subsubsection>
+
+<subsubsection title="ST_INTEGERx">
+<p>
+ST_INTEGERx values are all integer values. A variety of different sized
+integers are supported to suit different requirements. A flexible set of
+presentation methods is supported.
+</p>
+
+<p>The formats which this type uses are a bit field:</p>
+<p><value-table head-number="Format" head-value="Meaning">
+<value number="SIF_UNSIGNED (0x01)">If this bit is set, the value is unsigned. If this bit is clear, the value is signed.</value>
+<value number="SIF_BIGENDIAN (0x02)">If this bit is set, the value is supplied as big-endian. If this bit is clear, the value is supplied as little-endian.</value>
+</value-table></p>
+<p>The presentations which this type uses are:</p>
+<p><value-table head-number="Presentation" head-value="Meaning">
+<value number="SIP_HEXADECIMAL (0)">The value should be presented as a hexadecimal number.</value>
+<value number="SIP_DECIMAL (1)">The value should be presented as a decimal number.</value>
+<value number="SIP_DOTTED (2)">The value should be presented separating every octet with a '.' character. This was intended for use for addresses; it has been superseded by the ST_ADDRESS type.</value>
+</value-table></p>
+</subsubsection>
+
+<subsubsection title="ST_ADDRESS">
+<p>
+ST_ADDRESS values are network address values. A number of different formats of
+address are supported. This type is only available in version 1.01 of the
+statistics interface.
+</p>
+
+<p>The formats which this type uses are:</p>
+<p><value-table head-number="Format" head-value="Meaning">
+<value number="SAF_ETHERNET (0)">The value is a 6 byte MAC address. A value of 0 indicates no address.</value>
+<value number="SAF_IP (1)">The value is a 4 byte IP address. A value of 0 indicates no address.</value>
+<value number="SAF_ECONET (2)">The value is a 2 byte (net.station) address.</value>
+</value-table></p>
+<p>The presentations which this type uses are:</p>
+<p><value-table head-number="Presentation" head-value="Meaning">
+<value number="SAP_NORMAL (0)">There is only this presentation type.</value>
+</value-table></p>
+</subsubsection>
+
+<subsubsection title="ST_TIME">
+<p>
+ST_TIME values are times when events occurred, or will occur. This type is only
+available in version 1.01 of the statistics interface.
+</p>
+
+<p>The formats which this type uses are:</p>
+<p><value-table head-number="Format" head-value="Meaning">
+<value number="STF_5BYTE (0)">The value is a standard 5 bytes format (8 bytes, top 3 bytes ignored), measured in centiseconds since 00:00 1st January 1900.</value>
+<value number="STF_CTIME (1)">The value is a C time() value, measured in seconds since 00:00 1st January 1970.</value>
+<value number="STF_MONOTONIC (2)">The value is a centisecond value, as used by OS_ReadMonotonicTime, measured in centiseconds since the system started.</value>
+</value-table></p>
+<p>The presentations which this type uses are:</p>
+<p><value-table head-number="Presentation" head-value="Meaning">
+<value number="STP_ABSOLUTE (0)">The values are absolute and should be presented as time values from their reference base. An absolute value of 0 indicates that no time has been specified.</value>
+<value number="STP_RELATIVE (1)">The values are relative to the current time, and the reference base should be ignored. For example, a value of 250 in format STF_MONOTONIC might be presented as '2.50 seconds'. A relative value of 0 indicates that no period has been given.</value>
+</value-table></p>
+</subsubsection>
+</subsection>
+
+<subsection title="Ping pong atomicity">
+<p>
+The supplier is required to perform each read request atomically. This means a
+gatherer can rely upon a read operation producing consistent statistics, but it
+cannot be certain quite when in time these statistics apply to; in some cases,
+statistics are virtually always out of date by the time the gatherer obtains and
+uses them.
+</p>
+
+<p>
+The simplistic approach to ensuring an atomic read operation is to perform the
+entire action with interrupts disabled. This, however, has an undesirable effect
+on interrupt latency for suppliers with many or complex statistics and is not
+recommended.
+</p>
+
+<p>
+The suggested method is a three buffer scheme. One buffer holds the accumulated
+statistics, the second holds the increments (deltas) being generated "live",
+and the third is either entirely full of zero values, or there is an active read
+operation in progress and it holds a previous set of increments that are
+currently being added (merged) into the accumulated values.
+</p>
+
+<p>
+Two pointers are maintained. One for the "live" buffer and the other for the
+"merge" buffer. The operation that is necessary to perform atomically is the
+swapping of these two pointer values.
+</p>
+
+<p>The overall structure suggested is as follows:</p>
+<p><extended-example type="pseudo">
+<userinput>start thread of control (ie SWI)</userinput><br/>
+<userinput>    enter mutex (eg disable interrupts)</userinput><br/>
+<userinput>        temp := buffer pointer 1</userinput><br/>
+<userinput>        buffer pointer 1 := buffer pointer 2</userinput><br/>
+<userinput>        buffer pointer 2 := temp</userinput><br/>
+<userinput>    exit mutex (and ensure interrupts enabled)</userinput><br/>
+<userinput>    add values from buffer pointer 2 into the accumulated values</userinput><br/>
+<userinput>    zero the memory described by buffer pointer 2</userinput><br/>
+<userinput>end thread of control (ie SWI)</userinput>
+</extended-example></p>
+<p>
+This maximises the usefulness of the non re-entrancy requirement and requires
+ONLY the swapping of the buffer pointers to be performed atomically. All other
+operations can proceed with interrupts enabled. This minimal critical region is
+the prime motivation behind this scheme.
+</p>
+</subsection>
+
+<subsection title="Additional notes">
+<p>
+Some applications of the statistic interface will require a single RISC OS
+module to behave as multiple suppliers. For example, a device driver module that
+controls multiple interfaces might well wish to provide an overall set of
+statistics, and then an instance of a set of statistics per interface
+controlled. A separate SWI number is required for each 'effective supplier'.
+This is not normally a problem, as very few modules approach the limit of the 64
+separate SWIs allocated. Gatherers are expected to obtain SWI numbers through
+the enumeration method supplied, and should be capable of handling dynamic SWI
+number assignment. For example, a device driver may choose SWIs 63, 62 and 61
+for units 0, 1 and 2, respectively. If a gatherer were to attempt to 'cache'
+these SWI numbers across invocations of the device driver, then it might not
+correctly cater for the addition or removal of interfaces.
+</p>
+</subsection>
+</section>
+
+<section title="Service Calls">
+<service-definition name="StatisticEnumerate" number="A1"
+                    description="List available statistic suppliers">
+<entry>
+ <register-use number="0">0</register-use>
+ <register-use number="1">&hex;A1 (Service_StatisticEnumerate)</register-use>
+</entry>
+<exit>
+ <register-use number="0">NULL terminated head of linked list of structures</register-use>
+ <register-use number="1" state="preserved"/>
+</exit>
+<use>
+<p>
+Each supplier allocates a small structure from the RMA, initialises it and
+links it into the linked list whose head is pointed to by R0. See
+<reference type="subsection" name="Enumerating suppliers">Enumerating suppliers</reference>
+for the structure.
+</p>
+</use>
+<related>
+<reference type="entry" name="StatisticSWI" reason="0" />
+<reference type="entry" name="StatisticSWI" reason="1" />
+</related>
+</service-definition>
+</section>
+
+<section title="Entry points">
+<entry-definition name="StatisticSWI"
+                  reason="0"
+                  reasonname="SA_DESCRIBE"
+                  description="Obtain descriptions of a range of statistics"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="no">
+<entry>
+ <register-use number="0">0 (SA_DESCRIBE)</register-use>
+ <register-use number="1">First statistic, inclusive</register-use>
+ <register-use number="2">Last statistic, inclusive</register-use>
+ <register-use number="3">First byte of buffer in memory</register-use>
+ <register-use number="4">Number of bytes in buffer</register-use>
+</entry>
+<exit>
+ <register-use number="5">Number of statistics processed</register-use>
+ <register-use number="6">Number of bytes of buffer used</register-use>
+</exit>
+<use>
+<p>
+This is the action of the statistic SWI (the SWI whose number is the
+swinumber of the supplier) which writes a dci4_stdesc structure for each
+statistic in the range into the buffer. The description of a statistic must be
+read before its value, as it gives the size of the value. The buffer must be
+word aligned, and the SWI is not re-entrant.
+</p>
+</use>
+<related>
+<reference type="entry" name="StatisticSWI" reason="1" />
+</related>
+</entry-definition>
+
+<entry-definition name="StatisticSWI"
+                  reason="1"
+                  reasonname="SA_READ"
+                  description="Obtain the values of a range of statistics"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="no">
+<entry>
+ <register-use number="0">1 (SA_READ)</register-use>
+ <register-use number="1">First statistic, inclusive</register-use>
+ <register-use number="2">Last statistic, inclusive</register-use>
+ <register-use number="3">First byte of buffer in memory</register-use>
+ <register-use number="4">Number of bytes in buffer</register-use>
+</entry>
+<exit>
+ <register-use number="5">Number of statistics processed</register-use>
+ <register-use number="6">Number of bytes of buffer used</register-use>
+</exit>
+<use>
+<p>
+This is the action of the statistic SWI which writes the value of each
+statistic in the range into the buffer, using the number of bytes given in the
+size field of its description. The range is read atomically by the supplier.
+The buffer must be word aligned, and the SWI is not re-entrant.
+</p>
+</use>
+<related>
+<reference type="entry" name="StatisticSWI" reason="0" />
+</related>
+</entry-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+  <p>Copyright (C) 1994 ANT Limited., PO BOX 300, Cambridge, England. All rights reserved.</p>
+  <p>Redistribution and use in source code and executable binary forms are permitted provided that: (1) source distributions retain this entire copyright notice and comment, and (2) distributions including executable binaries contain the following acknowledgement:</p>
+  <p>"This product includes software developed by ANT Limited and its contributors. Copyright (C) ANT Limited 1994."</p>
+  <p>and also in the documentation and other materials provided with the distribution and in all advertising materials mentioning features or use of this software. Neither the name of ANT Limited nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.</p>
+  <p>This software is provided "as is" and without any express or implied warranties, including, without limitation, the implied warranties of merchantability and fitness for a particular purpose.</p>
+  <p>Not intended for use in life critical applications.</p>
+  <p>PRM-in-XML conversion &copy; Gerph, 2013-2026.</p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="Borris" date="23 Sep 1994" title="Issue 1">
+    <change>Tried to get the basic ideas into a coherent document.</change>
+  </revision>
+  <revision number="2" author="Borris" date="25 Sep 1994" title="Issue 2">
+    <change>Changed precise details of register updating on return from some of the swi operations.</change>
+  </revision>
+  <revision number="3" author="Borris" date="Oct 1994" title="Issue 3">
+    <change>Listened to feedback from reviewers. Adjust underlying model and streamlined most aspects. Added details of suggested scheme for atomic sampling. This issue not widely distributed.</change>
+  </revision>
+  <revision number="4" author="Borris" date="7 Nov 1994" title="Issue 4">
+    <change>Tidied up and checked consistency with reference header file. Added correct service call number. Added comments about effective suppliers and dynamic SWI number possibilities. name_tag as being outstanding added.</change>
+  </revision>
+  <revision number="5" author="Justin Fletcher" date="16 Apr 2003" title="Issue 5">
+    <change>Added time and address statistic types. Version number updated to 1.01.</change>
+  </revision>
+  <revision number="6" author="gerph" date="3 Nov 2015" title="HTML version">
+    <change>Captured as HTML document version 1.03.</change>
+  </revision>
+  <revision number="7" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>The structure field tables give the offsets of the fields; the description of STF_MONOTONIC now says that the value is measured in centiseconds since the system started, as its own example requires.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
