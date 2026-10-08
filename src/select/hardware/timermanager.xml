@@ -57,6 +57,7 @@ Many of the SWIs take a number of flags to indicate the measurement format of th
             <p>
                 <value-table>
                     <value number="0">Invalid</value>
+                    <value number="1">Scaled by 1/1000000000</value>
                     <value number="2">Scaled by 1/1000000</value>
                     <value number="3">Scaled by 1/1000</value>
                     <value number="4">Scaled by 1</value>
@@ -322,6 +323,9 @@ An error will be returned if the meaurement format used for return in R0 bits 8-
  <history>
   <revision number="1" author="Gerph" date="17 Nov 2022" title="Initial version">
     <change>Created from Select technical documentation.</change>
+  </revision>
+  <revision number="2" author="Gerph" date="8 Oct 2026" title="Supplemented with the original documentation">
+    <change>Added the unit scaler value 1 (scaled by 1/1000000000), from the original documentation (captured as HTML document version 1.03, 3 Nov 2015).</change>
   </revision>
  </history>
 
