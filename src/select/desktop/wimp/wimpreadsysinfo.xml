@@ -1,0 +1,344 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Wimp_ReadSysInfo">
+<section title="Introduction and Overview">
+<p>
+Wimp_ReadSysInfo provides a generic means of reading various details from the Window Manager about its capabilities, configuration and operation. The SWI has been extended in most versions of the module to cover the new features and allow them to be used in a more robust and reliable manner.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+With Select 3 the list has again been extended to cover new features which have been introduced. For completeness, the full list of reasons that this SWI may take are (see elsewhere for details of their use) :
+</p>
+<p><value-table head-number="Reason" head-value="Meaning">
+<value number="0">Read number of active tasks</value>
+<value number="1">Read current Wimp mode</value>
+<value number="2">Read suffix to append to filenames</value>
+<value number="3">Read status of command window</value>
+<value number="4">Current write direction</value>
+<value number="5">Current task handle</value>
+<value number="6">Reserved for internal use</value>
+<value number="7">Wimp version number</value>
+<value number="8">Outline font being used as system font</value>
+<value number="9">Toolsprites sprite area</value>
+<value number="10">Reserved for internal use</value>
+<value number="11">Application space size</value>
+<value number="12">Reserved for internal use</value>
+<value number="13">Reserved for internal use</value>
+<value number="14">Reserved for internal use</value>
+<value number="15">Reserved for internal use</value>
+<value number="16">Read user/ROM sprite pools</value>
+<value number="17">Default autoscroll pause delay</value>
+<value number="18">Reserved for internal use</value>
+<value number="19">Read low/high/priority sprite pools</value>
+<value number="20">Read special highlighting colours</value>
+<value number="21">Read text selection details</value>
+<value number="22">Read default caret colour</value>
+<value number="23">Read mouse drag detection settings</value>
+<value number="24">Read double click detection settings</value>
+<value number="25">Read auto-menu opening settings</value>
+<value number="26">Read iconbar speed and acceleration</value>
+<value number="27">Read screen edge notification settings</value>
+</value-table></p><p>
+Any reason which is not understood by the WindowManager will return an error. The new Wimp_ReadSysInfo calls are documented here :
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="Wimp_ReadSysInfo"
+                number="400F2"
+                reason="13"
+                reasonname="Wimp_ReadSysInfo_BaseOfSprites2"
+                description="Read the sprite pools used to locate sprites"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">19 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to priority sprite pool</register-use>
+ <register-use number="1">Pointer to high sprite pool</register-use>
+ <register-use number="2">Pointer to low sprite pool</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the sprite pools being used to locate sprites. The sprites are searched in the order 'priority', 'high', 'low' before the sprite is declared not found. The 'priority' sprite pool can be added to with the <userinput>*IconSprites -priority</userinput> command. The 'high' sprite pool is the pool to be looked at first. If 'Protect ROM sprites' is enabled, the 'high' pool is the ROM pool, and the 'low' pool is the standard RAM pool. If 'Protect ROM sprites' is disabled, the 'high' pool is the RAM pool, and the 'low' pool is the ROM pool.
+</p>
+<p>
+This call is provided for information only.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_ReadSysInfo"
+                number="400F2"
+                reason="14"
+                reasonname="Wimp_ReadSysInfo_HighlightColours"
+                description="Read the special highlighting colours"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">20 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Special highlighting background colour, or -1 if disabled</register-use>
+ <register-use number="1">Special highlighting foreground colour if R0 = -1</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the 'special' highlighting colours defined with <userinput>*WimpVisualFlags</userinput>. The special highlighting colours are used when an icon uses the 'standard' colours (background of grey 1, and foreground of black) and is selected. This can make selections easier to see for the user. Where applications render icons themselves (without the WindowManager's interaction) it may be necessary to read these settings to ensure that the application follows the users configured choices.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_ReadSysInfo"
+                number="400F2"
+                reason="15"
+                reasonname="Wimp_ReadSysInfo_TextSelection"
+                description="Read the text selection colours and flags"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">21 (reason code)</register-use>
+ <register-use number="2">1</register-use>
+</entry>
+<exit>
+ <register-use number="0">Text selection background colour, or -1 if selection colours disabled</register-use>
+ <register-use number="1">Text selection foreground colour if R0 = -1</register-use>
+ <register-use number="2">Text selection flags:
+  <bitfield-table>
+ <bit number="0">Text selections are enabled</bit>
+ <bit number="1-2">Operation on text insert:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">No operation, leave selection alone</value>
+ <value number="1">Delete selection</value>
+ <value number="2">Clear selected region</value>
+ <value number="3">Cut selection</value>
+</value-table></bit>
+ <bit number="3-4">Operation on text delete (as above)</bit>
+ <bit number="5-6">Operation on caret move within icon (as above)</bit>
+ <bit number="7">Auto-select text on caret entering icon</bit>
+ <bit number="8-31">Reserved for future expansion</bit>
+</bitfield-table></register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the text selection colours and flags, as defined with <userinput>*WimpTextSelection</userinput>. The text selection colours are used for selections of text made by the user in writable icons. Applications drawing text themselves (without the WindowManager's interaction) may need to read the settings with this call in order to ensure that it follows the users configured choices.
+</p>
+<p>
+Under some versions of the WindowManager the flags were not returned in this call and it is therefore necessary to supply a sensible default in R2. It is recommended that R2 be set to 1 to indicate that text selections are enabled as a standard default.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_ReadSysInfo"
+                number="400F2"
+                reason="16"
+                reasonname="Wimp_ReadSysInfo_CaretColour"
+                description="Read the default caret colour"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">22 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Default caret colour, or -1 if standard colour in use (Wimp 11)</register-use>
+ <register-use number="1">Actual caret colour (R0, or colour value of Wimp 11 if standard colour is in use)</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the default caret colour. The default caret colour under earlier versions of the WindowManager has been Wimp 11 (red), but this can be modified by the user to allow for cases where the standard colour is not visible. This may also be used to better match the selection colours used by the user. The colour may be changed by <userinput>*WimpVisualFlags</userinput>.
+</p>
+<p>
+On earlier systems, this call will generate an error.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_ReadSysInfo"
+                number="400F2"
+                reason="17"
+                reasonname="Wimp_ReadSysInfo_DragSettings"
+                description="Read the settings used to detect a drag"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">23 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="0">OS units movement which will cancel a drag</register-use>
+ <register-use number="1">Delay with button pressed before a drag is detected (cs)</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the settings used to detect a drag. The settings are configured through <userinput>*Configure WimpDragMove</userinput> and <userinput>WimpDragDelay</userinput>.
+</p>
+<p>
+On earlier systems, this call will generate an error.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_ReadSysInfo"
+                number="400F2"
+                reason="18"
+                reasonname="Wimp_ReadSysInfo_DoubleClickSettings"
+                description="Read the settings used to detect a double-click"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">24 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="0">OS units movement which will cancel a double click</register-use>
+ <register-use number="1">Delay between clicks for which a double click will be detected (cs)</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the settings used to detect a double-click. The settings are configured through <userinput>*Configure WimpDoubleClickMove</userinput> and <userinput>WimpDoubleClickDelay</userinput>. It is expected that clients implementing multiple clicks (for example triple or quadruple clicks) will require these settings in order to follow the configured behaviour of the Wimp.
+</p>
+<p>
+On earlier systems, this call will generate an error.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_ReadSysInfo"
+                number="400F2"
+                reason="19"
+                reasonname="Wimp_ReadSysInfo_AutoMenuSettings"
+                description="Read the settings used to open submenus automatically"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">25 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Delay over a menu item after which the menu will open (cs)</register-use>
+ <register-use number="1">Delay after an automatic open for which mouse moves are ignored (cs)</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the settings used to detect whether a submenu entry should be opened automatically. The settings are configured through <userinput>*Configure WimpAutoMenuDelay</userinput> and <userinput>*Configure WimpMenuDragDelay</userinput>. It is expected that clients providing a private implementation of menu-like dialogues will require these settings in order to follow the configured behaviour of the Wimp.
+</p>
+<p>
+On earlier systems, this call will generate an error.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_ReadSysInfo"
+                number="400F2"
+                reason="1A"
+                reasonname="Wimp_ReadSysInfo_IconBarScroll"
+                description="Read the settings used to scroll the iconbar"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">26 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Speed of iconbar scrolling (OS units/second)</register-use>
+ <register-use number="1">Acceleration of iconbar scrolling (OS units/second^2)</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the settings used to scroll the iconbar when the mouse is at its edge. The settings are configured through <userinput>*Configure WimpIconBarSpeed</userinput> and <userinput>*Configure WimpIconBarAcceleration</userinput>.
+</p>
+<p>
+On earlier systems, this call will generate an error.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_ReadSysInfo"
+                number="400F2"
+                reason="1B"
+                reasonname="Wimp_ReadSysInfo_ScreenEdge"
+                description="Read the screen edge notification settings"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">27 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Delay at edge of the screen before a notification is issued (cs)</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the settings used to notify applications that the mouse has idled at the edge of the screen. This setting is not presently configurable.
+</p>
+<p>
+On earlier systems, this call will generate an error.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the entry register of Wimp_ReadSysInfo 26, which was given as 'R0 = 25'; the reason numbers of the full list, lost from the captured HTML, were restored. The reason code names (such as Wimp_ReadSysInfo_ScreenEdge) are descriptive labels for the reason codes and not names defined by the operating system.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
