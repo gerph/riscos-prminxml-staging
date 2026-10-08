@@ -1,0 +1,410 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Hardware IRQ handler">
+<section title="Introduction">
+<p>
+The IRQ module provides the IRQ servicing interface for RISC OS. In the past, this task has always been provided by the Kernel. From Kernel 10.00 onward, the task of decoding and despatching IRQs to devices is handled by the IRQ module.
+</p>
+<p>
+Developers reading this section should ensure that they are familiar with the OS_ClaimDeviceVector interface and its related documentation (PRM-117, 'Interrupts and handling them').
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Core IRQ handler">
+<p>
+The Core IRQ handler replaces the SWIs OS_ClaimDeviceVector and OS_ReleaseDeviceVector, providing an interface to claim and release devices. The Core IRQ handler provides the main functions necessary to communicate with the IRQ controllers within the system in order to determine which devices are interrupting and to despatch to the relevant routines.
+</p>
+<subsubsection title="Registration">
+<p>
+In order to register a new IRQ handler with the Kernel, a variation of the standard OS_ClaimDeviceVector call is used. The device number -1 is used to indicate a core IRQ handler replacement. This interface may be provided by the IRQ handler module at its discretion. See <reference type="swi" name="OS_ClaimDeviceVector" /> and <reference type="swi" name="OS_ReleaseDeviceVector" />.
+</p>
+</subsubsection>
+
+<subsubsection title="Invocation">
+<p>
+The core IRQ handler will be called by the Kernel to handle an IRQ. The handler must either handle the IRQ such that the interrupting device ceases interrupting or disable the necessary hardware interrupt lines in order that the interrupt does not recur. The means by which this is done is that clients will register device handlers with OS_ClaimDeviceVector and these will be dispatched by the core IRQ handler. The interface for this registration and dispatch is described in a later section.
+</p>
+<p>
+The core IRQ handler is called by the Kernel after the following operations have been performed :
+</p>
+<p><list>
+<item><p>The interrupting address, PSR and a number of registers are placed on the stack.</p></item>
+<item><p>IRQs are disabled (and in 26bit systems, IRQ26 mode is entered)</p></item>
+<item><p>Where the interrupt occurred during a deferred page table mapping operation, the cache and TLBs will be flushed.</p></item>
+<item><p>The IRQ semaphore will be set.</p></item>
+</list></p><p>
+After the core IRQ handler returns, the Kernel performs the following operations :
+</p>
+<p><list>
+<item><p>The IRQ semaphore is restored.</p></item>
+<item><p>IRQ32 mode is entered.</p></item>
+<item><p>The callback flag is checked for transient and non-transient callbacks. (these will be despatched as usual if so)</p></item>
+<item><p>The registers are restored and the preserved PSR moved to the SPSR.</p></item>
+<item><p>The return address is restored, and the CPSR updated from the SPSR.</p></item>
+</list></p><p>
+The core IRQ handler is entered as described under <reference type="entry" name="CoreIRQHandler" />. The Core IRQ handler should determine which device is interrupted, using a prioritisation scheme suitable for the hardware, and call the handlers repeatedly until one is claimed. If no handler claims the call the default handler (as returned in R1 on return from the Core IRQ handler registration) should be called and then the interrupt line disabled. The disabling of the interrupt line is necessary to prevent the system entering an infinite loop attempting to service an unhandlable interrupt. The parameters for these device driver routines are described below.
+</p>
+</subsubsection>
+
+</subsection>
+
+<subsection title="Registering a device driver">
+<p>
+Registration of a device driver is performed using the OS_ClaimDeviceVector SWI call. The interface for this is largely unchanged from that of the earlier OS versions (see PRM-1-121). The format of R0 has changed to introduce a number of flags.
+</p>
+<p>
+The flags set on the device number have the following purpose :
+</p>
+<subsubsection title="Bit 31 ('Pass on')">
+<p>
+If set, the driver registered may ignore the interrupt and return with <userinput>MOV pc,lr</userinput>. If they do this, the previous registrant will be called. The driver may accept the interrupt by claiming the call, returning by pulling the return address from the stack. If clear, the driver always claims the call, whether they exit by <userinput>MOV pc,lr</userinput> or by pulling the return address from the stack.
+</p>
+<p>
+This is useful for devices which share interrupt lines on the controller.
+</p>
+</subsubsection>
+
+<subsubsection title="Bit 30 ('Sub-chain')">
+<p>
+This bit is intended for specialist use in order to register a special 'subchain' handler.
+</p>
+<p>
+If clear, the behaviour is unchanged from that described within the PRMs (with the exception of other flag bits).
+</p>
+<p>
+If set, the address supplied in R2 is the head of the sub-chain list. Once a sub-chain has been registered with the Core IRQ driver, all registrants on that vector will be added to the sub-chain. The Sub-chain indicates that the device is special and that R3 and R4 should be used as described within the PRMs.
+</p>
+<p>
+The address supplied in R1 will be called to perform the despatch. If the value in R1 is 0, the default despatch routine will be used.
+</p>
+<p>
+On IOMD systems, this interface is reserved for use by the Podule Manager (although it is currently implemented within the IRQ handler module).
+</p>
+<p>
+Other systems may provide similar implementations for their expansion hardware management modules. Contact your supplier for more details on the implementation of expansion management modules.
+</p>
+</subsubsection>
+
+<subsubsection title="Bit 29 ('Return IRQ enable/disable details')">
+<p>
+If clear, R1 and R2 are preserved on exit from this SWI.
+</p>
+<p>
+If set, R1 and R2 contain a pointer to the routine to enable or disable IRQs within the controllers for a device, and the workspace parameter. The routine is described under <reference type="entry" name="DeviceIRQEnable" />.
+</p>
+<p>
+Not all devices can be enabled and disabled for all IRQ controllers. Consult your hardware for specific details.
+</p>
+</subsubsection>
+
+<p>
+<strong>Note about special handlers:</strong> Although the definition of R3 and R4 is that a byte is referenced, it is dependent on the Core IRQ handler (or sub-chain handler) whether the memory will be accessed with a byte, half-word or word access. Consult the documentation for the hardware specific core IRQ handler.
+</p>
+</subsection>
+
+<subsection title="Deregistering a device driver">
+<p>
+Deregistration of a device driver is performed with OS_ReleaseDeviceVector, using the interface provided in PRM1-123. The device number supplied in R0 has been extended to include a number of flags. Bit 30 is used to remove the top-level sub-chain handler. It is reserved for use by expansion hardware management modules.
+</p>
+</subsection>
+
+<subsection title="Re-registering device drivers">
+<p>
+If the core IRQ module is restarted (or replaced) it will be necessary for devices to re-register themselves. Device drivers must watch for <reference type="service" name="DeviceReregister" />, documented below, and re-register their device claims appropriately.
+</p>
+</subsection>
+
+<subsection title="Device driver routines">
+<p>
+The device driver routines called by the IRQ module are approximately equivalent to those used by earlier versions of RISC OS. In earlier versions of RISC OS the only registers defined on entry were R3 and R12 (the IOC memory space and the workspace parameter supplied at registration), and on exit the routine may corrupt R0-R3 and R12. The new API provides additional information to the handler routine, described under <reference type="entry" name="DeviceDriverRoutine" />.
+</p>
+<p>
+The device driver may claim the interrupt by loading the return parameter from the stack, just as would be done to claim a software vector. For example:
+</p>
+<p><extended-example type="asm">
+<userinput>LDR     pc, [sp], #4</userinput>
+</extended-example></p><p>
+Routines registered with the old interface ('pass on' bit 31 unset) will be treated as having claimed the interrupt regardless of how they return.
+</p>
+</subsection>
+
+<subsection title="Clearing IRQs">
+<p>
+The routine and parameter provided by the IRQ handler in R1 and R2 may be used to clear the IRQ state from the controller. This feature may not be supported by all IRQ controllers, and may not be available for all devices. Where no operation is provided by the core IRQ handler to clear IRQs this will be documented with the IRQ handler and the routine will merely return immediately. The routine corrupts R0-R3 and R12.
+</p>
+<p>
+It is important that IRQs be cleared from their controller's state in the correct order for the hardware. If the hardware must be serviced before the IRQ is cleared, this must be done first.
+</p>
+</subsection>
+
+<subsection title="Hardware-specific Core IRQ handler information">
+<subsubsection title="IOMD Core IRQ handler">
+<p>
+The core IRQ handler for IOMD conforms to the devices list given in PRM 5a-31. All devices can be enabled and disabled using the interface returned by OS_ClaimDeviceVector with R0 bit 29 set.
+</p>
+<p>
+Only devices 0-7 can have their IRQs cleared by the interface returned through the device vector.
+</p>
+<p>
+Special sub-chain handlers are registered for devices 8 (podule FIQ downgrade) and 13 (podule IRQ) and R3 and R4 must be set up appropriately.
+</p>
+<p>
+If a Service_DeviceReregister is received podule device handlers should only register for devices in R0 of 8 and 13. Other device handlers should re-register for their device number or device -1. Most of the extant podule and system device drivers do not obey the Service_DeviceReregister service and replacement of the core IRQ handler on IOMD systems is not recommended.
+</p>
+<p>
+Access to the memory for the special devices used by the sub-chain handlers will be byte-based.
+</p>
+</subsubsection>
+
+</subsection>
+
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_ClaimDeviceVector"
+                number="4B"
+                description="Register a core IRQ handler replacement"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">-1</register-use>
+ <register-use number="1">Pointer to replacement IRQ handler routine</register-use>
+ <register-use number="2">Workspace parameter to pass in R12 to IRQ handler routine</register-use>
+</entry>
+<exit>
+ <register-use number="1">Default routine to call for all unclaimed IRQs</register-use>
+ <register-use number="2">Workspace parameter to pass in R12 to the unclaimed IRQ routine</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to register a core IRQ handler replacement. The IRQ handler should fill its table of IRQ handlers such that the routine returned in R1 (with R2 as a parameter) will be called if no handler has been provided. The IRQ handler may then enable interrupts.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ReleaseDeviceVector" />
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ReleaseDeviceVector"
+                number="4C"
+                description="Release a core IRQ handler"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">-1</register-use>
+ <register-use number="1">Pointer to replacement IRQ handler routine</register-use>
+ <register-use number="2">Workspace parameter to pass in R12 to IRQ handler routine</register-use>
+</entry>
+<exit>
+</exit>
+<use>
+<p>
+This SWI is used to release a core IRQ handler and restore the OS default. The default OS handler will disable IRQs and return to the caller.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ClaimDeviceVector" />
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ClaimDeviceVector"
+                number="4B"
+                description="Register a device driver with the Core IRQ handler"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Device number (bits 0-23) and flags (bits 24-31):
+  <bitfield-table>
+ <bit number="24-28">Reserved, must be 0</bit>
+ <bit number="29">Return IRQ enable/disable routine details</bit>
+ <bit number="30">Register subchain handler</bit>
+ <bit number="31">Pass on to earlier registrants if not claimed</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Pointer to device driver routine</register-use>
+ <register-use number="2">Workspace parameter to pass in R12 when driver is called</register-use>
+ <register-use number="3">Address of interrupt status byte for special handlers</register-use>
+ <register-use number="4">Mask value for interrupt status byte for special handlers</register-use>
+</entry>
+<exit>
+ <register-use number="0, 3, 4">Preserved</register-use>
+ <register-use number="1-2">Preserved if R0 bit 29 clear on entry. If R0 bit 29 was set on entry: R1 is a pointer to the routine to call to enable/disable the device IRQ, and R2 is the workspace parameter for it</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to register device drivers with the Core IRQ handler.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ReleaseDeviceVector" />
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ReleaseDeviceVector"
+                number="4C"
+                description="Deregister a device driver from the Core IRQ handler"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Device number (bits 0-23) and flags (bits 24-31):
+  <bitfield-table>
+ <bit number="24-28">Reserved, must be 0</bit>
+ <bit number="29">Ignored</bit>
+ <bit number="30">De-register subchain handler</bit>
+ <bit number="31">Ignored</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Pointer to device driver routine</register-use>
+ <register-use number="2">Workspace parameter to pass in R12 when driver is called</register-use>
+ <register-use number="3">Address of interrupt status byte for special handlers</register-use>
+ <register-use number="4">Mask value for interrupt status byte for special handlers</register-use>
+</entry>
+<exit>
+ <register-use number="0-4">Preserved</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to remove a device handler from the list. The parameters supplied must match those given on registration.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ClaimDeviceVector" />
+</related>
+</swi-definition>
+
+</section>
+
+<section title="Entry Points">
+<entry-definition name="CoreIRQHandler"
+                  description="Core IRQ handler"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="8">Interrupted address (R14 on entry to IRQ handler)</register-use>
+ <register-use number="9">Interrupted PSR (SPSR on entry to IRQ handler)</register-use>
+ <register-use number="10">Interrupted value of R10</register-use>
+ <register-use number="11">Interrupted value of R11</register-use>
+ <register-use number="12">Workspace parameter as registered with OS_ClaimDeviceVector</register-use>
+</entry>
+<exit>
+ <register-use number="0-3, 8-12">Corrupted</register-use>
+</exit>
+<use>
+<p>
+Called by the Kernel to handle an IRQ.
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+<entry-definition name="DeviceIRQEnable"
+                  description="Routine to enable or disable a device IRQ"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="0">Device number, bit 31 set to disable or clear to enable</register-use>
+ <register-use number="12">Workspace parameter supplied in R2</register-use>
+</entry>
+<exit>
+ <register-use number="0">Preserved</register-use>
+ <register-use number="1-3">Corrupted</register-use>
+</exit>
+<use>
+<p>
+Returned by OS_ClaimDeviceVector when R0 bit 29 is set on entry.
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+<entry-definition name="DeviceDriverRoutine"
+                  description="Device driver routine called by the IRQ module"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="0">Device number</register-use>
+ <register-use number="1">Parameter to pass in R0 to clear IRQ</register-use>
+ <register-use number="2">Pointer to routine to call to clear IRQ</register-use>
+ <register-use number="3">Pointer to IRQ handler dependent workspace</register-use>
+ <register-use number="12">Workspace parameter as supplied on claim</register-use>
+</entry>
+<exit>
+ <register-use number="0-3, 12">May be corrupted if claimed. R0 is preserved, and R1-R3 and R12 corrupted, if not claimed</register-use>
+</exit>
+<use>
+<p>
+Called by the Core IRQ handler to service a device IRQ.
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+</section>
+
+<section title="Service Calls">
+<service-definition name="DeviceReregister"
+                    number="E2"
+                    description="The core IRQ handler has initialised; devices should re-register">
+<entry>
+ <register-use number="0">Device number, or -1 for all devices except special handlers</register-use>
+ <register-use number="1">&hex;E2 (service call number)</register-use>
+</entry>
+<exit>
+ <register-use number="0-1">Preserved</register-use>
+</exit>
+<use>
+<p>
+This service call is issued by the core IRQ handler or by any special sub-chain handlers on their registration. Device drivers should check the device number in R0 for devices they service and re-register themselves with OS_ClaimDeviceVector. All device drivers except special handlers should register themselves if the device number is -1. Special handlers (those which require R3 and R4 to be supplied) should only register when they receive an explicit service call.
+</p>
+</use>
+<related>
+</related>
+</service-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Named the service call &amp;E2 consistently as DeviceReregister (the original used both Service_DeviceReregister and Service_DeviceRegister), corrected 'recurr', 'dependant', and 'the the', and 'dependant' in the device routine description. OS_ClaimDeviceVector and OS_ReleaseDeviceVector are given the SWI numbers from the PRM (&amp;4B, &amp;4C).</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
