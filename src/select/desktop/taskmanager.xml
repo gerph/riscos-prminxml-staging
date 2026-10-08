@@ -14,6 +14,25 @@
 </section>
 
 <section title="Technical Details">
+<subsection title="Changes to the Task Manager">
+<p>
+The TaskManager module has been updated to bring it up to date with the rest of RISC OS. The following changes have been made to the module :
+</p>
+<p><list>
+<item><p>The TaskManager will warn users when the system is powered off without being safely shut down. This should encourage users to correctly shut down the system, rather than to merely turn off the system. Failure to shut down correctly may result in data loss.</p></item>
+<item><p>The 'System memory allocation' details in the main tasks display has had a number of the previously displayed regions removed : Screen memory (no longer centrally allocated; see the 'Video' areas within the 'Dynamic areas' section); Cursor/System/Sound (these are now separate areas, listed under the 'Dynamic areas' section); System heap/Stack (now presented as just 'System heap', as the system stack is a separate area - not listed).</p></item>
+<item><p>The 'System memory allocation' details still includes the 'Font cache', 'System sprites' and 'RAM disc' areas, despite these areas now being controlled by the relevant modules (FontManager, SpriteUtils and RamFS respectively).</p></item>
+<item><p>Physical dynamic areas are indicated by blue bars rather than red. This indicates that the areas are not part of normal allocatable memory.</p></item>
+<item><p>It should be noted that the list of memory regions is not complete. In particular, memory regions allocated to the page tables, to the system stacks and other system areas (for example the softloaded ROM) are not included.</p></item>
+<item><p>The memory size allocations beside each region are now listed as megabyte when they exceed 16M (rounded down). This makes the memory allocations easier to read.</p></item>
+<item><p>The information window no longer provides a hidden 'cookie' by clicking on the authors field.</p></item>
+<item><p>An 'i' icon in the information window provides additional information on the components within the system.</p></item>
+<item><p>The shutdown confirmation window will offer 'Restart' and 'Off' buttons. These can be triggered by the 'R' and 'O' keys respectively. The 'Off' option is only available on hardware with power control (see the Portable document).</p></item>
+<item><p>The 'Exit' option has been removed from the menu, as it leaves the desktop without an obvious means of returning. Equivalent behaviour can be triggered by using Shift-Ctrl-F12 from the reset banner.</p></item>
+<item><p>The configuration applications can be accessed from the TaskManager menu by selecting the 'Choices...' option.</p></item>
+<item><p>The menu has an option 'Stand by' which will place the machine into a power conserving state. The power will not be removed, but hardware will be shut down and the system placed into a dormant state. This option is only available on hardware with power control (see the Portable document).</p></item>
+</list></p></subsection>
+
 <subsection title="Acknowledgements">
 <p>
   The Task Manager maintains a list of software acknowledgements and licences which are displayed in the system information window. The Task Manager broadcasts <reference type="service" name="TaskManagerAcknowledgements" /> to allow modules and applications to register their own acknowledgements.
@@ -26,7 +45,80 @@
 </p>
 </subsection>
 
+<subsection title="Registering acknowledgements">
+<p>
+Many components of the system are required to provide an acknowledgement of their licence to the user. The TaskManager provides a mechanism for this through the <reference type="service" name="TaskManagerAcknowledgements" /> service. It is intended primarily for commercial developers and software built into the OS itself, but may be used by anyone. It is used to allow modules to communicate information about their licences which they are required to state, but would otherwise have no other means of displaying.
+</p>
+<p>
+The group identifier passed to the registration routine is of the form &amp;GMMM, where G selects the category (0 to 2 being reserved for the operating system vendor, 3 for commercial components, 4 for freeware components and 5 for user components - private use only). The MMM field should be set to 0 and is for future developments.
+</p>
+<p>
+The registration routine must be called with the following notes in mind:
+</p>
+<p><list>
+<item><p>Return with <userinput>MOV pc,link</userinput> (ie do not preserve the flags).</p></item>
+<item><p>Details should be formatted for 60 characters, of LF terminated strings. Try to remember to include full stops at the ends of sentences. Thus, in BASIC, you might use <userinput>"© Fred Bloggs, 1998."+CHR$10+"© Sue Bloggs, 1999."+CHR$0</userinput></p></item>
+</list></p><p>
+You should only call the entry point when requested for information by the TaskManager. TaskManager 0.11 and later support this service. Data will be copied so you can build strings in a temporary area if necessary.
+</p>
+<p>
+In assembler you might use code something like the following to register messages :
+</p>
+<p><extended-example type="asm">
+<userinput>svc_acknowledgements</userinput><br/>
+<userinput>        TEQ     r2,#0</userinput><br/>
+<userinput>        MOVEQ   pc,r14</userinput><br/>
+<userinput>        STMFD   r13!,{r0-r3, r14}</userinput><br/>
+<userinput>        MOV     r3,r2</userinput><br/>
+<userinput>        MOV     r0,#&amp;5000            ; group id</userinput><br/>
+<userinput>        ADR     r1,Title             ; pointer to your module title string</userinput><br/>
+<userinput>        ADR     r2,CopyrightMessage  ; some copyright message</userinput><br/>
+<userinput>        MOV     r14,pc</userinput><br/>
+<userinput>        MOV     pc,r3</userinput><br/>
+<userinput>        MOV     r0,r0</userinput><br/>
+<userinput>        LDMFD   r13!,{r0-r3, pc}</userinput><br/>
+<userinput>CopyrightMessage</userinput><br/>
+<userinput>        = "This software is based in part on work by Diaxos Holdings", 10</userinput><br/>
+<userinput>        = "Incorporated.", 10</userinput><br/>
+<userinput>        = "Some sections have been provided by Wally Williams.",0</userinput>
+</extended-example></p><p>
+In C you might use code something like the following :
+</p>
+<p><extended-example type="c">
+<userinput>typedef void (*addmessages_func)(unsigned int group,char const *title,</userinput><br/>
+<userinput>                                 char const *message);</userinput><br/>
+<userinput>#define Service_TaskManagerAcknowledgements 0x42680</userinput><br/>
+<userinput>void main_service(int service_number, _kernel_swi_regs *r, void *pw)</userinput><br/>
+<userinput>{</userinput><br/>
+<userinput>  if (service_number==Service_TaskManagerAcknowledgements)</userinput><br/>
+<userinput>  {</userinput><br/>
+<userinput>    addmessages_func func=(addmessages_func)r-&gt;r[2];</userinput><br/>
+<userinput>    if (func!=NULL)</userinput><br/>
+<userinput>    {</userinput><br/>
+<userinput>      func(0x5000,Module_Title,"This software is based in part on the work of the Independent\nJPEG Group.");</userinput><br/>
+<userinput>    }</userinput><br/>
+<userinput>  }</userinput><br/>
+<userinput>}</userinput>
+</extended-example></p><p>
+On module initialisation and finalisation you should notify the TaskManager of the change to the acknowledgement messages by issuing the service with R2 = 0. In C you might do this as :
+</p>
+<p><extended-example type="c">
+<userinput>/* Let TaskManager know it's changed */</userinput><br/>
+<userinput>_swix(XOS_ServiceCall,_INR(1,2),Service_TaskManagerAcknowledgements,0);</userinput>
+</extended-example></p><p>
+In assembler, this could be :
+</p>
+<p><extended-example type="asm">
+<userinput>; Cause a re-cache of the acknowledgements window</userinput><br/>
+<userinput>        LDR     r1,=&amp;42680</userinput><br/>
+<userinput>        MOV     r2,#0</userinput><br/>
+<userinput>        SWI     XOS_ServiceCall</userinput>
+</extended-example></p></subsection>
+
 <subsection title="System Shutdown">
+<p>
+  In order to make shutdown more reliable and allow applications to force a reboot, the Task Manager shutdown controls have been updated. In addition to the standard bits that may be passed to <reference type="swi" name="TaskManager_Shutdown" />, new bits have been defined to provide additional functions.
+</p>
 <p>
   System shutdown is handled by the <reference type="swi" name="TaskManager_Shutdown" /> SWI. This call manages the process of notifying tasks that the system is closing, closing files, and optionally rebooting or powering off the machine.
 </p>
@@ -221,6 +313,9 @@
  <history>
   <revision number="1" author="CF" date="28 Apr 2026" title="Initial version">
     <change>Created documentation for TaskManager_Shutdown and Service_TaskManagerAcknowledgements.</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="Supplemented with the original documentation">
+    <change>Added the list of changes made to the Task Manager, and the notes and examples for registering acknowledgements, from the original documentation (captured as HTML document version 1.03, 3 Nov 2015).</change>
   </revision>
  </history>
 </meta>
