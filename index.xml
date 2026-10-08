@@ -108,6 +108,7 @@
         <page href="c99lowlevel">C99 low level support functions</page>
         <page href="sharedclibrary">SharedCLibrary</page>
         <page href="c99support">C99 support functions</page>
+        <page href="codeformats">Code execution changes</page>
         <page href="pathutils">PathUtils</page>
         <page href="zipper">Zipper module</page>
     </section>
