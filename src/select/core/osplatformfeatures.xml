@@ -1,0 +1,170 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="OS_PlatformFeatures">
+<section title="Introduction and Overview">
+<p>
+The OS_PlatformFeatures SWI has been updated to provide additional information on the core system and the MMU.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+This SWI is used to determine various features of the platform that the component is running on. The particular action of OS_PlatformFeatures is given by the reason code in bits 0-15 of R0 as follows:
+</p>
+<p><value-table head-number="Reason" head-value="Meaning">
+<value number="0">Read code features</value>
+<value number="1">Read MMU features</value>
+<value number="2+">Reserved for future expansion</value>
+</value-table></p><subsection title="Read code features">
+<p>
+This call was originally defined to determine features of the host processor's instruction set. It has been extended to return information about the Operating System's features as well.
+</p>
+<p>
+Platforms running ARM 6 or 7 cores will return with R0 bits 0-4 clear. Platforms running StrongARM will return with bits 0, 1, 3 and 4 set (RISC OS 3.7 incorrectly returns bit 2 set). Operating systems which are 32 bit will return with bit 6 set. ARM 6, 7 and StrongARM will return with bit 7 clear. Later ARM processors have abandoned 26 bit capabilities and bit 7 will be set. Consult the ARM Architecture Reference manual, or PRM 5a-15 for details of the distinction between 26 bit and 32 bit modes.
+</p>
+<p>
+For compatibility with older versions of RISC OS, you should call this SWI in the X form; if the overflow flag (V) is set on return and the error is 'SWI not known', then this can be taken as equivalent to a return with R0 having all bits clear. Note that the easiest way to deal with the PC+8/PC+12 issue across all platforms is to make sure that the code is valid in either case (typically with judicious use of NOPs).
+</p>
+<p>
+The routine pointed to by R1 is suitable for calling from any mode (26bit or 32bit); it preserves all flags and registers, and is reentrant.
+</p>
+</subsection>
+
+<subsection title="Read MMU features">
+<p>
+This call returns details about the Memory Management Unit features of the processor and the operating system. The flags returned are used by OS_MMUControl to determine the flags which it is acceptable for the user to modify. The flags in R2 and R4 are those which may be changed by the user. The flags in R3 and R5 are those which must be set for the system to function.
+</p>
+<p>
+For example, certain processors allow the Instruction cache to be controlled and so that bit will be set within R2 (acceptable flags for the processor). The operating system is not affected by the state of the Instruction cache and can function with the flag in either state, thus R4 (acceptable flags for the OS) has this bit set. By contrast, some processors allow alignment faults to be raised by the processor and so this bit is set in R2. However the operating system cannot function in this mode, and the bit will be clear in R4.
+</p>
+<p>
+Because of these restrictions there are a very limited set of changes which programs may make to the MMU state.
+</p>
+</subsection>
+
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_PlatformFeatures"
+                number="6D"
+                description="Determine features of the host platform"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Reason code and flags:
+  <bitfield-table>
+ <bit number="0-15">Reason code</bit>
+ <bit number="16-31">Flags specific to reason</bit>
+</bitfield-table></register-use>
+ <register-use number="1+">Dependent on reason code</register-use>
+</entry>
+<exit>
+ <register-use number="">Dependent on reason code</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to determine various features of the platform that the component is running on.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_PlatformFeatures"
+                number="6D"
+                reason="0"
+                reasonname="OS_PlatformFeatures_CodeFeatures"
+                description="Read code features"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">0 (reason code) + flags (all reserved, must be 0)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Bit mask of features of the CPU and OS:
+  <bitfield-table>
+ <bit number="0">Must tell OS when code areas change (by calling OS_SynchroniseCodeAreas)</bit>
+ <bit number="1">Enabling, then immediately disabling interrupts will not give interrupts a chance to occur (see R1)</bit>
+ <bit number="2">Must be in 32 bit mode to read hardware vectors</bit>
+ <bit number="3">Storing PC to memory (eg with STR or STM) stores PC+8 rather than PC+12</bit>
+ <bit number="4">Data aborts occur with 'full early' timing (i.e. as defined by ARM architecture 4)</bit>
+ <bit number="5">Reserved for future expansion</bit>
+ <bit number="6">Operating System executes in 32bit mode</bit>
+ <bit number="7">26 bit mode is not available</bit>
+ <bit number="8-31">Reserved for future expansion</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Pointer to routine to call to trigger IRQs after an enable (if bit 1 of R0 set)</register-use>
+</exit>
+<use>
+<p>
+Reads the features of the CPU and the operating system.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_PlatformFeatures"
+                number="6D"
+                reason="1"
+                reasonname="OS_PlatformFeatures_MMUFeatures"
+                description="Read MMU features"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">1 (reason code) + flags (all reserved, must be 0)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Default MMU state for cache enabled</register-use>
+ <register-use number="1">Default MMU state for cache disabled</register-use>
+ <register-use number="2">Acceptable flags for the MMU state (for the processor)</register-use>
+ <register-use number="3">Required flags for the MMU state (for the processor)</register-use>
+ <register-use number="4">Acceptable flags for the MMU state (for the OS)</register-use>
+ <register-use number="5">Required flags for the MMU state (for the OS)</register-use>
+</exit>
+<use>
+<p>
+Reads the features of the Memory Management Unit of the processor and the operating system, for use with OS_MMUControl.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected 'return with bits 0, 1, 3 and 4' (set) for StrongARM, and 'dependant' to 'dependent'. The reason code names (such as OS_PlatformFeatures_CodeFeatures) are descriptive labels for the reason codes and not names defined by the operating system.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
