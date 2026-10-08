@@ -1,0 +1,230 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="FileSwitch">
+<section title="Introduction and Overview">
+<p>
+FileSwitch has been extended with support for enumerating file handles, a catalogue filename width, IOCtl operations, and a reminder about the redeclaration of filing systems.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Enumerate Handles">
+<p>
+A reason code is available within FileSwitch version 2.44 onward to enumerate file handles. This allows clients to obtain information on open files using a defined interface rather than relying on knowledge of the earlier restriction within FileSwitch of 255 file handles, allocated sequentially downward from 255. This reason code is used by clients wishing to enumerate open file handles. Clients should be aware that filing system operations may occur during the enumeration process and should take appropriate action. See <reference type="swi" name="OS_FSControl" reason="3A" />.
+</p>
+</subsection>
+
+<subsection title="Catalogue filename width">
+<p>
+A variable, <sysvar>FileSwitch$NameWidth</sysvar>, can be set to give the width of filenames in the <userinput>*Cat</userinput> display. It has a minimum value of 12, and a maximum value of 255. This can be set at any time and will be read per-use of *Cat. It is present in all versions of FileSwitch since RISC OS 4.
+</p>
+</subsection>
+
+<subsection title="IOCtl operations">
+<p>
+From FileSwitch 2.36 onward support has been added for IOCtl calls. These allow 'control' commands from the client opening the file. An OS_Args reason code has been added to support this, and a new bit added to the extra filing system information word. See <reference type="swi" name="OS_Args" reason="9" />. This operation will be passed to the FileSystem Args entry as reason code 11.
+</p>
+<p>
+The IOCtl parameter block takes the following form :
+</p>
+<p><offset-table>
+ <offset number="0">Flags:
+   <bitfield-table>
+ <bit number="0-15">IOCtl reason code</bit>
+ <bit number="16-23">IOCtl group code:
+    <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Serial group operations</value>
+ <value number="1">Parallel group operations</value>
+ <value number="255">Generic group operations</value>
+</value-table></bit>
+ <bit number="24-29">Reserved (must be 0)</bit>
+ <bit number="30">Set to read data</bit>
+ <bit number="31">Set to write data</bit>
+</bitfield-table></offset>
+ <offset number="4...">Data for operation</offset>
+</offset-table></p>
+<subsubsection title="Parallel IOCtl operations">
+<p>
+The following parallel IOCtl operation reason codes are supported by the parallel device driver :
+</p>
+<p><list>
+<item><p>Read Device ID size</p></item>
+<item><p>Read Device ID data</p></item>
+<item><p>Read Reverse Nibble status size</p></item>
+<item><p>Read Reverse Nibble status data</p></item>
+</list></p><p>
+In each case the first word of the data indicates the size of the buffer.
+</p>
+<p><fixme>The IOCtl reason code numbers for the parallel operations are not documented.</fixme></p>
+</subsubsection>
+
+<subsubsection title="Serial IOCtl operations">
+<p>
+The following serial IOCtl operation reason codes are defined for serial devices :
+</p>
+<p><value-table head-number="Reason" head-name="Operation" head-value="Data">
+<value number="1" name="Baud rate">One word containing the baud rate (bits per second)</value>
+<value number="2" name="Data format">One word containing flags indicating data format:
+   <bitfield-table>
+ <bit number="0-7">Data length (5,6,7 or 8)</bit>
+ <bit number="8-15">Number of stop bits (1 or 2)</bit>
+ <bit number="16-23">Parity encoded as:
+    <value-table head-number="Value" head-value="Meaning">
+ <value number="0">No parity</value>
+ <value number="1">Even parity</value>
+ <value number="2">Odd parity</value>
+ <value number="3+">Reserved</value>
+</value-table></bit>
+ <bit number="24-31">Reserved</bit>
+</bitfield-table></value>
+<value number="3" name="Handshake">One word containing the handshaking type:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">No handshaking</value>
+ <value number="1">RTS/CTS handshaking</value>
+ <value number="2">XON/XOFF handshaking</value>
+ <value number="3">DTR/DSR handshaking</value>
+ <value number="4+">Reserved</value>
+</value-table></value>
+<value number="4" name="Buffer size">Size of buffer used for transfers</value>
+<value number="5" name="Buffer Threshold">Trigger for handshaking or upcall notification</value>
+<value number="6" name="Control lines">One word containing flags:
+   <bitfield-table>
+ <bit number="0">DTR (read/write)</bit>
+ <bit number="1">RTS (read/write)</bit>
+ <bit number="2-15">Reserved (read/write)</bit>
+ <bit number="16">CTS (read only)</bit>
+ <bit number="17">DSR (read only)</bit>
+ <bit number="18">RI (read only)</bit>
+ <bit number="19">DCD (read only)</bit>
+ <bit number="20">FIFOs enabled (read only)</bit>
+ <bit number="21-31">Reserved (read only)</bit>
+</bitfield-table></value>
+<value number="7" name="FIFO trigger">Number of bytes in FIFO before an interrupt is generated.</value>
+<value number="8" name="Read number of baud rates">Returns a word containing the number of baud rates available</value>
+<value number="9" name="Read baud rate index">Supplies one word of index numbers and reads the baud rate associated with that index.</value>
+<value number="10" name="Flush buffer">Flushes buffer on write; undefined on read</value>
+<value number="11" name="Read IR capabilities">One word containing flags:
+   <bitfield-table>
+ <bit number="0">IrDA capable</bit>
+ <bit number="1">Consumer IR capable</bit>
+ <bit number="2">ASK-IR capable</bit>
+ <bit number="3-31">Reserved</bit>
+</bitfield-table></value>
+<value number="12" name="IR status">One word containing the type of IR:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Wired</value>
+ <value number="1">IrDA</value>
+ <value number="2">ConsumerIR</value>
+ <value number="3">Ask-IR</value>
+ <value number="4+">Reserved</value>
+</value-table></value>
+</value-table></p>
+</subsubsection>
+
+<subsubsection title="Generic IOCtl operations">
+<p>
+The following IOCtl operations have been defined for generic operations :
+</p>
+<p><list>
+<item><p>Non-blocking operation. A word containing 0 for blocking operation, any other value indicating non-blocking operation</p></item>
+<item><p>Buffer threshold. A word indicating a point in the buffer at which a notification will be raised.</p></item>
+<item><p>Flush stream. No data; writing causes all pending data to be discarded</p></item>
+<item><p>Timeout. Time in centiseconds before a blocking operation should be considered failed.</p></item>
+</list></p><p><fixme>The IOCtl reason code numbers for the generic operations are not documented.</fixme></p>
+</subsubsection>
+
+</subsection>
+
+<subsection title="Filing system redeclaration">
+<p>
+As a reminder, PRM 2-524 indicates that filing systems should redeclare themselves to FileSwitch when <reference type="service" name="FSRedeclare" /> is issued. Some external filing systems do not do this and thus cannot cope when the FileSwitch module is restarted.
+</p>
+</subsection>
+
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_FSControl"
+                number="29"
+                reason="3A"
+                reasonname="OS_FSControl_EnumerateHandles"
+                description="Enumerate file handles"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">58 (reason code)</register-use>
+ <register-use number="1">Last handle, or -1 to start at first handle</register-use>
+</entry>
+<exit>
+ <register-use number="0">Stream status word, or preserved if no more handles exist</register-use>
+ <register-use number="1">File handle, or -1 if no more handles exist</register-use>
+ <register-use number="2">Filing system info word, or preserved if no more handles exist</register-use>
+</exit>
+<use>
+<p>
+This reason code is used by clients wishing to enumerate open file handles. Clients should be aware that filing system operations may occur during the enumeration process and should take appropriate action.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_Args"
+                number="9"
+                reason="9"
+                reasonname="OS_Args_IOCtl"
+                description="IOCtl"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">9 (reason code)</register-use>
+ <register-use number="1">File handle</register-use>
+ <register-use number="2">Pointer to parameter block</register-use>
+</entry>
+<exit>
+ <register-use number="0-2">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call is used by clients wishing to control devices at the other end of a file handle. This may be used for filing specific operations. This operation will be passed to the FileSystem Args entry as reason code 11.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>The reason code names (OS_FSControl_EnumerateHandles and OS_Args_IOCtl) are descriptive labels for the reason codes and not names defined by the operating system.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
