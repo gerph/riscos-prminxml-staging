@@ -102,6 +102,7 @@
         <page href="videov">Video drivers</page>
     </section>
     <section title="Programmer" dir="programmer">
+        <page href="aif">AIF module</page>
         <page href="pathutils">PathUtils</page>
         <page href="zipper">Zipper module</page>
     </section>

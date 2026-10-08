@@ -1,0 +1,107 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="AIF module">
+<section title="Introduction and Overview">
+<p>
+The AIF module provides support for running Absolute files. The new
+interfaces used by FileSwitch to invoke Absolute files are used to call the
+AIF module (see ExecFormats for more details). By default the most protective
+state is used by the module, where it will not let any un-headered file run.
+This is the recommended setting and should not be changed by users without
+due consideration for the implications.
+</p>
+
+<p>
+The checks used ensure the consistency of the AIF header on Absolute files.
+This helps to improve the stability of the system by rejecting code which is
+malformed.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Configuration">
+<p>
+The AIF module can be configured for the current session by setting the
+<sysvar>AIF$Options</sysvar> system variable. This allows the user to disable
+certain checks imposed by the module. It is strongly recommended that this
+not be used by default; it should only be set when no other alternative
+exists. The options to disable checks will be removed in future.
+</p>
+</subsection>
+
+<subsection title="Logging">
+<p>
+The AIF module will log any files which violate any of the checks it applies.
+All details are logged to the FileSwitch log, together with the error message
+(even if the error is not reported).
+</p>
+</subsection>
+</section>
+
+<section title="System Variables">
+<sysvar-definition name="AIF$Options"
+                   description="Checks made by the AIF module which are to be overridden">
+<use>
+<p>
+The <sysvar>AIF$Options</sysvar> variable should be set to a string of
+characters indicating the checks which will be overridden:
+</p>
+
+<p><value-table head-number="Character" head-value="Check which is disabled">
+<value number="O"><strong>Accept over-long files.</strong> With this check
+disabled, files which have had data appended to them, will be allowed to run.
+The additional data may indicate an incorrectly patched application, or a
+virus.</value>
+<value number="T"><strong>Accept truncated files.</strong> With this check
+disabled, files which have been reduced in size, to smaller than the header
+declares, will be allowed to run. Such truncation is usually caused by
+incomplete file transfers.</value>
+<value number="D"><strong>Accept files with bad debug data
+descriptors.</strong> With this check disabled, files which contain
+incorrectly specified debug data will be allowed to run. This may cause
+problems for debuggers.</value>
+<value number="C"><strong>Accept unsuitable code bit size.</strong> With this
+check disabled, code which claims to be 26 bit only will be allowed to run on
+32 bit hardware. This is one of the most dangerous options and it should be
+used only as a last resort.</value>
+<value number="A"><strong>Accept non-AIF files.</strong> With this check
+disabled, code which does not have AIF headers will be allowed to run. This
+may cause problems for very old applications which have been compressed using
+unsupported compression tools.</value>
+</value-table></p>
+
+<p>
+<strong>Warning:</strong> Disabling the checks imposed by the AIF module is
+not recommended. Any data loss or hardware damage caused by the disabling of
+the checks is at the user's own risk.
+</p>
+</use>
+</sysvar-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
