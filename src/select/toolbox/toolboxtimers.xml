@@ -1,0 +1,130 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Toolbox Timers">
+<section title="Introduction and Overview">
+<p>
+To date, Toolbox Objects and Window Gadgets have been restricted to operating on a purely responsive basis. That is, an event occurs and it is dealt with by the gadget or object. For most operations this is sufficient, however, for more complex gadgets it may be necessary to defer the operation until some future time. A typical example of such a gadget might be an animated icon, cycling through a number of images.
+</p>
+<p>
+In order to be able to do this it is necessary that gadgets or objects have the ability to set timers to trigger their deferred behaviour. This functionality has been added to the Toolbox. The Gadget Library (GLib) interfaces have been updated to provide additional functions to activate these.
+</p>
+<p>
+Timers may be associated with a Object and Component, and trigger a Toolbox_Timer event when they expire. Gadgets or Objects should filter such events and perform whatever activity is necessary on those times.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Registering a Toolbox timer">
+<p>
+A Toolbox Timer is started by calling the relevant Toolbox_TimerOp SWI reason to register a new Timer. The Timers may be started from any environment, such as within a method call, a filter or from within an IRQ.
+</p>
+<p>
+Each timer is identified by a 'timer_handle' which can be used to remove the timer and will be delivered with the 'Timer' event. Timers must be associated with an Object and Component when they are registered. This allows the timers to be filtered with the correct handles. Although applications can use Toolbox Timers it is recommended that they perform their own timing operations as this will be more efficient than the messaging method used by Toolbox.
+</p>
+<p>
+Timers take one of two forms - single shot and recurring. These are similar to the OS_CallAfter and OS_CallEvery registered ticker events. The triggering of the event can only happen within the desktop. The trigger is signalled by a Toolbox_Timer event which should be trapped in the normal manner through the gadget or object's filters. Events which would occur outside the desktop, or whilst the system is busy, will be deferred until the user returns to the desktop.
+</p>
+<p>
+Timers can be registered with a private value to be passed with the event. This private value can be used for any purpose by the client.
+</p>
+</subsection>
+
+<subsection title="Removing a Toolbox timer">
+<p>
+One-shot timers are implicitly removed when they have been triggered. Recurrent timers will continue until they are removed or the task terminates. Other than this, timers are never removed automatically. When an object or component upon which a timer is dependent is deleted the timer must also be removed. Usually this would be done in the gadget remove entry point.
+</p>
+<p>
+Note that the events for a timer may be 'in transit' at the point at which the timer is removed. Unrecognised Timer events should be ignored by applications, Gadgets and Objects.
+</p>
+</subsection>
+
+<subsection title="Toolbox_Timer events">
+<p>
+The Toolbox_Timer event (&amp;44EC30) is issued to inform clients that the timer has been triggered. This event will set the application's ID block object and component values (self_id, component_id) to the appropriate object and component.
+</p>
+<p>
+It is expected that clients check that the Toolbox_Timer event they receive matches the timer they have registered by comparing the timer_handle field with that they were given on registration. This allows concurrent use of the timers by multiple clients.
+</p>
+<p>
+The private handle will be passed in the Toolbox_Timer event and may be used by the client only once it has been determined that the timer belongs to that client.
+</p>
+<p>
+Clients should claim the event if they requested it.
+</p>
+</subsection>
+
+<subsection title="Functions">
+<p><extended-example type="c">
+<userinput>void *glib_timer_after(ObjectId object, ComponentId component, void *private, int delay);</userinput><br/>
+<userinput>void *glib_timer_every(ObjectId object, ComponentId component, void *private, int delay);</userinput>
+</extended-example></p><p>
+This registers a new Timer timer, returning a handle called the timer_handle. The delay specified is in centiseconds and may not be accurate. This is because the desktop is in use and so other applications will affect the accuracy of the event. If accuracy is important clients should perform their own timing in addition to the events and compensate for any events delivered late.
+</p>
+<p>
+The value NULL will be returned to indicate that the timer could not be registered. There may be many reasons for this, including the shortage of memory.
+</p>
+<p><extended-example type="c">
+<userinput>void glib_timer_remove(void *timer_handle);</userinput>
+</extended-example></p><p>
+Removes a previously registered Toolbox timer.
+</p>
+</subsection>
+
+<subsection title="Window gadget timers">
+<p>
+The most common use of timers is to update a gadget dynamically. Because of this the Window object provides a pair of support functions to allow gadgets to register timers with less code. The Window module will call the 'Timer' entry point when the timer goes off. The following functions can be used for this purpose (see the <reference type="document" href="gadgets/windowsupportexternal" name="Window support functions" /> document for more details) :
+</p>
+<p><extended-example type="c">
+<userinput>void glib_gadget_timer_after(ObjectId object, ComponentId component, int delay);</userinput><br/>
+<userinput>void glib_gadget_timer_remove(ObjectId object, ComponentId component);</userinput><br/>
+<userinput>void glib_gadget_timer_every(ObjectId object, ComponentId component, int delay);</userinput>
+</extended-example></p><p>
+When events are delivered to gadgets by the GADGET_TIMER entry the timer handle discussed earlier is not necessary as the Window module will handle this internally before dispatch to the gadget.
+</p>
+</subsection>
+
+</section>
+
+<section title="Toolbox Events">
+<tboxmessage-definition name="Toolbox_Timer"
+                    number="44EC30"
+                    description="A Toolbox timer has been triggered">
+<use>
+<p>
+This event is issued to inform clients that the timer has been triggered. The application's ID block object and component values (self_id, component_id) are set to the object and component with which the timer was registered. The event contains the timer_handle and the private handle which were given on registration.
+</p>
+</use>
+<related>
+</related>
+</tboxmessage-definition>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected 'an Toolbox_Timer', 'a animated icon', 'the returning a handle', 'compensate from any events' and 'the point at which the event is removed' (the timer is removed). The fields of the Toolbox_Timer event, which the original did not lay out, are described in prose.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
