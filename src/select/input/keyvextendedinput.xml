@@ -1,0 +1,367 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Augmentation of KeyV for modern keyboard systems">
+<section title="Introduction">
+<p>
+KeyV was introduced with RISC OS 3.5 to provide a more generic mechanism for the system to report key events at a lower level. This allowed the abstraction of the Hardware keyboard driver from the Kernel - KeyV providing the communication between the Kernel key input tracking routines and the hardware driver. The key handler routines providing the communication between the Kernel and InternationalKeyboard were unaffected by this change.
+</p>
+<p>
+The appearance of new keyboard styles providing many other controls through PS/2, and the huge selection of keyboard input operations possible with USB keyboards, has meant that this design is quite limited.
+</p>
+<p>
+Because a large number of possible keys can now be generated these must be fitted into the current system. The following interfaces provide access to input information from the keyboard and mouse, at increasingly high levels :
+</p>
+<p><value-table head-number="Interface" head-value="Level">
+<value number="PS2Driver">Not compiled in, but available interface for modifying PS/2 to Low Level key code translations</value>
+<value number="KeyV">Low level key codes</value>
+<value number="EventV">Internal key codes, using Key_Transition and Mouse_Transition</value>
+<value number="OS_Byte &amp;amp;81">Internal BBC key codes, as INKEY and range scanning operations</value>
+<value number="REMV">Read keyboard buffer directly</value>
+<value number="OS_Byte &amp;amp;81">Read ASCII key within time limit</value>
+<value number="OS_ReadC">Read ASCII key</value>
+</value-table></p><p>
+Key transitions have always been expected to come from a simple input stream - the keyboard and mouse being the most common input mechanisms. The input system has never been extended to other input mechanisms such as joysticks or remote control devices. Joystick interfacing has followed its own, limited, SWI interface. Remote Control devices have invariably been provided through a keyboard driver, allowing an almost equivalent overlay to be provided for the development keyboard environment.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Requirements">
+<p>
+This change has ensured the following :
+</p>
+<p><list>
+<item><p>Support for larger numbers of inputs, primarily supporting PS/2 keyboards with specialised inputs, and focusing on the power controls and media controls initially</p></item>
+<item><p>Better 'source' support for multiple devices connected to the system, where such sources need to be differentiated.</p></item>
+<item><p>Compatibility with legacy APIs where ever possible, and additional APIs only where necessary.</p></item>
+</list></p><p>
+The change does not intend to address :
+</p>
+<p><list>
+<item><p>Unicode input issues</p></item>
+<item><p>Fully unified HID input mechanisms</p></item>
+<item><p>Key modifier support within buffered input</p></item>
+</list></p></subsection>
+
+<subsection title="RISC OS 3.5 KeyV API">
+<p>
+The RISC OS 3.5 KeyV API provides a mechanism for the keyboard driver to report keys to the system. It is described under the key transition reason codes of <reference type="vector" name="KeyV" reason="1" />.
+</p>
+</subsection>
+
+<subsection title="New KeyV interface">
+<p>
+At present, KeyV provides all low-level key codes as numerically low values. This is important to earlier (pre-Select 1) RISC OS, because values above &amp;A0 may generate aborts from the Kernel. This should be borne in mind when any of the following changes are considered.
+</p>
+<p>
+The USB HID Usage Tables provide a large collection of defined usages of HID devices and will be the most commonly used feature set for manufacturers of keyboard (and other input devices). To simplify the design of such an interface, the spirit of the HID Usage will be followed rather than the full design. It is expected that clients wishing to obtain fully specified USB HID reports should use a dedicated API to do so.
+</p>
+<p>
+The following features of the USB HID Usage Tables are provided by the proposed interface :
+</p>
+<p><list>
+<item><p>HID Usage Page and HID Usage ID will be grouped together into a 32bit value. HID Usage Page 0 is guaranteed reserved by the specification and thus can be safely used for 'legacy' key operations.</p></item>
+<item><p>One-Shot-Controls (OSC), Momentary Controls (MC) and Retrigger Controls (RTC) are the only controls which are suitable for reporting through this mechanism. Other reports should use an alternative, more specific interface to read information. Linear Controls (LC) will be supported in a simplified form only. On-Off-Controls (OOC) <fixme>The sentence about On-Off-Controls is incomplete.</fixme></p></item>
+<item><p>The Usage will be reported raw, together with its source. It is expected that clients wishing to obtain more specific information should use alternative interfaces.</p></item>
+</list></p></subsection>
+
+<subsection title="New KeyV API">
+<p>
+The changes to the KeyV API are minimal, allowing the system to continue functioning with legacy drivers where necessary. The new reason code is described under <reference type="vector" name="KeyV" reason="F" />.
+</p>
+<p>
+The operation of USB HID devices is expected to be as follows :
+</p>
+<p><list>
+<item><p>Examine the HID Usage for the components of a Report.</p></item>
+<item><p>If the Usage is determined to be Mouse, Keyboard or Keypad, it can be passed to this vector entry directly.</p></item>
+<item><p>Mouse button events should be passed through as raw 'Button' usages (ie Button usage page, button number in identifier)</p></item>
+<item><p>Where USB devices already provide direct support for conversion to the regular KeyV interface, this may be retained. Conversion of code to the proposed interface should take place in stages and may require staggering where legacy support (ie before this interface is in use) is available.</p></item>
+</list></p><p>
+A new module, KeyInput performs the translation from this usage to key operations necessary under the legacy operating system interfaces. That is, the key events reported here are downgraded to KeyV reason code values, where appropriate, which will then be passed on to the remainder of the system. Legacy applications will thus be unaware of the additional layer above them, but more modern applications will be able to trap additional key codes in order to provide advanced functions.
+</p>
+<p>
+In addition, the KeyInput module will provide an interface to read the state of Usages which it has observed. This will replace the INKEY method of key state checks.
+</p>
+<p>
+It is expected that 'source types' would be registered values and the 'source-specific information' would be declared public information such that users could trap specific sources where necessary.
+</p>
+</subsection>
+
+<subsection title="Example operation (1)">
+<p><list>
+<item><p>PS2 receives an event (&amp;E0 &amp;3B)</p></item>
+<item><p>PS2 converts to HID usage &amp;000C00B7 ('Stop'), with state '1'</p></item>
+<item><p>PS2 issues KeyV with R0 = 15 (reason), R1 = &amp;C00B7 (usage), R2 = 1 (state), R3 = 1 (source), R4 undefined</p></item>
+<item><p>(indeterminate modules may identify and claim this call if they are interested in the 'Stop' event)</p></item>
+<item><p>KeyInput receives this event. There is no associated action for it; it is ignored.</p></item>
+</list></p>
+</subsection>
+
+<subsection title="Example operation (2)">
+<p><list>
+<item><p>USB HID driver receives an event from a keyboard for usage page &amp;07, id &amp;67, with the state '1'.</p></item>
+<item><p>USB HID driver issues KeyV with R0 = 15 (reason), R1 = &amp;70067 (usage), R2 = 1 (state), R3 = 2 (source), R4 = some value or other, possibly a pointer, which describes the source of the event. all to be decided by USB informed people.</p></item>
+<item><p>KeyInput receives this event.</p></item>
+<item><p>KeyInput translates this to a keypad '=', code 28</p></item>
+<item><p>KeyInput issues KeyV with R0 = 2, R1 = 28</p></item>
+<item><p>(legacy components pick up on KeyV event)</p></item>
+<item><p>Kernel spots this KeyV event.</p></item>
+<item><p>Kernel calls EventV KeyTransition.</p></item>
+<item><p>Kernel starts the whole process of InternationalKeyboard processing</p></item>
+<item><p>InternationalKeyboard passes the translated value back to the Kernel</p></item>
+<item><p>Kernel inserts an '=' into the keyboard buffer</p></item>
+</list></p>
+</subsection>
+
+<subsection title="Future extensions">
+<p><list>
+<item><p>The Keyboard module will be modified to take over from the Kernel all tasks relating to key generation and insertion into buffers.</p></item>
+<item><p>Wimp and other interactive components will be modified to use this interface in preference to the INKEY interfaces.</p></item>
+<item><p>INKEY operations will be declared legacy and moved to a separate component. Event_KeyTransition will be declared legacy.</p></item>
+<item><p>KeyV support will be relegated to being a legacy component, reversing the above described backward compatible interface.</p></item>
+<item><p>KeyInput may be extended to provide scripted, trigger actions for keys which are not presently supported.</p></item>
+<item><p>KeyInput may be extended to provide typematic actions for keys which are not presently supported.</p></item>
+</list></p></subsection>
+
+</section>
+
+<section title="Software vectors">
+<vector-definition name="KeyV"
+                   number="13"
+                   reason="1"
+                   reasonname="KeyV_Release"
+                   description="Key released (RISC OS 3.5 API)"
+                   irqs="undefined"
+                   fiqs="undefined"
+                   processor-mode="undefined"
+                   re-entrant="undefined">
+<entry>
+ <register-use number="0">1 (key released)</register-use>
+ <register-use number="1">Low-level key number</register-use>
+</entry>
+<exit>
+ <register-use number="0-1">Preserved</register-use>
+</exit>
+<use>
+<p>
+Reports the release of a key to the system. This is the interface provided by RISC OS 3.5 for the keyboard driver.
+</p>
+</use>
+<related>
+<reference type="vector" name="KeyV" reason="2" />
+</related>
+</vector-definition>
+
+<vector-definition name="KeyV"
+                   number="13"
+                   reason="2"
+                   reasonname="KeyV_Press"
+                   description="Key pressed (RISC OS 3.5 API)"
+                   irqs="undefined"
+                   fiqs="undefined"
+                   processor-mode="undefined"
+                   re-entrant="undefined">
+<entry>
+ <register-use number="0">2 (key pressed)</register-use>
+ <register-use number="1">Low-level key number</register-use>
+</entry>
+<exit>
+ <register-use number="0-1">Preserved</register-use>
+</exit>
+<use>
+<p>
+Reports the pressing of a key to the system. This is the interface provided by RISC OS 3.5 for the keyboard driver.
+</p>
+</use>
+<related>
+<reference type="vector" name="KeyV" reason="1" />
+</related>
+</vector-definition>
+
+<vector-definition name="KeyV"
+                   number="13"
+                   reason="F"
+                   reasonname="KeyV_StateChange"
+                   description="Report a change of state of a HID usage"
+                   irqs="undefined"
+                   fiqs="undefined"
+                   processor-mode="undefined"
+                   re-entrant="undefined">
+<entry>
+ <register-use number="0">15 (reason code)</register-use>
+ <register-use number="1">32bit usage (HID Usage Page&lt;&lt;16 | HID Usage ID)</register-use>
+ <register-use number="2">Effect: 0 for disabled, 1 for enabled or a scale for a linear control</register-use>
+ <register-use number="3">Source type:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Anonymous source (no additional information present, such as might be provided by a simple forwarding tool)</value>
+ <value number="1">Simple source (internal device, such as PS/2)</value>
+ <value number="2">USB source (to be defined)</value>
+ <value number="3">Remote control (to be defined)</value>
+</value-table></register-use>
+ <register-use number="4">Source-specific information (none present for source type 0, 1)</register-use>
+</entry>
+<exit>
+ <register-use number="0-4">Preserved</register-use>
+</exit>
+<use>
+<p>
+This reason code is used to report the state of a HID usage. The KeyInput module translates these events into the legacy KeyV reason codes where appropriate.
+</p>
+</use>
+<related>
+</related>
+</vector-definition>
+
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="KeyInput_Check"
+                number="58540"
+                description="Read the state of a particular key"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags (must be 0)</register-use>
+ <register-use number="1">32bit usage</register-use>
+</entry>
+<exit>
+ <register-use number="2">Current state (as last seen through KeyV)</register-use>
+ <register-use number="3">Time of last state change</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the state of a particular key. It replaces OS_Byte &amp;81 as a mechanism for reading internal BBC key code states.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="KeyInput_CheckMultiple"
+                number="58541"
+                description="Read the state of a number of keys"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+ <bit number="0">Return time of state change</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Pointer to buffer</register-use>
+ <register-use number="2">Number of entries to fill in</register-use>
+</entry>
+<exit>
+ <register-use number="2">Number of entries filled in</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the state of a number of defined keys. The buffer will be filled in with the state of the currently depressed keys. The size of the records returned depends on the bits set in the flags on entry:
+</p>
+<p><offset-table>
+ <offset number="0">32bit usage (on input)</offset>
+ <offset number="4">Current state (on output)</offset>
+ <offset number="8">Time of state change (on output; present only if requested)</offset>
+</offset-table></p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="KeyInput_Scan"
+                number="58542"
+                description="Read the currently pressed key information"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags (must be 0)</register-use>
+ <register-use number="1">Initial code, or 0 to start a scan</register-use>
+</entry>
+<exit>
+ <register-use number="1">New key code, or 0 when no more keys are pressed</register-use>
+ <register-use number="2">State of the new key code (will be 1 or some other value for linear controls)</register-use>
+ <register-use number="3">Time of last state change</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the currently pressed key information. It replaces OS_Byte &amp;81, &amp;79 and &amp;7A as a mechanism for scanning key codes.
+</p>
+<p>
+<strong>Note:</strong> Key codes passed for the initial value must only be those codes returned by a previous call. The order in which keys are returned is not defined.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="KeyInput_ScanMultiple"
+                number="58543"
+                description="Read the state of keys into a buffer"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+ <bit number="0">Return time of state change</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Initial code, or 0 to start a scan</register-use>
+ <register-use number="2">Pointer to buffer to fill</register-use>
+ <register-use number="3">Number of entries to fill in</register-use>
+</entry>
+<exit>
+ <register-use number="1">Next key code to pass to SWI, or 0 when no more keys are pressed</register-use>
+ <register-use number="3">Number of entries filled in</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the state of keys to a buffer. The buffer should be at least 8 bytes per key code (depends on the flags set):
+</p>
+<p><offset-table>
+ <offset number="0">32bit usage</offset>
+ <offset number="4">Current state</offset>
+ <offset number="8">Time of last state change (present only if requested)</offset>
+</offset-table></p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the examples, which gave the KeyV reason code as 20; the definition (and the KeyInput interface header) give the reason code as 15 (&amp;F). Corrected 'does not intending' (intend) and 'when no move keys are pressed' (no more keys).</change>
+    <change>The SWI numbers of the KeyInput module were added from the system headers; the original did not give them.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
