@@ -1,0 +1,198 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Dynamic areas with automatic heap extension">
+<section title="Introduction and Overview">
+<p>
+As of Select release 1 Dynamic Areas can provide OS_Heap-like operations which auto-extend and reduce the size of the areas in a similar manner to that of the system areas. Such areas are known as Heap Dynamic Areas, or HeapDAs for short. It is not expected that applications use HeapDAs for their storage - as previously, applications should use application space for application specific data except where this is not feasible.
+</p>
+<p>
+Modules which need to retain state information may use HeapDAs to handle their memory usage rather than using RMA as previously. If the modules state information does not change regularly - and is reasonably small - then using a HeapDA might be extreme, in which case it would be prudent to continue using RMA. However, where larger, or quite variable data is being stored (such as runtime caches) this may be better held in a HeapDA.
+</p>
+<p>
+As with any other Dynamic Area, it is important that the total size of the dynamic area is sensibly constrained. Whilst dynamic area sizes should not be unnecessarily restrictive, it is important to use restraint when setting the limits of such areas, just as it is when allocating space in the area itself.
+</p>
+<p>
+From Kernel 9.36 onward heap areas with no space used will not use the single header page that they previously required. In addition, the manager will not release space if there are fewer than 3 empty pages at the end of the heap. This helps to alleviate cases where data structures are allocated and released at the boundary of a page within the heap, causing repeated area resizes. Whilst it is still possible to trigger this behaviour it is less likely to occur with most structures which the heap is used for. As the page size is 4K, this corresponds to (potentially) 12K excess per heap dynamic area.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Creating a HeapDA">
+<p>
+The creation of a Heap Dynamic Area is similar to that of other Dynamic Areas. To indicate that a Dynamic Area is to be controlled by the automatic extension and reduction handlers, bit 14 of the flags should be set on entry to the SWI.
+</p>
+<p>
+Heap DAs may not :
+</p>
+<p><list>
+<item><p>Be 'doubly mapped' (bit 6)</p></item>
+<item><p>Be resized by the user (bit 7)</p></item>
+<item><p>Request specific pages (bit 8)</p></item>
+<item><p>Be 'shrinkable' (bit 9)</p></item>
+<item><p>Be 'sparse' (bit 10)</p></item>
+<item><p>Use area handlers (R6)</p></item>
+</list></p></subsection>
+
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_DynamicArea"
+                number="66"
+                reason="E"
+                reasonname="OS_DynamicArea_HeapDescribe"
+                description="Describe the space used by a dynamic area heap"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">14 (HeapDescribe)</register-use>
+ <register-use number="1">Dynamic area number to describe</register-use>
+</entry>
+<exit>
+ <register-use number="2">Largest free space</register-use>
+ <register-use number="3">Total free space</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to describe the space used by the dynamic areas heap in a similar manner to OS_Heap 1.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_DynamicArea"
+                number="66"
+                reason="F"
+                reasonname="OS_DynamicArea_HeapClaim"
+                description="Claim space from a dynamic area heap"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">15 (HeapClaim)</register-use>
+ <register-use number="1">Dynamic area number to claim from</register-use>
+ <register-use number="3">Size to claim</register-use>
+</entry>
+<exit>
+ <register-use number="2">Pointer to block</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to claim space from a dynamic area heap in a similar manner to OS_Heap 2.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_DynamicArea"
+                number="66"
+                reason="10"
+                reasonname="OS_DynamicArea_HeapRelease"
+                description="Release a block in a dynamic area heap"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">16 (HeapRelease)</register-use>
+ <register-use number="1">Dynamic area number to release space from</register-use>
+ <register-use number="2">Pointer to block</register-use>
+</entry>
+<exit>
+</exit>
+<use>
+<p>
+This SWI is used to release space previously claimed from a dynamic area heap in a similar manner to OS_Heap 3.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_DynamicArea"
+                number="66"
+                reason="11"
+                reasonname="OS_DynamicArea_HeapResizeBlock"
+                description="Resize a block in a dynamic area heap"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">17 (HeapResizeBlock)</register-use>
+ <register-use number="1">Dynamic area number to resize block in</register-use>
+ <register-use number="2">Pointer to block</register-use>
+ <register-use number="3">Required size change in bytes</register-use>
+</entry>
+<exit>
+</exit>
+<use>
+<p>
+This SWI is used to resize a previously claimed block in a dynamic area heap in a similar manner to OS_Heap 4.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_DynamicArea"
+                number="66"
+                reason="12"
+                reasonname="OS_DynamicArea_HeapReadBlockSize"
+                description="Read the size of a block in a dynamic area heap"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">18 (HeapReadBlockSize)</register-use>
+ <register-use number="1">Dynamic area number containing the block</register-use>
+ <register-use number="2">Pointer to block</register-use>
+</entry>
+<exit>
+ <register-use number="3">Size of block</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to determine the space allocated to a previously claimed block in a dynamic area heap, in a similar manner to OS_Heap 6.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the R1 description of HeapReadBlockSize, which repeated that of HeapRelease ('to release space from'). The reason code names (such as OS_DynamicArea_HeapClaim) are descriptive labels for the reason codes and not names defined by the operating system.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
