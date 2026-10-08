@@ -1,0 +1,75 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Sprite Plot Actions">
+<section title="Introduction and Overview">
+<p>
+The sprite plot action is a bit field allowing the caller to specify the manner of the sprite plotting. It is used on a number of OS_SpriteOp calls, in particular :
+</p>
+<p><list>
+<item><p>Put sprite (28)</p></item>
+<item><p>Put sprite at user co-ords (32)</p></item>
+<item><p>Paint sprite scaled (52)</p></item>
+<item><p>Plot sprite transformed (56)</p></item>
+<item><p>Tile sprite scaled (65)</p></item>
+</list></p></section>
+
+<section title="Technical Details">
+<p>
+The following bits are used within the plot action :
+</p>
+<p><bitfield-table>
+ <bit number="0-2">Plot action (see PRM 1-753):
+  <value-table head-number="Value" head-value="Meaning">
+   <value number="0">Overwrite</value>
+   <value number="1">OR</value>
+   <value number="2">AND</value>
+   <value number="3">EOR</value>
+   <value number="4">Invert</value>
+   <value number="5">No-effect</value>
+   <value number="6">AND-NOT</value>
+   <value number="7">OR-NOT</value>
+  </value-table>
+ </bit>
+ <bit number="3">Use mask if set, otherwise ignore mask data if present. See PRM 1-753</bit>
+ <bit number="4">Use palette entries rather than translation table if suitable. See PRM 5a-117</bit>
+ <bit number="5">Wide Translation Table has been used if set, otherwise 8 bit translation is present. See PRM 5a-118</bit>
+ <bit number="6">Use dithering to more accurately match colours if set, otherwise the fastest rendering method will be used. See PRM 5a-118</bit>
+ <bit number="7">Colour-mapping function is provided rather than a translation table if set. See <reference type="document" href="colourmap" name="ColourMapping of deep sprites" /></bit>
+ <bit number="8-15">Translucency level (see <reference type="document" href="translucency" name="Translucent sprite operation" />):
+  <value-table head-number="Value" head-value="Meaning">
+   <value number="0">Solid image</value>
+   <value number="255">No effect, or close to no effect</value>
+   <value number="1-254">Other values linearly represent translucency levels between these extremes, but may be quantised by the rendering implementation in SpriteExtend or other acceleration systems</value>
+  </value-table>
+ </bit>
+ <bit number="16-31">Reserved, must be 0</bit>
+</bitfield-table></p>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
