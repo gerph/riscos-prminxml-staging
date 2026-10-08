@@ -1,0 +1,95 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Memory Map">
+<section title="Introduction and Overview">
+<p>
+The RISC OS logical memory map has not changed significantly from RISC OS 4. In turn, the memory map in RISC OS 4 had not changed significantly from RISC OS 3.7 version. It is very important to note that there are defined mechanisms for reading most of the regions of memory on RISC OS. Where possible, the supported system calls should be used and applications should not rely on the logical mapping of memory being unchanged on future versions of the operating system.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="The logical memory map">
+<p>
+The map is listed from the top of the address space; each entry is identified by its start address. The numbers in brackets refer to the notes below the table.
+</p>
+<p><value-table head-number="Start address" head-name="Function" head-value="Size and type">
+<value number="&amp;FF800000" name="Reserved">8M, Private</value>
+<value number="&amp;90000000" name="Dynamic areas [8]">1.75G-8M, Public [5]</value>
+<value number="&amp;80000000" name="Copy of physical space">256M, Private</value>
+<value number="&amp;08800000" name="Dynamic areas">2G-136M, Public [5]</value>
+<value number="&amp;08500000" name="Reserved">3M, Private</value>
+<value number="&amp;08404000" name="OS page tables (SoftCAM) [9]">1M-16k, Private</value>
+<value number="&amp;08400000" name="UNDEF stack [9]">8k, Private</value>
+<value number="&amp;08000000" name="Level 2 page tables">4M, Private</value>
+<value number="&amp;04000000" name="Dynamic areas">64M, Public [5]</value>
+<value number="&amp;03800000" name="ROM">8M, Private</value>
+<value number="&amp;03700000" name="Reserved for 2nd processor">1M, Private</value>
+<value number="&amp;03600000" name="Reserved">1M, Private</value>
+<value number="&amp;03500000" name="VIDC20">1M, Private</value>
+<value number="&amp;03400000" name="Reserved for VIDC1 emulation">1M, Private</value>
+<value number="&amp;03000000" name="I/O space">4M, Private [4]</value>
+<value number="&amp;02100000" name="RMA">15M, Public [3]</value>
+<value number="&amp;02078000" name="Kernel buffers">544k, Private</value>
+<value number="&amp;01F88000" name="Reserved for fake screen">960k, Private</value>
+<value number="&amp;01F18000" name="Reserved">448k, Private</value>
+<value number="&amp;01F10000" name="Reserved">32k, Private</value>
+<value number="&amp;01F0A000" name="Reserved">24k, Private</value>
+<value number="&amp;01F08000" name="&quot;Nowhere&quot; (2 pages)">8k, Private</value>
+<value number="&amp;01F04000" name="SWI dispatch / IRQ tables [7]">16k, Private</value>
+<value number="&amp;01F00000" name="Reserved [7]">16k, Private</value>
+<value number="&amp;01E04000" name="Reserved">1M-16k, Private</value>
+<value number="&amp;01E00000" name="IRQ stack [7]">16k, Public [2]</value>
+<value number="&amp;01C09000" name="System heap [6]">2M-36k, Private</value>
+<value number="&amp;01C08000" name="Reserved [6]">4k, Private</value>
+<value number="&amp;01C00000" name="SVC stack">32k, Public [2]</value>
+<value number="&amp;00008000" name="Application space">28M-32k, Public</value>
+<value number="&amp;00004000" name="Scratch space [10]">16k, Public [1]</value>
+<value number="&amp;00000000" name="System workspace [10]">16k, Private</value>
+</value-table></p>
+</subsection>
+
+<subsection title="Notes about the logical memory map">
+<p><list>
+<item><p>[1] The public [1] area may be used by any module that is not used in an IRQ routine, and not used if you call something else that might also use it. An example client would be FileCore using the scratch space to hold structures while working out how to allocate some free space. Another example would be the Filer using the scratch space to hold structures for OS_HeapSort.</p></item>
+<item><p>[2] The public [2] areas can be assumed to have their lowest address on a 1MB boundary (being descending stacks). An exception will occur if they are accessed beyond this point. The exact location of these stacks should not be assumed.</p></item>
+<item><p>[3] The public [3] area should not assume the location of the RMA or its maximum size. However it will be in the lower 64MB (ie it can execute 26 bit code).</p></item>
+<item><p>[4] The private [4] area is private, and used for I/O except where device drivers export hardware addresses.</p></item>
+<item><p>[5] The public [5] areas can be used by a client to make its own dynamic area.</p></item>
+<item><p>[6] The system heap previously started at &amp;01C08000, but has been moved up by a page such that stack underflow causes an abort, and reduced in size due to the requirement of the IRQ stack to be aligned on a 1MB boundary and to avoid its old allocation.</p></item>
+<item><p>[7] The IRQ stack previously started at &amp;01F00000. The stack has been increased in size. Because of this, it would have covered a region which was reserved for the SWI dispatch table. This table has changed in its internal organisation. Because of these changes, it was decided to move the IRQ stack and SWI dispatch tables such that components attempting to access the dispatch table do not overwrite the IRQ stack. Thus the SWI dispatch area is now higher in memory, and the IRQ stack is lower in memory, with a hole where the IRQ stack was previously.</p></item>
+<item><p>[8] Under RISC OS 4, 256M of PCI space was reserved at &amp;9000000. This is no longer reserved, and is available for dynamic areas.</p></item>
+<item><p>[9] Under RISC OS 4, the UNDEF stack was 8K. In order to simplify some memory arrangement, it has been increased in size to 16K.</p></item>
+<item><p>[10] Under RISC OS 4, the system workspace (also known as 'zero page') and scratch space were only protected against being written to from USR mode for the first 256 bytes. The entire 32K of this region is now only readable in USR mode.</p></item>
+</list></p></subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>The table was reorganised so that each entry is identified by its start address; the original listed the base address on the line following each entry. Corrected 'The IRQ previously started' to 'The IRQ stack previously started'. The note numbers were restored from the markers in the table.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
