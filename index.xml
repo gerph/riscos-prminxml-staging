@@ -123,6 +123,9 @@
         <page href="pathutils">PathUtils</page>
         <page href="zipper">Zipper module</page>
     </section>
+    <section title="Diagnostics" dir="diagnostics">
+        <page href="bts">Back Trace Structures</page>
+    </section>
     <section title="Boot sequence" dir="boot">
         <page href="configure-plugins">Configure plugins</page>
     </section>

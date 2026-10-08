@@ -1,0 +1,139 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Back Trace Structures">
+<section title="Introduction">
+<p>
+The Back Trace Structure (BTS) chain is a feature provided by some Kernels and
+components to allow failures within the system to be diagnosed. Usually this is
+most useful during development, but it is envisaged that support will remain
+within the distributed release systems.
+</p>
+
+<p>There are three categories of Kernel:</p>
+<p><list>
+<item><p>BTS-unaware Kernels - these are Kernels which know nothing of BTS and upon which BTS-active components will FAIL. All Kernels prior to 7.94 are BTS-unaware.</p></item>
+<item><p>BTS-aware Kernels - these are Kernels which know that BTS is available to developers and will provide the necessary support for it. However, they do not include the BTS details for the kernel operations themselves. Thus only client-provided BTS details will be provided. All Kernels from 7.94 onward are BTS-aware.</p></item>
+<item><p>BTS-active Kernels - these are Kernels which record details using the BTS for their own activities. Kernels after 7.94 can be optionally built with this option.</p></item>
+</list></p>
+<p>
+This document describes the side effects of the implementation of the BTS chain
+used by modern versions of RISC OS.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Stack usage">
+<p>
+The SVC and IRQ stacks contain a word which is used to point to the head of the
+BTS chain. The SVC stack contains a word which is used as the head of the BTS
+chain itself. These words are stored at the base of the stack. This means that
+the 4 words at the base of the SVC and IRQ stacks are reserved for system
+purposes.
+</p>
+
+<p>The use of these words on the SVC stack is as follows:</p>
+
+<p><offset-table>
+<offset number="0" name="C library offset">APCS module C library static data offset</offset>
+<offset number="4" name="User static offset">APCS module user static data offset</offset>
+<offset number="8" name="Chain pointer">Pointer to head of BTS chain</offset>
+<offset number="12" name="Chain head">Head of BTS chain</offset>
+</offset-table></p>
+
+<p>On the IRQ stack the use of the words is as follows:</p>
+
+<p><offset-table>
+<offset number="0" name="Reserved">Reserved</offset>
+<offset number="4" name="Reserved">Reserved</offset>
+<offset number="8" name="Chain pointer">Pointer to head of BTS chain</offset>
+<offset number="12" name="Reserved">Reserved</offset>
+</offset-table></p>
+
+<p>
+Because BTS structures are stored within the stack, the amount of space used by
+routines will be changed. Most operations will be unaffected as the space
+requirements for BTS are not great compared to many component uses of the
+stack.
+</p>
+
+<p>
+Similarly, the presence of BTS structures on the stack means that previous
+attempts to access data stored above the entry point on the stack, such as the
+SWI or IRQ entry parameters or similar, will fail. Such behaviour is strongly
+discouraged where it is reliant on internal behaviour within components which
+are outside the author's control.
+</p>
+
+<p>
+Aside from following the path of control between components, the stack content
+above the entry should be considered private except where pointers are passed
+to structures which have been constructed upon the stack.
+</p>
+</subsection>
+
+<subsection title="Chain and stack corruption">
+<p>
+During the operation of the BTS system the operations will, where possible,
+check for corruption of the internal BTS structures. This is achieved by the
+'return' from a BTS-active function checking that the head of the chain and the
+current stack pointer being the same. Where this is not the case there are 3
+possible failures which could have taken place:
+</p>
+<p><list>
+<item><p>Corruption of the BTS chain head value</p></item>
+<item><p>Corruption of the BTS structure within the stack</p></item>
+<item><p>Stack imbalance</p></item>
+</list></p>
+<p>
+All 3 failures appear identical to the checks and will be reported in the same
+way. Under development versions of the Kernel, this was reported as a branch
+through zero. The failure is reported through an undefined instruction
+(&hex;17FFFFFE) which is trapped by the Kernel undefined instruction handler. The
+undefined instruction handler converts this into a report that the system stack
+has become corrupt. It is reported as a hardware error, number
+<reference type="error" name="SystemStackCorrupt" />.
+</p>
+</subsection>
+</section>
+
+<section title="Error Messages">
+<error-definition name="SystemStackCorrupt" number="80000006"
+                  description="The system stack has become corrupt">
+<use>
+<p>
+Reported as a hardware error when the Kernel undefined instruction handler
+traps the instruction &hex;17FFFFFE, which a BTS-active function executes on
+return if the head of the BTS chain and the stack pointer disagree. This
+indicates corruption of the BTS chain head, corruption of a BTS structure within
+the stack, or a stack imbalance.
+</p>
+</use>
+</error-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+ </revision>
+ </history>
+
+</meta>
+</riscos-prm>
