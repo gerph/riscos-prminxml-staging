@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="OS_Word 21">
+<section title="Introduction and Overview">
+<p>
+The calls to control the mouse and pointer settings are accessed through OS_Word 21. In order to ensure that the interfaces are complete, a new reason code has been defined to read the mouse bounding box.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_Word"
+                number="7"
+                reason="15"
+                reasonname="OS_Word_ReadMouseBounds"
+                description="Read mouse bounding box (OS_Word 21,7)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">21 (reason code)</register-use>
+ <register-use number="1">Pointer to 9 byte block, first byte of which is 7</register-use>
+</entry>
+<exit>
+ <register-use number="0-1">Preserved</register-use>
+ <register-use number="Block at R1">Updated to contain:
+  <offset-table>
+ <offset number="1">LSB of left coordinate</offset>
+ <offset number="2">MSB of left coordinate</offset>
+ <offset number="3">LSB of bottom coordinate</offset>
+ <offset number="4">MSB of bottom coordinate</offset>
+ <offset number="5">LSB of right coordinate</offset>
+ <offset number="6">MSB of right coordinate</offset>
+ <offset number="7">LSB of top coordinate</offset>
+ <offset number="8">MSB of top coordinate</offset>
+</offset-table></register-use>
+</exit>
+<use>
+<p>
+This SWI call is used to read the mouse bounding box which was set using OS_Word 21,1. The parameters in the block in R1 are in the same order. As with OS_Word 21,1, the coordinates are relative to the screen origin at the time of this call. This means that the bounding box can be preserved with this call, modified, and later restored using OS_Word 21,1.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
