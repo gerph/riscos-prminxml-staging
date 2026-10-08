@@ -1,0 +1,110 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Remote disc types">
+<section title="Introduction and Overview">
+<p>
+Remote disc icons follow a set theme. This theme was designed for RISC OS 4, but was incomplete in a number of respects. The documentation for the conventions used was not released at that time. This document fills in some of the blanks.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Access type">
+<p>
+The access type for a disc is indicated by a symbol in the bottom right corner of the icon. The only filing system which does not follow this convention is ShareFS. This is partly due to the nature of ShareFS and partly due to the fact that no representation of ShareFS has been decided.
+</p>
+<p>
+AUN clients use a Level 4 pyramid with a flash on its peak. This is slightly different from the use under RISC OS 4 where the pyramid indicated a generic network.
+</p>
+<p>
+A general network is now indicated by a network 'spider' instead.
+</p>
+<p>
+NFS clients use three yellow triangle slices, pointing downward. This has no iconic meaning, except that it is distinguishable from the other access types.
+</p>
+<p>
+LanManager clients use a group of three slightly offset cubes. Like the NFS access type, these have no iconic meaning, although the arrangement is intentionally similar to that of the SNIA group which has produced a description of the CIFS protocols.
+</p>
+<p>
+AppleTalk clients use a group of stepped cubes. As with the preceding types, there is no iconic meaning, except that apples are green (red and yellow already having been used).
+</p>
+<p>
+Other network filing systems should use a similar scheme for their icons.
+</p>
+</subsection>
+
+<subsection title="Access level">
+<p>
+The level of access being assigned to a client is indicated by the 's' flash at the top left of the icon. This should be coloured according to the type of access that can be performed on the data it refers to.
+</p>
+<p><value-table head-number="Colour" head-value="Meaning">
+<value number="Grey">Revoked access, eg disc unavailable</value>
+<value number="Green">Full read/write access with no restrictions</value>
+<value number="Red">Read only access</value>
+<value number="Blue">Restricted access, eg permission based</value>
+</value-table></p><p>
+Other colours may be defined in the future should such indications be necessary. For now, it is recommended (but not required) that the scheme suggested be followed, even where custom iconsets are used. Where the level of access is unknown, a blue flash should be used.
+</p>
+</subsection>
+
+<subsection title="Additional indicators">
+<p>
+A small indicator may be present in the bottom left to indicate any other special features of the disc which are deemed appropriate. At the present time, only one such indicator is defined. In future, other indicators may be defined and third party implementations may wish to use alternative indicators.
+</p>
+<p><value-table head-number="Indicator" head-value="Meaning">
+<value number="Keyhole">Disc is authenticated (requires user information to be provided)</value>
+</value-table></p></subsection>
+
+<subsection title="Changes made to common icons">
+<p>
+The following changes have been made to the common icons in the wimp sprite pool :
+</p>
+<p><value-table head-number="Sprite" head-value="Change">
+<value number="file_bda">RW disc - no change</value>
+<value number="file_bd9">Protected disc - keyhole removed</value>
+<value number="file_fb4">RO disc - Draw icon removed</value>
+<value number="file_f9f">RW logon disc - keyhole added</value>
+<value number="file_f9e">Protected logon disc - keyhole now an indicator on left</value>
+<value number="file_f9d">CD share - no change</value>
+<value number="small_bda">RW disc - no change</value>
+<value number="small_bd9">Protected disc - keyhole removed</value>
+<value number="small_fb4">RO disc - created</value>
+<value number="small_f9f">RW logon disc - keyhole added</value>
+<value number="small_f9e">Protected logon disc - no change</value>
+<value number="network">Replaced AUN-style pyramid with more generic 'network' spider</value>
+<value number="netfs">Created from old network icon</value>
+<value number="netfsg">Created from old network icon, using grey Access level.</value>
+</value-table></p><p>
+<strong>Note:</strong> The CD share should not, by this document, use a CD icon as the access type. If used at all, this should be an indicator at the bottom left. This may be addressed in a later version of ShareFS.
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
