@@ -1,0 +1,155 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="CMYK sprites">
+<section title="Introduction and Overview">
+<p>
+CMYK sprites (also known as 'type 7 sprites') may now be rendered by SpriteExtend. Calls to PlotSpriteScaled, and PlotSpriteTransformed for these sprites will now render the sprite in the same manner as 32 bpp sprites ('type 6'). As such, CMYK sprites will be subject to colour mapping as 16 bpp or 32 bpp sprites.
+</p>
+<p>
+Data within CMYK sprites is stored in the format &amp;KKYYMMCC, as compared to 32 bpp RGB sprites which is stored in the format &amp;00BBGGRR. As with other new format sprites, masks are held in 1 bpp format.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Caveats">
+<p>
+A side effect of CMYK-style sprites is that the colour number (<reference type="swi" name="ColourTrans_ReturnColourNumber" /> etc.) now spans the whole 32 bits. Thus it is possible to generate colour numbers which, if treated as signed values, are negative. If any private data has previously been stored in the top 8 bits of the colour number by applications or extensions this may now be invalid. The previous assumption that a colour number would be 24bits wide was incorrect.
+</p>
+<p>
+An example of code that might fail would be code that used +ve colour numbers to mean literal colours, and -ve values to mean special effects, such as ECF plotting. Where such assumptions are made this may result in undefined behaviour of the application concerned. If applications restrict their processing to the standard RGB colours, this should not be an issue.
+</p>
+</subsection>
+
+<subsection title="Masks">
+<p>
+Masks should function as for other new format sprites; masks are 1bpp. Operations to create and remove masks function correctly, as does redirection to masks.
+</p>
+</subsection>
+
+<subsection title="Redirection">
+<p>
+Standard graphical operations will function normally if ColourTrans is used. For sprite plotting, pixel translation tables must be 'wide' (bit 4 set) to allow colour matching to be performed correctly, as is the case with 16 and 32bpp RGB sprites. Operations which use ColourTrans should function normally.
+</p>
+<p>
+If it is necessary to determine whether output is directed to a CMYK sprite, <reference type="swi" name="OS_ReadModeVariable" />/<reference type="swi" name="OS_ReadVduVariables" /> 0 should be used to read the mode flags. Additional bits have been defined to describe the format of the data :
+</p>
+<p><bitfield-table>
+ <bit number="12-15">Data format:
+  <value-table head-number="Value" head-value="Meaning">
+   <value number="0">RGB data (sprite types 0 to 6 will return this)</value>
+   <value number="1">CMYK data (sprite type 7 will return this)</value>
+  </value-table>
+ </bit>
+</bitfield-table></p>
+</subsection>
+
+<subsection title="Mode variables for CMYK sprites">
+<p>
+Variables returned for CMYK sprites through OS_ReadModeVariable or OS_ReadVduVariables have been updated to supply the following values :
+</p>
+<p><value-table head-number="Variable" head-value="Value">
+<value number="0">(see above for new data format flags)</value>
+<value number="3">&amp;FFFFFFFF</value>
+<value number="4">from sprite type word</value>
+<value number="5">from sprite type word</value>
+<value number="9">5</value>
+<value number="10">5</value>
+</value-table></p><p>
+Other values are undefined.
+</p>
+</subsection>
+
+<subsection title="Reading colours">
+<p>
+Reading a pixel colour will return the colour number at the position declared in the native format (as with the other sprite formats). To convert this to RGB you may need to use <reference type="swi" name="ColourTrans_ConvertCMYKToRGB" />.
+</p>
+</subsection>
+
+<subsection title="Advanced notes">
+<p>
+Converting to and from RGB may need to be performed quickly by more advanced applications. Where no calibration is necessary, this can be done with the following code examples :
+</p>
+<p>
+RGB to CMYK conversion (&amp;00BBGGRR to &amp;KKYYMMCC) :
+</p>
+<p><extended-example type="asm">
+<userinput>        ; First, invert the lot</userinput><br/>
+<userinput>        MVN     r_pixel,r_pixel                 ; invert</userinput><br/>
+<userinput>        ; Now work out what 'black' value to use</userinput><br/>
+<userinput>        AND     r_temp1,r_pixel,#&amp;00FF00        ; green component</userinput><br/>
+<userinput>        AND     r_temp2,r_pixel,#&amp;0000FF        ; red component</userinput><br/>
+<userinput>        CMP     r_temp1,r_temp2,LSL #8          ; compare them</userinput><br/>
+<userinput>        MOVHI   r_temp1,r_temp2,LSL #8          ; red was lower</userinput><br/>
+<userinput>        AND     r_temp2,r_pixel,#&amp;FF0000        ; blue component</userinput><br/>
+<userinput>        CMP     r_temp1,r_temp2,LSR #8          ; compare them</userinput><br/>
+<userinput>        MOVHI   r_temp1,r_temp2,LSR #8          ; blue was lower</userinput><br/>
+<userinput>        ; r_temp1 now = &amp;0000KK00</userinput><br/>
+<userinput>        ORR     r_temp2,r_temp1,r_temp1,LSL #8  ; &amp;00KKKK00</userinput><br/>
+<userinput>        ORR     r_temp2,r_temp2,r_temp2,LSL #8  ; &amp;KKKKKK00</userinput><br/>
+<userinput>        RSB     r_pixel,r_temp2,r_pixel,LSL #8  ; &amp;YYMMCC00</userinput><br/>
+<userinput>        MOV     r_pixel,r_pixel,LSR #8          ; &amp;00YYMMCC</userinput><br/>
+<userinput>        ORR     r_pixel,r_pixel,r_temp1,LSL #16 ; &amp;KKYYMMCC</userinput>
+</extended-example></p><p>
+CMYK to RGB conversion (&amp;KKYYMMCC to &amp;00BBGGRR) :
+</p>
+<p><extended-example type="asm">
+<userinput>        ; r_pixel = &amp;KKYYMMCC</userinput><br/>
+<userinput>        AND     r_temp1, r_pixel, #&amp;ff000000       ; K</userinput><br/>
+<userinput>        AND     r_temp2, r_pixel, #&amp;00ff0000       ; Y</userinput><br/>
+<userinput>        ADDS    r_temp2, r_temp1, r_temp2, LSL #8  ; Y + K</userinput><br/>
+<userinput>        MOVCS   r_temp2, #&amp;ff000000                ; clamp</userinput><br/>
+<userinput>        MOV     r_pixel, r_pixel, LSL #16</userinput><br/>
+<userinput>        ; r_pixel = &amp;MMCC0000</userinput><br/>
+<userinput>        ORR     r_pixel, r_pixel, r_temp2, LSR #16 ; B</userinput><br/>
+<userinput>        ; r_pixel = &amp;MMCCBB00</userinput><br/>
+<userinput>        ADDS    r_temp2, r_temp1, r_pixel          ; M + K</userinput><br/>
+<userinput>        MOVCS   r_temp2, #&amp;ff000000</userinput><br/>
+<userinput>        ORR     r_pixel, r_pixel, r_temp2, LSR #24 ; G</userinput><br/>
+<userinput>        ; r_pixel = &amp;MMCCBBGG</userinput><br/>
+<userinput>        ADDS    r_temp2, r_temp1, r_pixel, LSL #8  ; C + K</userinput><br/>
+<userinput>        MOVCS   r_temp2, #&amp;ff000000</userinput><br/>
+<userinput>        MOV     r_pixel, r_pixel, LSL #16          ; clear top half</userinput><br/>
+<userinput>        ; r_pixel = &amp;BBGG0000</userinput><br/>
+<userinput>        ORR     r_pixel, r_pixel, r_temp2, LSR #16 ; R</userinput><br/>
+<userinput>        ; r_pixel = &amp;BBGGRRxx</userinput><br/>
+<userinput>        ; inverted to be true colours</userinput><br/>
+<userinput>        MVN     r_pixel, r_pixel ; Invert</userinput><br/>
+<userinput>        MOV     r_pixel, r_pixel, LSR #8 ; Shift to bottom</userinput><br/>
+<userinput>        ; true 00BBGGRR</userinput>
+</extended-example></p></subsection>
+
+<subsection title="Requirements">
+<p>
+For certain operations an updated version of ColourTrans will be necessary.
+</p>
+</subsection>
+
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
