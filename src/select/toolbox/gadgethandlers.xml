@@ -1,0 +1,427 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Gadget handlers">
+<section title="Introduction">
+<p>
+When the Window module wishes to notify a gadget of an event or operation it will call the gadget handler through the SWI supplied on registration (if the gadget's FeatureMask indicates that a 'Private handler' is present). These handler entry points have been extended in recent versions of the Window module. This document duplicates and extends on some of the details in AppNote 281.
+</p>
+<p>
+The gadget handler is entered with the following conditions :
+</p>
+<p><offset-table>
+ <offset number="R0">Operation flags (dependent on reason code)</offset>
+ <offset number="R1">Gadget type</offset>
+ <offset number="R2">Reason code (see below)</offset>
+ <offset number="R3...">Reason code dependent</offset>
+</offset-table></p>
+<p>
+The reason codes are:
+</p>
+<p><value-table head-number="Reason" head-value="Meaning">
+<value number="0">Reserved</value>
+<value number="1">Create new gadget</value>
+<value number="2">Delete gadget</value>
+<value number="3">Fade gadget</value>
+<value number="4">Gadget method</value>
+<value number="5">Reserved</value>
+<value number="6">Mouse click on gadget icon</value>
+<value number="7">Reserved</value>
+<value number="8">Reserved</value>
+<value number="9">Plot gadget</value>
+<value number="10">Set focus to gadget</value>
+<value number="11">Move gadget</value>
+<value number="12">Reserved</value>
+<value number="13">Parent window shown notification</value>
+<value number="14">Mouse scroll gadget</value>
+<value number="15">Gadget lost focus notification</value>
+<value number="16">Redraw request</value>
+<value number="17">Timer triggered</value>
+<value number="18+">Reserved</value>
+</value-table></p><p>
+Over time more handlers may become available and so the SWI handler should not assume that only the handlers it has requested will result in a call out. For a handler in C this would result in nothing being done by the default case.
+</p>
+</section>
+
+<section title="Entry Points">
+<entry-definition name="GADGET_ADD"
+                  description="Create a new gadget"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="2">GADGET_ADD (1)</register-use>
+ <register-use number="3">Pointer to gadget template</register-use>
+ <register-use number="4">ObjectId of parent window</register-use>
+ <register-use number="5">Wimp window handle</register-use>
+</entry>
+<exit>
+ <register-use number="0">Handle to use in future calls</register-use>
+ <register-use number="1">Pointer to icon list</register-use>
+</exit>
+<use>
+<p>
+On receiving this reason code an extension module should create the new gadget from the given data and return its icon list and private handle. The template will already have been checked for valid flags. Any attached objects (like the Click show objects attached to action buttons) should be created using the GLib calls.
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+<entry-definition name="GADGET_REMOVE"
+                  description="Remove a gadget"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+ <bit number="0">Set if gadget should remove attached objects</bit>
+ <bit number="1-31">Reserved, must be 0</bit>
+</bitfield-table></register-use>
+ <register-use number="2">GADGET_REMOVE (2)</register-use>
+ <register-use number="3">Pointer to private data</register-use>
+</entry>
+<exit>
+ <register-use number="0-12">Preserved</register-use>
+</exit>
+<use>
+<p>
+On receiving this reason code an extension module should remove the gadget. If the recurse bit is set then any attached objects such as Windows or Menus should not be removed. This is in common with the flag bit in the SWI Toolbox_DeleteObject.
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+<entry-definition name="GADGET_FADE"
+                  description="Fade or unfade a gadget"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="2">GADGET_FADE (3)</register-use>
+ <register-use number="3">Pointer to private data</register-use>
+ <register-use number="4">State (non zero = fade)</register-use>
+ <register-use number="5">ObjectId of window to which this Gadget belongs</register-use>
+</entry>
+<exit>
+ <register-use number="0-12">Preserved</register-use>
+</exit>
+<use>
+<p>
+On receiving this reason code an extension module should fade or unfade the gadget, according to the value in R4. A Gadget will have been faded by the client making a call to the Gadget_SetFlags method.
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+<entry-definition name="GADGET_METHOD"
+                  description="Perform a gadget method"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="2">GADGET_METHOD (4)</register-use>
+ <register-use number="3">Pointer to private data</register-use>
+ <register-use number="4">Pointer to registers passed to Toolbox_ObjectMiscOp SWI</register-use>
+</entry>
+<exit>
+ <register-use number="">Depends on Method</register-use>
+</exit>
+<use>
+<p>
+The window module raises this reason code when a task uses the Toolbox_ObjectMiscOp SWI on a Gadget which is provided by an extension module. R4 points to a register bank (in C terms this is the _kernel_swi_regs type) which contains the values that the client passed to the SWI. If any information is to be returned to the client then this bank should be updated. i.e. to return a value in R0 do not set R0 to the value but update the contents of the location pointed to by R4+0. Note that the generic Gadget methods such as Gadget_SetFlags do not result in a call to GADGET_METHOD.
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+<entry-definition name="GADGET_MCLICK"
+                  description="Mouse click on a gadget icon"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="2">GADGET_MCLICK (6)</register-use>
+ <register-use number="3">Pointer to private data</register-use>
+ <register-use number="4">Pointer to wimp event block</register-use>
+</entry>
+<exit>
+ <register-use number="1">Claim</register-use>
+</exit>
+<use>
+<p>
+The window module raises this reason code when an icon belonging to the Gadget is clicked on. The event block in R4 is just like the one returned by Wimp_Poll when an icon is clicked on. An extension module would typically use this to update the state of the Gadget or return a 'high-level' Toolbox Event. By setting R1 to be non-zero the Window module will update the task's ID block so that when the wimp mouse click event is delivered it is marked as belonging to this Gadget. Although it is unlikely that the task will be interested in the underlying event it should still be claimed. Possible exceptions to this rule are when the menu mouse button is used - in this case, not claiming the click (R1 = 0) passes the mouse click on which would allow the Window's menu to be viewed. This is not true for a popup menu type Gadget though.
+</p>
+<p>
+It is also possible to claim the event entirely so that the task will not see the mouse click. This is achieved by setting R1 to -1 on exit, but this should be avoided as this does not fit the Toolbox model and so should only be done in specialist cases.
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+<entry-definition name="GADGET_PLOT"
+                  description="Plot a gadget (for !ResEd)"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="2">GADGET_PLOT (9)</register-use>
+ <register-use number="3">Pointer to gadget template definition</register-use>
+</entry>
+<exit>
+ <register-use number="0-12">Preserved</register-use>
+</exit>
+<use>
+<p>
+The window module raises this reason code when !ResEd is plotting Gadgets. The extension module should use Wimp_PlotIcon or Window_PlotGadget (for composite Gadgets) to display the Gadget which is defined by the template.
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+<entry-definition name="GADGET_SETFOCUS"
+                  description="Set the focus to a gadget"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+ <bit number="0">Set if the focus is being set 'upwards', clear if the focus is being set 'downwards'</bit>
+ <bit number="1-31">Reserved, must be 0</bit>
+</bitfield-table></register-use>
+ <register-use number="2">GADGET_SETFOCUS (10)</register-use>
+ <register-use number="3">Pointer to private data</register-use>
+</entry>
+<exit>
+ <register-use number="0-12">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call will be made when the Window module wishes to set the focus to a Gadget. The direction signals whether to set the focus to the before or after Gadget in the event of this Gadget being faded. Care should be taken when 'passing on' the focus as an infinite loop will be entered if all members of the list are faded. Gadgets which are composite and consist of a writable Gadget do not need to worry about this and should just set focus to their writable without checking their faded status, assuming that the before and after fields of the underlying writable have been set.
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+<entry-definition name="GADGET_MOVE"
+                  description="Move a gadget"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="2">GADGET_MOVE (11)</register-use>
+ <register-use number="3">Pointer to private data</register-use>
+ <register-use number="4">Wimp window handle</register-use>
+ <register-use number="5">Pointer to new bounding box</register-use>
+ <register-use number="6">Window ObjectId</register-use>
+</entry>
+<exit>
+ <register-use number="0-12">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call is made when the Gadget_Move method is applied to a Gadget. A composite gadget must supply a handler if it is going to be moved after creation as the default handler can only move the icons which belong directly to a Gadget. It is also of use if the Gadget supports resizing - the default mover will only move by an offset as it generally does not know how to handle any change in the size of the bounding box.
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+<entry-definition name="GADGET_POSTADD"
+                  description="Gadget post-add notification (reason 12)"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="2">GADGET_POSTADD (12)</register-use>
+</entry>
+<exit>
+</exit>
+<use>
+<p>
+<fixme>The entry and exit conditions of this reason code are not documented.</fixme>
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+<entry-definition name="GADGET_WINDOWSHOW"
+                  description="Parent window shown or hidden"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="2">GADGET_WINDOWSHOW (13)</register-use>
+ <register-use number="3">Pointer to private data</register-use>
+ <register-use number="4">Window ObjectId</register-use>
+ <register-use number="5">Wimp window handle</register-use>
+ <register-use number="6">1 if window is being shown, 0 if window is being hidden</register-use>
+</entry>
+<exit>
+ <register-use number="0-12">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call is made to inform the gadget that its parent Window has been shown or has been hidden. Gadgets may wish to take action the first time they are shown or to stop an action once the window is hidden. A typical example of such a gadget might be a timer.
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+<entry-definition name="GADGET_MSCROLL"
+                  description="Mouse scroll on a gadget"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="2">GADGET_MSCROLL (14)</register-use>
+ <register-use number="3">Pointer to private data</register-use>
+ <register-use number="4">Window ObjectId</register-use>
+ <register-use number="5">Wimp window handle</register-use>
+ <register-use number="6">Pointer to wimp event block</register-use>
+</entry>
+<exit>
+ <register-use number="0-12">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call is made when the Window module receives a scroll event for an icon belonging to the gadget. In order for the WindowScroll module to generate such events the icons must have the correct validation string set. See the <reference type="document" href="../desktop/windowscroll" name="WindowScroll module" /> document for more details.
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+<entry-definition name="GADGET_LOSTFOCUS"
+                  description="Gadget lost the focus"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="2">GADGET_LOSTFOCUS (15)</register-use>
+ <register-use number="3">Pointer to private data</register-use>
+ <register-use number="4">Window ObjectId</register-use>
+ <register-use number="5">Wimp window handle</register-use>
+ <register-use number="6">Pointer to wimp event block</register-use>
+</entry>
+<exit>
+ <register-use number="0-12">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call is made when the Window module detects that a gadget has lost the focus, either due to a cursor movement or the focus being moved to another icon (even temporarily by a Menu). Gadgets may wish to take action based on having lost the focus, such as validating input.
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+<entry-definition name="GADGET_REDRAW"
+                  description="Redraw a region of a gadget"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+ <bit number="0">1 if the gadget needs to be redrawn entirely, 0 if part of the gadget is obscured</bit>
+ <bit number="1">1 if the gadget should be rendered faded, 0 if the gadget should be rendered normally</bit>
+ <bit number="2-31">Reserved</bit>
+</bitfield-table></register-use>
+ <register-use number="2">GADGET_REDRAW (16)</register-use>
+ <register-use number="3">Pointer to private data</register-use>
+ <register-use number="4">Pointer to redraw bounding box in workspace coordinates</register-use>
+ <register-use number="5">Pointer to window state block (as returned from Wimp_GetWindowState)</register-use>
+ <register-use number="6">Pointer to gadget bounding box in workspace coordinates</register-use>
+ <register-use number="7">X screen coordinate of workspace coordinate 0,0</register-use>
+ <register-use number="8">Y screen coordinate of workspace coordinate 0,0</register-use>
+</entry>
+<exit>
+ <register-use number="0-12">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call is made when the Window module needs to redraw a region of the window covered by a gadget. Gadgets which have the 'redraw' Feature set to include a 'Private Handler' will be automatically registered with the RedrawManager module and this entry point will be called to redraw their content. The 'Gadget_AtBack' flag is used to control whether the redraw occurs before or after icon rendering. Because the redraw operation uses the RedrawManager, the order of such gadgets within the window will be arbitrary, but always before or after all other (non-Redraw) gadgets. The Redraw region will be bounded by the graphics window. See the <reference type="document" href="../desktop/redrawmanager" name="Rendering into Windows" /> document for more details.
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+<entry-definition name="GADGET_TIMER"
+                  description="A gadget timer was triggered"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="2">GADGET_TIMER (17)</register-use>
+ <register-use number="3">Pointer to private data</register-use>
+ <register-use number="4">Window ObjectId</register-use>
+ <register-use number="5">Wimp window handle</register-use>
+</entry>
+<exit>
+ <register-use number="0-12">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call is made when a Gadget's timer is triggered. The accuracy of gadget timers cannot be guaranteed. Gadget timers are started either on creation or when the window is shown. They are stopped when the window is hidden.
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Captured in the original HTML as part of the Toolbox Gadgets page, and separated into its own document. Corrected 'to the before of after Gadget' to 'before or after', 'handle and change in the size' to 'handle any change in the size', and 'the order of the such gadgets'. The placeholder heading GADGET_???? is expressed as a general statement about future handlers.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
