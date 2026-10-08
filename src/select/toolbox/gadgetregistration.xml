@@ -1,0 +1,192 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Gadget registration">
+<section title="Introduction and Overview">
+<p>
+Gadgets are registered using the SWI <reference type="swi" name="Window_RegisterExternal" /> and removed using the SWI <reference type="swi" name="Window_DeregisterExternal" />. These SWIs have been extended in order to allow for greater flexibility in the future.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Type details">
+<p>
+The type details can take one of two forms, depending on whether R0 bit 0 is set or clear. The basic form has bit 0 clear and, in C, has the following structure :
+</p>
+<p><extended-example type="c">
+<userinput>typedef struct {</userinput><br/>
+<userinput>  int type;</userinput><br/>
+<userinput>  unsigned long validflags;</userinput><br/>
+<userinput>  FeatureMask features;</userinput><br/>
+<userinput>} GadgetExtensionRecord;</userinput>
+</extended-example></p><p>
+The extended form adds an extra FeatureMask word, making the record 4 words long, rather than 3 :
+</p>
+<p><extended-example type="c">
+<userinput>typedef struct {</userinput><br/>
+<userinput>  int           type;</userinput><br/>
+<userinput>  unsigned long validflags;</userinput><br/>
+<userinput>  FeatureMask   features;</userinput><br/>
+<userinput>  FeatureMask2  features2;</userinput><br/>
+<userinput>} GadgetExtensionRecord2;</userinput>
+</extended-example></p><p>
+The FeatureMask (and FeatureMask2) flags word takes the following form in C :
+</p>
+<p><extended-example type="c">
+<userinput>typedef struct {</userinput><br/>
+<userinput>   int add:2,</userinput><br/>
+<userinput>       remove:2,</userinput><br/>
+<userinput>       postadd:2,</userinput><br/>
+<userinput>       method:2,</userinput><br/>
+<userinput>       reserved:2,</userinput><br/>
+<userinput>       mclick:2,</userinput><br/>
+<userinput>       reserved2:4,</userinput><br/>
+<userinput>       plot:2,</userinput><br/>
+<userinput>       setfocus:2,</userinput><br/>
+<userinput>       move:2,</userinput><br/>
+<userinput>       fade:2,</userinput><br/>
+<userinput>       windowshow:2,</userinput><br/>
+<userinput>       mscroll:2,</userinput><br/>
+<userinput>       lostfocus:2,</userinput><br/>
+<userinput>       redraw:2;</userinput><br/>
+<userinput>} FeatureMask;</userinput>
+</extended-example></p><p><extended-example type="c">
+<userinput>typedef struct {</userinput><br/>
+<userinput>   int timer:2,</userinput><br/>
+<userinput>       unused2:2,</userinput><br/>
+<userinput>       unused4:2,</userinput><br/>
+<userinput>       unused6:2,</userinput><br/>
+<userinput>       unused8:2,</userinput><br/>
+<userinput>       unused10:2,</userinput><br/>
+<userinput>       unused12:2,</userinput><br/>
+<userinput>       unused14:2,</userinput><br/>
+<userinput>       unused16:2,</userinput><br/>
+<userinput>       unused18:2,</userinput><br/>
+<userinput>       unused20:2,</userinput><br/>
+<userinput>       unused22:2,</userinput><br/>
+<userinput>       unused24:2,</userinput><br/>
+<userinput>       unused26:2,</userinput><br/>
+<userinput>       unused28:2,</userinput><br/>
+<userinput>       unused30:2;</userinput><br/>
+<userinput>} FeatureMask2;</userinput>
+</extended-example></p><p>
+Each of these bits can take a value to indicate what type of handler is present in the gadget :
+</p>
+<p><value-table head-number="Value" head-value="Meaning">
+<value number="0">'No handler present'. The operation will be ignored</value>
+<value number="1">'Default handler present'. The Window module will perform whatever default processing the operation expects, for example a 'move' operation will apply simple position changes to the registered icons for the gadget.</value>
+<value number="2">'Private handler present'. The Window module will call the gadget entry point to request the operation be performed.</value>
+<value number="3">Reserved, must not be used</value>
+</value-table></p><p>
+See the <reference type="document" href="gadgethandlers" name="Gadget handlers" /> document for details of the handlers and their API.
+</p>
+<p>
+A number of functions exist to be used to register and deregister gadgets :
+</p>
+<p><extended-example type="c">
+<userinput>extern _kernel_oserror *register_gadget_types(unsigned int flags,</userinput><br/>
+<userinput>                                              GadgetExtensionRecord *rec,</userinput><br/>
+<userinput>                                              int SWIno);</userinput><br/>
+<userinput>extern _kernel_oserror *deregister_gadget_type(unsigned int flags,</userinput><br/>
+<userinput>                                               int type,</userinput><br/>
+<userinput>                                               int SWIno);</userinput><br/>
+<userinput>extern _kernel_oserror *register_gadget_type(unsigned int flags,</userinput><br/>
+<userinput>                                             int type,</userinput><br/>
+<userinput>                                             unsigned int valid,</userinput><br/>
+<userinput>                                             unsigned int mask,</userinput><br/>
+<userinput>                                             int SWIno);</userinput><br/>
+<userinput>extern _kernel_oserror *register_gadget_type2(unsigned int flags,</userinput><br/>
+<userinput>                                              int type,</userinput><br/>
+<userinput>                                              unsigned int valid,</userinput><br/>
+<userinput>                                              unsigned int mask,</userinput><br/>
+<userinput>                                              unsigned int mask2,</userinput><br/>
+<userinput>                                              int SWIno);</userinput>
+</extended-example></p></subsection>
+
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="Window_RegisterExternal"
+                number="82885"
+                description="Register new Gadget types with the Window module"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+ <bit number="0">Use extended form of gadget details</bit>
+ <bit number="1-31">Must be 0</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Pointer to list of type details (see above)</register-use>
+ <register-use number="2">Gadget SWI number</register-use>
+</entry>
+<exit>
+ <register-use number="0-2">Preserved</register-use>
+</exit>
+<use>
+<p>
+This SWI registers the new Gadget type(s) with the Window module. The given SWI number will be called whenever the Window module encounters the given Gadget type and the features mask indicates that there is a handler available.
+</p>
+</use>
+<related>
+<reference type="swi" name="Window_DeregisterExternal" />
+</related>
+</swi-definition>
+
+<swi-definition name="Window_DeregisterExternal"
+                number="82886"
+                description="Deregister a Gadget type"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags, must be 0</register-use>
+ <register-use number="1">Type of Gadget to deregister</register-use>
+ <register-use number="2">SWI that handled it</register-use>
+</entry>
+<exit>
+ <register-use number="0-2">Preserved</register-use>
+</exit>
+<use>
+<p>
+This SWI deregisters a Gadget type. Note that if a module dies without deregistering the Window module will automatically deregister it on the next SWI call. However, this behaviour should not be relied upon - it is there to prevent unexpected behaviour with the rest of the system.
+</p>
+</use>
+<related>
+<reference type="swi" name="Window_RegisterExternal" />
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Captured in the original HTML as part of the Toolbox Gadgets page, and separated into its own document. Corrected 'rather then' to 'rather than' and 'exist be used' to 'exist to be used'. The C declarations were restored from the original documentation text.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
