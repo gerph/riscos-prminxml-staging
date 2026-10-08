@@ -1,0 +1,280 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="CompressJPEG module">
+<section title="Introduction and Overview">
+<p>
+The CompressJPEG module has been extended beyond the functions provided by the original version as documented in PRM 5a-609. In particular it is now possible to transcode JPEGs (convert from one form of JPEG to another without loss of information), to add comments and to create JPEGs from arbitrary paletted data.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="CompressJPEG_WriteLineExtended"
+                number="4A504"
+                description="Write lines to a JPEG from a generic source"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">JPEG tag</register-use>
+ <register-use number="1">Flags:
+  <bitfield-table>
+   <bit number="0-2">Pixel type, size of pixels (number of colours):
+    <value-table head-number="Value" head-value="Meaning">
+     <value number="0">1bit (2 colours, palette supplied in R3)</value>
+     <value number="1">2bits (4 colours, palette supplied in R3)</value>
+     <value number="2">4bits (16 colours, palette supplied in R3)</value>
+     <value number="3">8bits (256 colours, palette supplied in R3)</value>
+     <value number="4">16bits (32767 colours, 15bits of colour data)</value>
+     <value number="5">32bits (16M colours, 24bits of colour data)</value>
+     <value number="6">Reserved</value>
+     <value number="7">24bits (16M colour, flag bits 4 and 5 are ignored)</value>
+    </value-table>
+   </bit>
+   <bit number="3">Palette has double entries (flashing colours included)</bit>
+   <bit number="4">If set, colour data has any spare data in high bits</bit>
+   <bit number="5">If set, colour data holds the red component in the high bits; if clear, colour data holds the red component in the low bits</bit>
+   <bit number="6-31">Reserved</bit>
+  </bitfield-table></register-use>
+ <register-use number="2">Pointer to data to write</register-use>
+ <register-use number="3">Pointer to palette data (for pixel type 0-3)</register-use>
+ <register-use number="4">Number of lines to write</register-use>
+ <register-use number="5">Bytes between each line (for alignment issues)</register-use>
+</entry>
+<exit>
+ <register-use number="2">New data pointer</register-use>
+ <register-use number="4">Number of lines that were not written</register-use>
+</exit>
+<use>
+<p>
+This SWI can be used to write a line to a JPEG from a more generic source than with <userinput>CompressJPEG_WriteLine</userinput>. Example code for Sprite conversion can be supplied.
+</p>
+<p>
+For a pixel type of 7, RGB data is provided in RGBRGBRGB... format, making it equivalent to that of <userinput>CompressJPEG_WriteLine</userinput>. In this mode, the other flags have no effect.
+</p>
+<p>
+This extended form of WriteLine requires a greater storage space than that of the standard operation. In addition to the normal storage space required :
+</p>
+<p><list>
+<item><p><userinput>width*3</userinput> extra bytes are required for colour JPEGs</p></item>
+<item><p><userinput>width</userinput> extra bytes are required for monochrome JPEGs</p></item>
+</list></p>
+</use>
+<related>
+<reference type="swi" name="CompressJPEG_Comment" />
+</related>
+</swi-definition>
+
+<swi-definition name="CompressJPEG_Comment"
+                number="4A503"
+                description="Add a comment to a JPEG being created"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">JPEG tag</register-use>
+ <register-use number="1">Flags:
+  <bitfield-table>
+   <bit number="0">Data is a string, ignore length and use control termination (10 and 9 are accepted as non-control characters)</bit>
+   <bit number="1-31">Reserved, must be 0</bit>
+  </bitfield-table></register-use>
+ <register-use number="2">Pointer to comment data</register-use>
+ <register-use number="3">Length of comment data (if R1 bit 0 clear)</register-use>
+</entry>
+<exit>
+ <register-use number="0-3">Preserved</register-use>
+</exit>
+<use>
+<p>
+This SWI can be used to add a comment to a JPEG in the process of being created. It should be used immediately after <userinput>CompressJPEG_Start</userinput>. Comment data may contain multiple lines and/or binary data (although this is discouraged).
+</p>
+</use>
+<related>
+<reference type="swi" name="CompressJPEG_WriteLineExtended" />
+</related>
+</swi-definition>
+
+<swi-definition name="CompressJPEG_Transcode"
+                number="4A510"
+                description="Convert a JPEG from one form to another"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+   <bit number="0">Generate a progressive JPEG, described by R7</bit>
+   <bit number="1-2">Operation on 'unknown elements':
+    <value-table head-number="Value" head-value="Meaning">
+     <value number="0">Copy no additional elements</value>
+     <value number="1">Copy comments</value>
+     <value number="2">Undefined</value>
+     <value number="3">Copy all elements</value>
+    </value-table>
+   </bit>
+   <bit number="3-6">Transformation type:
+    <value-table head-number="Value" head-value="Meaning">
+     <value number="0">No transformation</value>
+     <value number="1">Flip horizontally</value>
+     <value number="2">Flip vertically</value>
+     <value number="3">Rotate 90 degrees clockwise</value>
+     <value number="4">Rotate 180 degrees</value>
+     <value number="5">Rotate 90 degrees anticlockwise</value>
+     <value number="6">Transpose (rotate 90 degrees clockwise + flip horizontally)</value>
+     <value number="7">Transverse transpose (rotate 90 degrees anticlockwise + flip vertically)</value>
+     <value number="8-15">Reserved</value>
+    </value-table>
+   </bit>
+   <bit number="7">Trim the edges of the output transform</bit>
+   <bit number="8">Generate greyscale output</bit>
+   <bit number="9">Optimise for a smaller image</bit>
+  </bitfield-table></register-use>
+ <register-use number="1">Pointer to original JPEG</register-use>
+ <register-use number="2">Length of original JPEG</register-use>
+ <register-use number="3">Pointer to output JPEG buffer</register-use>
+ <register-use number="4">Length of output JPEG buffer</register-use>
+ <register-use number="5">Pointer to workspace, or 0 to read the length</register-use>
+ <register-use number="6">Length of workspace</register-use>
+ <register-use number="7">Pointer to scan description block, or 0 for simple progressive (if R0 bit 0 set):
+  <offset-table>
+   <offset number="0">Number of scans present</offset>
+   <offset number="4">For each scan (repeated), the scan description:
+    <offset-table>
+     <offset number="0">Components within scan</offset>
+     <offset number="4-16">Component indices</offset>
+     <offset number="20">Spectral selection start (Ss)</offset>
+     <offset number="24">Spectral selection end (Se)</offset>
+     <offset number="28">Approximation high value (Ah)</offset>
+     <offset number="32">Approximation low value (Al)</offset>
+    </offset-table>
+   </offset>
+  </offset-table></register-use>
+</entry>
+<exit>
+</exit>
+<use>
+<p>
+This SWI is used to transcode a JPEG - that is, convert a JPEG in one form to another form. The most common use for this call is to convert a multi-pass JPEG into a single-pass JPEG suitable for rendering with the built in renderer. For more details about the scan description block, consult the Independent JPEG Groups JPEG library version 6b document 'Experts'.
+</p>
+</use>
+<related>
+<reference type="swi" name="CompressJPEG_Comment" />
+</related>
+</swi-definition>
+
+</section>
+
+<section title="Error Messages">
+<p>
+Errors use the error base &amp;8183C0 for the core errors, but some errors use a base of &amp;81A8C0 :
+</p>
+<p><fixme>The error base for the JPEG-specific errors is given here as &amp;81A8C0, but the table of those errors is relative to &amp;81A880; the correct base needs to be confirmed.</fixme></p>
+<p>
+The core errors are:
+</p>
+<p><value-table head-number="Error number" head-value="Message and meaning">
+<value number="&amp;8183C0"><strong>Bad number of bits per pixel passed to CompressJPEG</strong>. The pixel depth of the line is not understood by this version of the CompressJPEG module.</value>
+<value number="&amp;8183C1"><strong>Bad number of lines passed to CompressJPEG</strong>. Too many lines have been passed to the CompressJPEG module.</value>
+<value number="&amp;8183C2"><strong>Bad buffer or workspace block</strong>. Buffers or workspace is not aligned correctly, they overlap, or their lengths are too small.</value>
+<value number="&amp;8183C3"><strong>Bad width or height</strong>. Width or height are invalid for this version of CompressJPEG.</value>
+</value-table></p>
+<p>
+The JPEG-specific errors have the number &amp;81A880+n. Not all of these are possible with the current version of the module.
+</p>
+<p><value-table head-number="n" head-name="Name" head-value="Message">
+<value number="1" name="ARITH_NOTIMPL">Sorry, there are legal restrictions on arithmetic coding</value>
+<value number="2" name="BAD_ALIGN_TYPE">ALIGN_TYPE is wrong, please fix</value>
+<value number="3" name="BAD_ALLOC_CHUNK">MAX_ALLOC_CHUNK is wrong, please fix</value>
+<value number="4" name="BAD_BUFFER_MODE">Bogus buffer control mode</value>
+<value number="5" name="BAD_COMPONENT_ID">Invalid component ID %d in SOS</value>
+<value number="6" name="BAD_DCTSIZE">IDCT output block size %d not supported</value>
+<value number="7" name="BAD_IN_COLORSPACE">Bogus input colorspace</value>
+<value number="8" name="BAD_J_COLORSPACE">Bogus JPEG colorspace</value>
+<value number="9" name="BAD_LENGTH">Bogus marker length</value>
+<value number="10" name="BAD_MCU_SIZE">Sampling factors too large for interleaved scan</value>
+<value number="11" name="BAD_POOL_ID">Invalid memory pool code %d</value>
+<value number="12" name="BAD_PRECISION">Unsupported JPEG data precision %d</value>
+<value number="13" name="BAD_SAMPLING">Bogus sampling factors</value>
+<value number="14" name="BAD_STATE">Improper call to JPEG library in state %d</value>
+<value number="15" name="BAD_VIRTUAL_ACCESS">Bogus virtual array access</value>
+<value number="16" name="BUFFER_SIZE">Buffer passed to JPEG library is too small</value>
+<value number="17" name="CANT_SUSPEND">Suspension not allowed here</value>
+<value number="18" name="CCIR601_NOTIMPL">CCIR601 sampling not implemented yet</value>
+<value number="19" name="COMPONENT_COUNT">Too many color components: %d, max %d</value>
+<value number="20" name="CONVERSION_NOTIMPL">Unsupported color conversion request</value>
+<value number="21" name="DAC_INDEX">Bogus DAC index %d</value>
+<value number="22" name="DAC_VALUE">Bogus DAC value 0x%x</value>
+<value number="23" name="DHT_INDEX">Bogus DHT index %d</value>
+<value number="24" name="DQT_INDEX">Bogus DQT index %d</value>
+<value number="25" name="EMPTY_IMAGE">Empty JPEG image (DNL not supported)</value>
+<value number="26" name="EOI_EXPECTED">Didn't expect more than one scan</value>
+<value number="27" name="FILE_READ">Input file read error</value>
+<value number="28" name="FILE_WRITE">Output file write error --- out of disk space?</value>
+<value number="29" name="FRACT_SAMPLE_NOTIMPL">Fractional sampling not implemented yet</value>
+<value number="30" name="HUFF_CLEN_OVERFLOW">Huffman code size table overflow</value>
+<value number="31" name="HUFF_MISSING_CODE">Missing Huffman code table entry</value>
+<value number="32" name="IMAGE_TOO_BIG">Maximum supported image dimension is %u pixels</value>
+<value number="33" name="INPUT_EMPTY">Empty input file</value>
+<value number="34" name="INPUT_EOF">Premature end of input file</value>
+<value number="35" name="NOTIMPL">Not implemented yet</value>
+<value number="36" name="NOT_COMPILED">Requested feature was omitted at compile time</value>
+<value number="37" name="NO_BACKING_STORE">Backing store not supported</value>
+<value number="38" name="NO_HUFF_TABLE">Huffman table 0x%02x was not defined</value>
+<value number="39" name="NO_IMAGE">JPEG datastream contains no image</value>
+<value number="40" name="NO_QUANT_TABLE">Quantization table 0x%02x was not defined</value>
+<value number="41" name="NO_SOI">Not a JPEG file: starts with 0x%02x 0x%02x</value>
+<value number="42" name="OUT_OF_MEMORY">Insufficient memory (case %d)</value>
+<value number="43" name="QUANT_COMPONENTS">Cannot quantize more than %d color components</value>
+<value number="44" name="QUANT_FEW_COLORS">Cannot quantize to fewer than %d colors</value>
+<value number="45" name="QUANT_MANY_COLORS">Cannot quantize to more than %d colors</value>
+<value number="46" name="SOF_DUPLICATE">Invalid JPEG file structure: two SOF markers</value>
+<value number="47" name="SOF_NO_SOS">Invalid JPEG file structure: missing SOS marker</value>
+<value number="48" name="SOF_UNSUPPORTED">Unsupported JPEG process: SOF type 0x%02x</value>
+<value number="49" name="SOI_DUPLICATE">Invalid JPEG file structure: two SOI markers</value>
+<value number="50" name="SOS_NO_SOF">Invalid JPEG file structure: SOS before SOF</value>
+<value number="51" name="TOO_LITTLE_DATA">Application transferred too few scanlines</value>
+<value number="52" name="UNKNOWN_MARKER">Unsupported marker type 0x%02x</value>
+<value number="53" name="VIRTUAL_BUG">Virtual array controller messed up</value>
+<value number="54" name="WIDTH_OVERFLOW">Image too wide for this implementation</value>
+<value number="55" name="BAD_DCT_COEF">DCT coefficient out of range</value>
+<value number="56" name="BAD_HUFF_TABLE">Bogus Huffman table definition</value>
+<value number="57" name="BAD_PROGRESSION">Invalid progressive parameters Ss=%d Se=%d Ah=%d Al=%d</value>
+<value number="58" name="BAD_PROG_SCRIPT">Invalid progressive parameters at scan script entry %d</value>
+<value number="59" name="BAD_SCAN_SCRIPT">Invalid scan script at entry %d</value>
+<value number="60" name="MISMATCHED_QUANT_TABLE">Cannot transcode due to multiple use of quantization table %d</value>
+<value number="61" name="MISSING_DATA">Scan script does not transmit all data</value>
+<value number="62" name="MODE_CHANGE">Invalid color quantization mode change</value>
+<value number="63" name="WBUFFER_SIZE">Workspace buffer passed to JPEG library is too small</value>
+</value-table></p>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the description of CompressJPEG_Comment, in which the R0 and R1 entries had run together and the length of comment data was conditional on 'R0 b0' where bit 0 is held in R1.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
