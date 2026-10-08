@@ -1,0 +1,214 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Wimp_TextOp">
+<section title="Introduction and Overview">
+<p>
+In order to address certain issues with fonts which 'overhang' their right hand edge (such as oblique or italic fonts), a new flag bit has been added to Wimp_TextOp 1 (read size of string). This allows applications (such as the Filer) to calculate icon bounding boxes more reliably where such fonts are in use.
+</p>
+<p>
+Since RISC OS 4 a number of additional flags have been available for Wimp_TextOp 2 (plot string). These allow the text strings to be rendered within the current window and make the font appear vertically centred at the position specified.
+</p>
+<p>
+Two additional reason codes have been added to centralise the splitting of system font text and its truncation.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+The operation is selected by the reason code in R0 bits 0-7:
+</p>
+<p><bitfield-table>
+ <bit number="0-7">Operation:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Set colours to use</value>
+ <value number="1">Read string size</value>
+ <value number="2">Plot font</value>
+ <value number="3">Find split point in string</value>
+ <value number="4">Truncate string with ellipsis</value>
+</value-table></bit>
+ <bit number="8-31">Dependent on operation</bit>
+</bitfield-table></p>
+<p>
+Other registers are dependent on the operation. The SWI is used to perform text string operations using the desktop font.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="Wimp_TextOp"
+                number="400F9"
+                reason="0"
+                reasonname="Wimp_TextOp_SetColours"
+                description="Set colours for desktop font operations"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">0 (set font colours)</register-use>
+ <register-use number="1">Foreground colour (&amp;BBGGRR00)</register-use>
+ <register-use number="2">Background colour (&amp;BBGGRR00)</register-use>
+</entry>
+<exit>
+ <register-use number="0-2">Preserved</register-use>
+</exit>
+<use>
+<p>
+This SWI sets the colours to use for subsequent desktop font operations.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_TextOp"
+                number="400F9"
+                reason="1"
+                reasonname="Wimp_TextOp_ReadStringSize"
+                description="Read the width of a string in the desktop font"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">1 (read string size) + flags:
+  <bitfield-table>
+ <bit number="31">Return size covered by string</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Pointer to string</register-use>
+ <register-use number="2">Number of characters to process, or 0 for the entire string</register-use>
+</entry>
+<exit>
+ <register-use number="0">Width of string in desktop font in OS units</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the width of a string when rendered on the screen. Bit 31 controls whether the space covered by the string is returned rather than the baseline offset at which the string ends. This distinction must be made because certain fonts (italic fonts, for example) will end at a baseline position before the end of the rendered font. With the bit set the whole area covered will be returned. Thus, if this call is required for locating the end of a string such that another may be added (for example, in another colour) then bit 31 should be clear. If, however, this call is being used to calculate the size required for the font such that it is entirely rendered (for example, in calculating the size of an icon's bounding box), bit 31 should be set.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_TextOp"
+                number="400F9"
+                reason="2"
+                reasonname="Wimp_TextOp_PlotString"
+                description="Plot a text string in the desktop font"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">2 (plot text string) + flags:
+  <bitfield-table>
+ <bit number="8-26">Reserved, must be 0</bit>
+ <bit number="27">Reserved for future expansion</bit>
+ <bit number="28">Centre text vertically</bit>
+ <bit number="29">X/Y offsets are offsets within the current redraw window, rather than screen offsets</bit>
+ <bit number="30">Vertically justify to make the baseline the same as system font</bit>
+ <bit number="31">Right justify string</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Pointer to string</register-use>
+ <register-use number="2">Reserved (must be -1)</register-use>
+ <register-use number="3">Reserved (must be -1)</register-use>
+ <register-use number="4">X co-ordinate, in OS units</register-use>
+ <register-use number="5">Y co-ordinate, in OS units</register-use>
+</entry>
+<exit>
+ <register-use number="0-5">Preserved</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to plot a text string in the desktop font.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_TextOp"
+                number="400F9"
+                reason="3"
+                reasonname="Wimp_TextOp_GetSplitPoint"
+                description="Find the split point in a string"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">3 (get split point)</register-use>
+ <register-use number="1">Pointer to string</register-use>
+ <register-use number="2">Width to split at in OS units</register-use>
+ <register-use number="3">Split character, or -1 for none</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to split point in supplied string</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read a split point by limiting to a given length. It is similar in function to the <reference type="swi" name="Font_ScanString" /> SWI.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Wimp_TextOp"
+                number="400F9"
+                reason="4"
+                reasonname="Wimp_TextOp_Truncate"
+                description="Truncate a string with an ellipsis"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">4 (truncate string with ellipsis)</register-use>
+ <register-use number="1">Pointer to string</register-use>
+ <register-use number="2">Pointer to output buffer</register-use>
+ <register-use number="3">Size of output buffer, or 0 to request size required</register-use>
+ <register-use number="4">Maximum width in OS units</register-use>
+</entry>
+<exit>
+ <register-use number="0">Size of buffer required</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to truncate a string by using an ellipsis character for the currently selected alphabet, or three full stops. If the string fits within the size specified, no ellipsis will be added.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected 'Two additional reason code' to 'reason codes'. The reason code names (such as Wimp_TextOp_PlotString) are descriptive labels for the reason codes and not names defined by the operating system.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
