@@ -1,0 +1,239 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Extended C functions">
+<section title="Introduction and Overview">
+<p>
+For some time the SharedCLibrary core (library chunk ID 2) has provided two
+additional functions over those documented in the PRMs. The
+<code type="c">_clib_version</code> function, used to read the C library
+details, has been expanded to give more detail on the components that make up
+the library. This document provides a description of these functions.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Calling conventions">
+<p>
+All these functions use APCS-R or APCS-32 (dependent on linkage) calling
+conventions.
+</p>
+</subsection>
+
+<subsection title="Language support functions">
+<subsubsection title="_clib_version (entry number 180)">
+<p><code type="c">const char *_clib_version(void);</code></p>
+
+<p>
+This function returns a read-only string giving information on the C library.
+The string is composed of a number of newline delimited fields. Each field
+describes a component of the shared library, with the first field describing
+the overall features of the library.
+</p>
+
+<p>The initial field will take the form:</p>
+
+<p><extended-example type="format">
+<userinput>"C library[&lt;qualifiers&gt;]"</userinput>
+</extended-example></p>
+
+<p>
+where <userinput>&lt;qualifiers&gt;</userinput> is a sequence of strings
+prefixed by a '/' character to indicate the facilities offered by the core
+library. The only defined qualifier at present is <userinput>/R</userinput>:
+</p>
+
+<p><value-table head-number="Qualifier" head-value="Meaning">
+<value number="/R">Indicates that the format of the jmp_buf array is fixed to
+the logical APCS-A bindings of registers. That is, the format is: v4-v6, fp,
+sp, sl, lr, f4-f7</value>
+</value-table></p>
+
+<p>
+Subsequent fields within the returned string describe the component versions
+in the form:
+</p>
+
+<p><extended-example type="format">
+<userinput>"&lt;component&gt; vsn &lt;version&gt; (&lt;date&gt;)[&lt;qualifiers&gt;]"</userinput>
+</extended-example></p>
+
+<p><list>
+<item><p>The <userinput>&lt;version&gt;</userinput> is a 3 digit decimal number
+indicating the version number of that component.</p></item>
+<item><p>The <userinput>&lt;date&gt;</userinput> is a standard RISC OS date string
+("DD MMM YYYY") giving the date of this version of the component.</p></item>
+<item><p>The <userinput>&lt;qualifiers&gt;</userinput> are formed in a similar
+manner to the overall features but the qualifiers should be interpreted on a
+component-specific basis. No qualifiers have been defined for any of the
+components.</p></item>
+</list></p>
+
+<p>
+The current component names which may be used to construct the C library are:
+</p>
+
+<p><value-table head-number="Component" head-value="Meaning">
+<value number="Kernel">The Run Time System Kernel which manages the
+environment used by the C library</value>
+<value number="Core">Core C library functions</value>
+<value number="C99Low">Low-level C functions (primarily variable length
+arrays, and 64bit operations)</value>
+<value number="C99">High-level C functions (all other C99-specific
+features)</value>
+<value number="RISC_OSLib">Name allocated, but unused</value>
+<value number="Shared C Library">Indicates that the C library is part of the
+'SharedCLibrary' module.</value>
+</value-table></p>
+
+<p>
+The prior definition of this function placed no meaning on the string
+returned, and did not declare that the returned string was const. This
+definition improves that description. Under earlier versions of the Shared C
+Library (and ANSILib), this function would return a string in the form:
+</p>
+
+<p><extended-example type="format">
+<userinput>"[Shared ]C Library vsn &lt;version&gt;/R \[&lt;cppdate&gt;\]\n"</userinput>
+</extended-example></p>
+
+<p>
+where <userinput>&lt;cppdate&gt;</userinput> is a date as produced by the C
+pre-processor <code type="c">__DATE__</code> macro (MMM DD YYY). The new
+format retains a similar style to this earlier form and so should be
+machine-parseable by code which previously interpreted the string value. The
+new format remains printable, so should be usable for diagnostic purposes.
+</p>
+</subsubsection>
+</subsection>
+
+<subsection title="Variadic SWI call">
+<subsubsection title="_swi (entry number 183) and _swix (entry number 184)">
+<p><code type="c">int _swi(int swi_number, unsigned int flags, ...);</code></p>
+<p><code type="c">_kernel_oserror *_swix(int swi_number, unsigned int mask, ...);</code></p>
+
+<p>
+These functions provide a generic method of calling RISC OS SWIs from C or
+C++.
+</p>
+
+<p>Two functions are provided:</p>
+
+<p><list>
+<item><p><code type="c">_swi</code> for calling SWIs without setting the X bit</p></item>
+<item><p><code type="c">_swix</code> which sets the X bit before calling the SWI.</p></item>
+</list></p>
+
+<p>
+<userinput>swi_number</userinput> is the number of the SWI to be called. This
+should never have the X bit set.
+</p>
+
+<p>
+<userinput>mask</userinput> (the <userinput>flags</userinput> argument of
+<code type="c">_swi</code>) is a word containing an input and output register
+mask, a return register, and a block parameter register.
+</p>
+
+<p>The arrangement of the mask is as follows:</p>
+
+<p><value-table head-number="Bits" head-value="Meaning">
+<value number="0-9">Set if R(N) is passed to the SWI.</value>
+<value number="10">Unused.</value>
+<value number="11">Set if a local block parameter is to be passed to the
+SWI</value>
+<value number="12-15">Register number for local block parameter if bit 11
+set.</value>
+<value number="16-19">Register number to be returned from a _swi call. This is
+only applicable to _swi as _swix always returns either 0 or an error
+pointer.</value>
+<value number="20">Unused.</value>
+<value number="21">Set if the PC (including the flags) is to be output.</value>
+<value number="22-31">Set if R(31-N) is output from the SWI (ie bit 31
+corresponds to R0, bit 22 corresponds to R9).</value>
+</value-table></p>
+
+<p>
+If a register is specified as a return register (bits 16-19) it must not also
+be specified as an output register in the output register mask (bits 22-31).
+</p>
+
+<p>
+If a register is specified as a local block parameter register it must not
+also be specified as an input register in the input register mask (bits 0-9).
+</p>
+
+<p>
+If the PC is specified as a return register (ie bits 16-19 = 15) or as an
+output register (bit 21 = 1) the value returned will contain the flags in bits
+28 to 31 (28 = V, 29 = C, 30 = Z, 31 = N).
+</p>
+
+<p>The remainder of the variadic arguments are as follows (in order):</p>
+
+<p><list>
+<item><p>The word value of each input register in order from 0 to 9 as specified
+by bits 0 to 9 of the mask.</p></item>
+<item><p>The address of a word to be written for each output register in order
+from 0 to 9 as specified by bits 31 downto 22 of the mask.</p></item>
+<item><p>The address of a word to be written with the PC value on exit from the
+SWI if bit 21 of the register mask is set.</p></item>
+</list></p>
+
+<p>
+If bit 11 is set the remainder of the arguments are placed in order in a
+parameter block and the address of the parameter block is passed to the SWI
+in the register specified by bits 12-15.
+</p>
+
+<p>The macros are as follows:</p>
+
+<p><value-table head-number="Macro" head-value="Meaning">
+<value number="_IN(n)">Specifies that R(n) is used on input</value>
+<value number="_OUT(n)">Specifies that R(n) is output</value>
+<value number="_BLOCK(n)">Specifies that R(n) is a block parameter</value>
+<value number="_RETURN(n)">Specifies that R(n) is returned from _swi.</value>
+</value-table></p>
+
+<p>
+The values of the macros should be ORed together to produce the value for the
+mask.
+</p>
+
+<p>The following constants are defined:</p>
+
+<p><value-table head-number="Constant" head-value="Meaning">
+<value number="_FLAGS">The register containing the flags (currently 15)</value>
+<value number="_C">Mask for the C bit in _FLAGS</value>
+<value number="_Z">Mask for the Z bit in _FLAGS</value>
+<value number="_N">Mask for the N bit in _FLAGS</value>
+</value-table></p>
+</subsubsection>
+</subsection>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>

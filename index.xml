@@ -103,6 +103,7 @@
     </section>
     <section title="Programmer" dir="programmer">
         <page href="aif">AIF module</page>
+        <page href="extendedc">Extended C functions</page>
         <page href="pathutils">PathUtils</page>
         <page href="zipper">Zipper module</page>
     </section>
