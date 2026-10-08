@@ -1,0 +1,124 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="BlendTable">
+<section title="Introduction and Overview">
+<p>
+The BlendTable module was introduced in RISC OS 4.31. It supplies facilities for merging paletted colours at arbitrary ratios. This is required for SpriteExtend to provide support for translucent sprite rendering.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="BlendTable_GenerateTable"
+                number="56280"
+                description="Generate a table of blended palette entries"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+   <bit number="0">Source sprite is a pointer to a sprite, not a pointer to a name</bit>
+   <bit number="1">Destination sprite is a pointer to a sprite, not a pointer to a name</bit>
+   <bit number="2">Lock table after creation</bit>
+   <bit number="3-31">Reserved, must be 0</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">Source mode, or pointer to source sprite area</register-use>
+ <register-use number="2">0, or pointer to source sprite/sprite name</register-use>
+ <register-use number="3">Destination mode, or pointer to destination sprite area</register-use>
+ <register-use number="4">0, or pointer to destination sprite/sprite name</register-use>
+ <register-use number="5">Translucency factor (0-255): 0 for opaque sprites, 255 for transparent sprites; that is, increasing values reduce the opacity of source (or, in converse terms, increase the translucency of the source)</register-use>
+ <register-use number="6">Pointer to buffer for table, or 0 to return size required (may be omitted if locking area)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Number of colours in source</register-use>
+ <register-use number="1">Number of colours in destination</register-use>
+ <register-use number="2">Size of buffer required (if R6 = 0 on entry), or size of buffer used (if R6 was a pointer on entry)</register-use>
+ <register-use number="6">Preserved (if R0 bit 2 clear), or pointer to cached data buffer (if R0 bit 2 set)</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to generate a table of 'blended' palette entries for
+SpriteExtend (and other clients). The tables generated will be the product of
+the sizes of the palettes in the source and destination. The terms 'source' and
+'destination' merely refer to the palettes in use. The 'source' is the palette
+which is being overlaid on to the 'destination'. The palettes will be blended in
+the ratio &lt;translucency factor&gt;:(255-&lt;translucency factor&gt;).
+</p>
+
+<p>
+By setting bit 2, it is possible to lock the area in BlendTable's workspace,
+preventing the cached copy from being flushed by other clients. This ensures that
+the space can be used until the area is unlocked. If bit 2 is set, then the value
+in R6 on entry will be ignored (that is, no user buffer is required) and space
+will be allocated by the BlendTable module. A pointer to the buffer will be
+returned in R6 on exit and the client may use this as it wishes until the next
+mode change or until the buffer is unlocked. The buffer should be treated as
+read only.
+</p>
+
+<p>
+The palettes are laid out in the form destination by source. That is, given a
+source palette value (src) and a destination palette value (dst), for a
+destination palette of dstcols colours, the blended palette value - in the
+destination palette - is to be found at (dst*dstcols + src).
+</p>
+</use>
+<related>
+<reference type="swi" name="BlendTable_UnlockTable" />
+</related>
+</swi-definition>
+
+<swi-definition name="BlendTable_UnlockTable"
+                number="56281"
+                description="Unlock a table previously locked by BlendTable_GenerateTable"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to cached data buffer to unlock</register-use>
+</entry>
+<exit>
+ <register-use number="0" state="preserved"/>
+</exit>
+<use>
+<p>
+This SWI is used to unlock a table previously locked by setting bit 2 on entry
+to <reference type="swi" name="BlendTable_GenerateTable" />.
+</p>
+</use>
+<related>
+<reference type="swi" name="BlendTable_GenerateTable" />
+</related>
+</swi-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
