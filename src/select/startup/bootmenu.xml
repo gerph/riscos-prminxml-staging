@@ -1,0 +1,169 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Boot Menu">
+<section title="Introduction">
+<p>
+The Boot Menu was introduced in RISC OS 4.15 and has increased in functionality since the early text-based interface. Modern versions of the Boot Menu are capable of :
+</p>
+<p><list>
+<item><p>Booting from alternative devices</p></item>
+<item><p>Simple system configuration</p></item>
+<item><p>Being extended by other user components</p></item>
+</list></p><p>
+The menu is started by holding the 'shift' key during system startup. The menu displayed offers options based on the current system configuration.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+A typical menu might offer the following options :
+</p>
+<p><extended-example type="format">
+<userinput>1.        Boot from ADFS hard drive</userinput><br/>
+<userinput>2.        Boot from ADFS floppy drive</userinput><br/>
+<userinput>3.        Boot from CD drive</userinput><br/>
+<userinput>4.        Network boot with BootP</userinput><br/>
+<userinput>5.        Network boot with DHCP</userinput><br/>
+<userinput>O.        Turn off power</userinput><br/>
+<userinput>W.        Configure machine</userinput><br/>
+<userinput>X.        Exit to desktop</userinput><br/>
+<userinput>Y.        Exit to command line</userinput><br/>
+<userinput>Z.        Continue default boot</userinput>
+</extended-example></p><p>
+Menu options can be selected by pressing the indicated key, or by using the cursor keys and return to select an option. Most menus allow back tracking by pressing backspace key.
+</p>
+<subsection title="Booting from fixed discs">
+<p>
+Selecting the 'Boot from ADFS hard drive', 'Boot from ADFS floppy drive' or 'Boot from CD drive' options will immediately boot the system from the chosen disc if it has a boot sequence present on it. If the chosen device does not exist or has no media present the boot will fail.
+</p>
+<p>
+Other fixed discs may appear in this menu if supplied by third parties.
+</p>
+</subsection>
+
+<subsection title="Network booting">
+<p>
+Selecting the 'Network boot with BootP' or 'Network boot with DHCP' options will cause the system to request an address with the protocol selected before offering a separate menu of the known network discs that can be booted from.
+</p>
+<p>
+If multiple interfaces are present these options may be given for multiple interfaces. If the system has been configured to obtain an address automatically on startup (whether AUN, Dynamic or Static) an additional option will be given for 'Network boot with current network settings'. Selecting this option will offer the same network discs menu but without an additional address request.
+</p>
+<p>
+The 'current' network settings will be offered for network devices which require no configuration to be set up, or which have already been configured. For example, if the network configuration has been set to 'automatic' then a ZeroConf Link Local address will have been configured, together with a DHCP address. Similarly, Econet systems are configured through the NVRAM settings and are immediately available.
+</p>
+<p>
+The network discs menu includes the known network devices that can be booted from. The network boot system can locate shared discs using LanManFS, ShareFS and NetFS.
+</p>
+<p>
+The menu might offer the following options :
+</p>
+<p><extended-example type="format">
+<userinput>1.        Boot from LanMan disc Xeno (linux server)</userinput><br/>
+<userinput>2.        Boot from ShareFS disc Craig</userinput><br/>
+<userinput>3.        Boot from NetFS server BOOT</userinput>
+</extended-example></p><p>
+For LanManFS a share must be available which allows guest (unauthenticated) access containing a !Boot object at the root. LanManFS must have been configured to the appropriate protocol for this to function; that is, IP for most modern servers.
+</p>
+<p>
+For ShareFS an unauthenticated share must exist which contains a !Boot object.
+</p>
+<p>
+For NetFS a server must export a disc which contains a BOOT user. In addition either Econet hardware or NetI must be present and configured. For NetI this means that the NetI automap option may need to be configured.
+</p>
+<p>
+Other network devices may appear in this menu if supplied by third parties.
+</p>
+</subsection>
+
+<subsection title="Configuring the machine">
+<p>
+A limited set of configuration parameters may be modified from the Boot Menu. These relate directly to the vital operations necessary to start the system.
+</p>
+<p>
+The menu might offer the following options :
+</p>
+<p><extended-example type="format">
+<userinput>1.        Change ADFS hard drives</userinput><br/>
+<userinput>2.        Change ADFS floppy drives</userinput><br/>
+<userinput>3.        Change ADFS boot drive</userinput><br/>
+<userinput>4.        Change CD drives</userinput><br/>
+<userinput>5.        Change mouse type</userinput><br/>
+<userinput>6.        Change display number</userinput><br/>
+<userinput>7.        Change boot file system</userinput><br/>
+<userinput>Z.        Reboot machine</userinput>
+</extended-example></p><p>
+The configuration menu does not allow backtracking by the backspace key. It is expected that after any configuration changes it will be necessary to reboot the machine.
+</p>
+<p>
+Each of the configuration options provides a separate menu which allows the selection of the desired option. The currently selected option will be highlighted by being suffixed by '(selected)'.
+</p>
+<p>
+The number of fixed discs present within the system can be configured with the first group of options.
+</p>
+<p>
+The mouse type setting allows different mouse types to be selected by the user as these cannot be automatically detected.
+</p>
+<p>
+The display number configuration allows a different display to be selected on startup. Where alternate display devices are present within the system these can be chosen as the default display. Selecting an invalid display number may result in no display being shown. Should this happen re-entering the Boot Menu (by a shift-boot) will revert to display 0 such that another display may be selected. Alternatively the '0' key on the keyboard may be held during start up to force the use of display 0.
+</p>
+<p>
+The boot filing system configuration allows the selection of an alternative filing system from which to boot. Not all filing systems are suitable for use on boot. If an invalid filing system is selected the system will not boot from the filing system and will revert to the boot menu.
+</p>
+</subsection>
+
+<subsection title="Power off">
+<p>
+Where suitable hardware is present the option to turn off power will be offered on the main menu. Selecting this option will turn off the machine.
+</p>
+</subsection>
+
+<subsection title="Exiting the boot menu">
+<p>
+There are 3 options to exit the boot menu :
+</p>
+<p><list>
+<item><p>Exit to desktop</p></item>
+<item><p>Exit to command line</p></item>
+<item><p>Continue default boot</p></item>
+</list></p><p>
+Exiting to the desktop will leave the menu and enter the desktop. No applications will be run, no other configuration will be applied and no display setup will be applied. This may be useful for maintenance purposes. The machine may be rebooted by using the Task Manager menu as normal.
+</p>
+<p>
+Exiting to the command line will leave the menu and enter the 'Supervisor' command line environment. From here '*Commands' may be issued and other system maintenance may be performed. Recommended only for advanced users. The machine may be rebooted by pressing Ctrl-Break.
+</p>
+<p>
+Continuing the default boot sequence will leave the menu and attempt to run the boot sequence which would have run if the menu had not been entered. Once the configuration and initial components have been loaded the desktop will be entered and the user configuration applied. The machine may be rebooted by using the Task Manager menu, as normal.
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected 'allows the selection an alternative' to 'selection of an alternative'.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
