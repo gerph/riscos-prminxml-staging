@@ -1,0 +1,95 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Domain-based dynamic areas">
+<section title="Introduction and Overview">
+<p>
+From version 8.20 of the Kernel, it is possible to create a dynamic area using an ARM Domain. Domain numbers are allocated dynamically by the Kernel. Dynamic areas created in this way can be made inaccessible to the rest of the operating system. This may be useful to provide memory protection on certain administrative data. In conjunction with the Abort-Trapping flags introduced in the preceding version, this may be used to provide notifications of accesses to external memory.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+To create a Domain-based dynamic area, bit 17 on the Dynamic Area flags should be set. Domain based dynamic areas will be limited in size and allocation in a slightly different manner to other dynamic areas :
+</p>
+<p><list>
+<item><p>They will always be aligned to a megabyte boundary (in logical memory)</p></item>
+<item><p>They will always have a maximum size aligned to a megabyte boundary</p></item>
+</list></p><p>
+Because of these requirements, use of many Domain dynamic areas will result in much faster consumption of logical address space. They should be used with care.
+</p>
+<p>
+The ARM processors support 16 domains. Domain 0 is used by RISC OS for 'regular' memory access. Domain 1-13 will be allocated dynamically by the operating system. Domains 14 and 15 are reserved for internal use. Because of this limitation, only 13 Domain areas can be created at any one time. The limited utility of this interface means that this restriction should not be significant. Clients are expected to function where a domain could not be allocated. If a domain could not be allocated by the Operating system the flags returned from OS_DynamicArea will have bit 17 clear. Clients which cannot function without the support of the Domains should report an error.
+</p>
+<p>
+An additional interface is available for clients using the Domain interface. This may change in the future.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_DynamicArea"
+                number="66"
+                reason="13"
+                reasonname="OS_DynamicArea_DomainState"
+                description="Change the domain state of a dynamic area"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">DynArea_DomainState (19)</register-use>
+ <register-use number="1">Dynamic area number</register-use>
+ <register-use number="2">State:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Abort all accesses ('no access')</value>
+ <value number="1">Normal access ('client')</value>
+ <value number="2">Reserved, must not be used</value>
+ <value number="3">Access permissions ignored ('manager')</value>
+ <value number="-1">Read state</value>
+</value-table></register-use>
+</entry>
+<exit>
+ <register-use number="2">Old state</register-use>
+</exit>
+<use>
+<p>
+This SWI call is used to change the access of Domain dynamic areas to aborting, or to allow full access. This interface is of limited usefulness, but is provided for specific clients which require access to the domains system under the operating system's control.
+</p>
+<p>
+Under current versions of the operating system, 'manager' mode is unreliable and should not be used.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>The reason code name OS_DynamicArea_DomainState is a descriptive label for the reason code and not a name defined by the operating system.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
