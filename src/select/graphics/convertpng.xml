@@ -1,0 +1,233 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="ConvertPNG">
+<section title="Introduction">
+<p>
+Developing from the initial PNG module supplied with RISC OS Select release 1 a new module dedicated to converting PNG images to sprites has been created. This module performs simple conversion of PNG images to standard RISC OS sprites. For more advanced uses clients can use the PNG operations from the PNG module itself without the ConvertPNG module. Many users will find that the interface provided by <reference type="document" href="imagefileconvert" name="ImageFileConvert" /> is more suitable.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="PNG to sprite conversion">
+<p>
+The PNG to Sprite conversion performed by the ConvertPNG module should allow PNG images to be imported into applications and rendered as native images. The operation of the PNG to Sprite conversion is usually hidden from the user as the conversion is usually performed implicitly as required. The ImageFileRender component will, via the ImageFileConvert tools, convert PNG files to sprites for rendering through the native sprite rendering routines.
+</p>
+<p>
+Because of differences in the sprite and PNG format the images produced may not correspond to the original form of the image. Such conversions should not result in a reduction in image quality except where 16 bit per channel data is used. No 16 bit per channel format is defined for RISC OS and as a result all 16 bit per channel data will be reduced to 8 bit per channel. Such images are rare and this limitation should not pose a problem for users. Applications wishing to manipulate 16 bit per channel data should consider using the PNG module library directly.
+</p>
+<subsubsection title="The sBIT chunk">
+<p>
+The sBIT chunk on a 24 bpp image declares the number of significant bits of image data in the original image. Such chunks will force the output sprite to be 16 bpp if, and only if, all three channels are 5 bits wide. All other representations declared in the sBIT chunk are ignored.
+</p>
+</subsubsection>
+
+<subsubsection title="The pHYs chunk">
+<p>
+The pHYs chunk declares the physical dimensions of the image. Where possible this will be retained, but it will be rounded to the nearest suitable sprite pixel size (11, 23, 45, 90 or 180 DPI). This should ensure that the approximate ratio of the source image is retained.
+</p>
+</subsubsection>
+
+<subsubsection title="The gAMA chunk">
+<p>
+The gAMA chunk - describing the gamma value of the image - is honoured, converting the image data according to the gamma correction specified in the file. This should ensure that the image is rendered correctly. Applications wishing to have greater control over the gamma correction features of PNGs should consider using the PNG module library directly.
+</p>
+</subsubsection>
+
+<subsubsection title="The bKGD chunk">
+<p>
+The bKGD chunk declares the colour that the image should be composed against if transparency is not present. This chunk is only processed if a background is requested and the natural background (background of -1) used. Images created through the ImageFileRender interface to ImageFileConvert will never use the bKGD chunk - they will always be masked if a mask of some form is present.
+</p>
+</subsubsection>
+
+<subsubsection title="Masking through the tRNS chunk and alpha channels">
+<p>
+The tRNS chunk provides information about transparent palette entries or a single colour which should be regarded as transparent. Such entries will be honoured and the image converted to use an alpha channel mask. Images with alpha channel will create sprites in the new format allowing alpha channel data in the 8bpp mask.
+</p>
+<p>
+After the image has been generated its mask is examined. If it is found to be a binary mask (containing only fully transparent and fully opaque entries) the 8 bpp mask will be reduced to a 1 bpp mask. If it is found that no mask is present (the entire image is fully opaque) the mask will be removed entirely.
+</p>
+</subsubsection>
+
+<subsubsection title="Greyscale images">
+<p>
+Greyscale images will be converted to the equivalent paletted image. Greyscale images with alpha channel will be converted to 8 bpp sprites with alpha channel.
+</p>
+</subsubsection>
+
+<subsubsection title="Known issues">
+<p>
+True colour, or greyscale PNGs with 16 bit per channel and a tRNS entry referring to a colour which, when reduced to 8 bits per channel, is in use as part of the image, are masked incorrectly.
+</p>
+</subsubsection>
+
+</subsection>
+
+<subsection title="Sprite to PNG conversion">
+<p>
+The Sprite to PNG conversion is performed by the ConvertPNG module. Because of differences in the capabilities of the formats, it may be necessary for the image format to be promoted to a wider format. For example, a 1bpp image may be promoted to 2bpp if it is not possible to represent the image data accurately as a PNG. None of the conversions should result in a reduction in image quality.
+</p>
+<p>
+The following translations are performed on sprites :
+</p>
+<subsubsection title="Unpaletted 1 bpp, 2 bpp, 4 bpp and 8 bpp images">
+<p>
+These are given the default desktop palette for their depth.
+</p>
+</subsubsection>
+
+<subsubsection title="Images without masks">
+<p><value-table head-number="Sprite" head-value="Conversion">
+<value number="1 bpp, 2 bpp, 4 bpp, 8 bpp images">These are converted to paletted colour PNG images.</value>
+<value number="16 bpp images">These are converted to 24 bpp colour PNG images, with an sBIT chunk indicating that 5 bits are used per channel.</value>
+<value number="24 bpp images">These are converted to 24 bpp colour PNG images.</value>
+<value number="CMYK images">The image is converted to RGB and a 24 bpp PNG image is created.</value>
+</value-table></p></subsubsection>
+
+<subsubsection title="Images with binary masks">
+<p><value-table head-number="Sprite" head-value="Conversion">
+<value number="1 bpp, 2 bpp, 4 bpp images">These are converted to paletted colour PNG images. A tRNS chunk is used to represent an unused palette entry as the mask. If all palette entries are used within the image, the image will be promoted to the next highest depth (1 bpp promoted to 2 bpp, 2 bpp promoted to 4 bpp, 4 bpp promoted to 8 bpp).</value>
+<value number="8 bpp images">If the image contains an unused palette entry, these are converted to paletted colour PNG images. A tRNS chunk is used to represent the mask. If no unused palette entries exist, the image is converted to a 24 bpp PNG with an alpha channel.</value>
+<value number="16 bpp images">If a region of the colour cube can be found which is not used, these are converted to 24 bpp colour PNG images, with a tRNS chunk indicating an unused colour entry as the mask. If a region cannot be found, the image is promoted to a 24 bpp colour PNG with an alpha channel. Either way, an sBIT chunk indicating that 5 bits are used per channel.</value>
+<value number="24 bpp images">If a region of the colour cube can be found which is not used, these are converted to 24 bpp colour PNG images, with a tRNS chunk indicating an unused colour entry as the mask. If a region cannot be found, the image is promoted to a 24 bpp colour PNG with an alpha channel.</value>
+<value number="CMYK images">The image is converted to RGB and a 24 bpp PNG image with alpha channel is created.</value>
+</value-table></p></subsubsection>
+
+<subsubsection title="Images with alpha channel (8 bpp masks)">
+<p><value-table head-number="Sprite" head-value="Conversion">
+<value number="1 bpp, 2 bpp, 4 bpp, 8bpp, 24 bpp images">These are converted to 24 bpp PNG images with alpha channel.</value>
+<value number="16 bpp images">These are converted to 24 bpp PNG images with alpha channel, with an sBIT chunk indicating that 5 bits are used per channel.</value>
+<value number="CMYK images">These are converted to RGB and a 24 bpp PNG image with alpha channel is created.</value>
+</value-table></p></subsubsection>
+
+<subsubsection title="Deep sprites with binary masks">
+<p>
+The algorithm used by the 16 bpp and 24 bpp binary mask conversions to locate an unused region of the image calculates the colour coverage of the image using a quantised form of the colour cube (4 bits per dimension). The image is examined and pixels within the image are flagged as being 'present' in the quantised cube. Once complete, the cube is searched for an unused cell. If no such cell can be found the image is deemed to be complex and will be promoted to alpha channel. If a free cell is found its colour will be used in the output image as part of the tRNS chunk.
+</p>
+</subsubsection>
+
+<subsubsection title="Pixel dimensions">
+<p>
+The pixel dimensions will be written to the image in the form of a pHYs chunk. This chunk describes the pixel dimensions in pixels per metre. Not all PNG processing tools and renderers handle the pHYs chunk, so images in non-square modes may be processed incorrectly by such tools.
+</p>
+</subsubsection>
+
+<subsubsection title="Creator information">
+<p>
+PNG images are always created with a text chunk describing the creator as 'ConvertPNG &lt;version and date&gt;'.
+</p>
+</subsubsection>
+
+<subsubsection title="Other sprite formats">
+<p>
+Sprite formats other than those described in the above paragraphs are not supported in the current version of the ConvertPNG module.
+</p>
+</subsubsection>
+
+</subsection>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="ConvertPNG_Info"
+                number="564C2"
+                description="Read simple information about a PNG"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags (all reserved, must be zero)</register-use>
+ <register-use number="1">Pointer to PNG data</register-use>
+ <register-use number="2">Length of PNG data</register-use>
+</entry>
+<exit>
+ <register-use number="0">Width of PNG</register-use>
+ <register-use number="1">Height of PNG</register-use>
+ <register-use number="2">Bit depth (as stored in the PNG, ignoring sBIT chunks)</register-use>
+ <register-use number="3">Colour type:
+  <bitfield-table>
+   <bit number="0">Image has palette</bit>
+   <bit number="1">Image is colour</bit>
+   <bit number="2">Image has alpha channel</bit>
+   <bit number="3-31">Reserved</bit>
+  </bitfield-table>
+  If bit 0 and bit 1 are clear, the image is greyscale.</register-use>
+ <register-use number="4">Interlace type:
+  <value-table head-number="Value" head-value="Meaning">
+   <value number="0">No interlacing</value>
+   <value number="1">Adam7 interlacing</value>
+  </value-table></register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read simple information about a PNG in order to provide feedback to the user or as an indication of the requirements of an image. More complex information can be obtained by direct access to the PNG module.
+</p>
+</use>
+<related>
+<reference type="swi" name="ConvertPNG_CreateSprite" />
+</related>
+</swi-definition>
+
+<swi-definition name="ConvertPNG_CreateSprite"
+                number="564C1"
+                description="Create a sprite from a PNG file"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flag bits:
+  <bitfield-table>
+   <bit number="0">Create sprite area, not sprite</bit>
+   <bit number="1">Use the background chunk if provided, or the background colour in R5 if none is provided</bit>
+   <bit number="2-31">Reserved, must be zero</bit>
+  </bitfield-table></register-use>
+ <register-use number="1">Pointer to PNG data</register-use>
+ <register-use number="2">Length of PNG data</register-use>
+ <register-use number="3">Pointer to output sprite buffer, or 0 to read size</register-use>
+ <register-use number="4">Size of output sprite buffer, or 0 to read size</register-use>
+ <register-use number="5">Colour (&amp;BBGGRR00) for background, or -1 for default</register-use>
+</entry>
+<exit>
+ <register-use number="4">Size of output sprite buffer required (if R3 = 0 on entry), size of output sprite buffer used (if R3 not 0 on entry)</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to create a sprite from a PNG file. It should usually be called twice, once to read the memory requirements and again to create the sprite itself. The space required by the first call may be larger than that actually used as additional workspace is required for certain conversion types. On exit from the conversion call R4 will reflect the actual size of the converted data. The sprite name is undefined and should be set by the application. Present implementations set the sprite name to '!'. The data created will be a raw sprite unless bit 0 of the flags is set. Clients wishing to operate on sprite areas may set bit 0, or create an area header to precede the sprite itself. Clients wishing to merge sprite areas should ensure that sufficient space exists in the sprite area they are appending to.
+</p>
+</use>
+<related>
+<reference type="swi" name="ConvertPNG_Info" />
+</related>
+</swi-definition>
+
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the description of ConvertPNG_CreateSprite, which referred to bit 1 of the flags as selecting a sprite area; this is bit 0 (bit 1 selects the background colour).</change>
+    <change>Corrected minor grammatical slips ('converted use an alpha channel mask' and 'will be create sprites').</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
