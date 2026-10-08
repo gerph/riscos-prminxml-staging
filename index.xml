@@ -98,6 +98,7 @@
         <page href="automaticconfig">Automatic network configuration</page>
         <page href="internetoverview">Internet components overview</page>
         <page href="internetmodule">Internet module</page>
+        <page href="resolver">Resolver</page>
         <page href="addresscollisions">Internet address collision</page>
         <page href="linkstatus">DCI Driver Link Status</page>
         <page href="routerdiscovery">RouterDiscovery</page>

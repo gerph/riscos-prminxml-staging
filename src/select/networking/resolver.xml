@@ -1,0 +1,472 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Resolver">
+<section title="Introduction">
+<p>
+Internet based applications are required to connect to other hosts throughout
+the world. Location of these hosts is via numeric addresses which are
+determined by human readable names. The process of converting from names to
+addresses is performed by 'Domain Name Servers' (DNS).
+</p>
+
+<p>Under RISC OS, communication with DNS is performed by the Resolver module.</p>
+
+<p>
+This chapter describes how the Resolver module is configured to use DNS, and
+how applications should interact with it.
+</p>
+</section>
+
+<section title="Terminology used">
+<p><list>
+<item><p>The Resolver module provides shared Internet IP address resolution facilities to the system.</p></item>
+<item><p>The Hosts file is the file InetDBase:Hosts. It is used to initialise the local DNS cache with entries.</p></item>
+<item><p>DNS servers are queried by the Resolver and the results are cached.</p></item>
+</list></p>
+
+<p>
+Application is used within this chapter as a description of the Resolver
+querist, but this may also apply to Modules.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="How the Resolver works">
+<p>The Resolver works as follows:</p>
+
+<p><list>
+<item><p>The user configures the resolver through serial variables. Usually this is performed on machine start up from pre-set values.</p></item>
+<item><p>When an address is requested the application requests a lookup from the Resolver.</p></item>
+<item><p>The Resolver module checks its cached entries and if one exists that matches the request it is returned immediately. Otherwise a request is sent to the configured DNS servers.</p></item>
+<item><p>The application continues to request a lookup from the Resolver. The Resolver continues to try to look up the request until it times out.</p></item>
+<item><p>If the request to the DNS servers is satisfied or a failure is returned the result is returned to the application.</p></item>
+<item><p>If the request is not responded to within a period a failure is returned to the application.</p></item>
+</list></p>
+</subsection>
+
+<subsection title="SWIs used">
+<p>The module provides two interfaces for resolving addresses:</p>
+
+<p><list>
+<item><p><reference type="swi" name="Resolver_GetHostByName" /> to provide an equivalent operation to that expected by unix applications. This SWI will not return until a result or failure has been determined.</p></item>
+<item><p><reference type="swi" name="Resolver_GetHost" /> to provide a multi-tasking version of GetHostByName. This SWI returns a notification that the resolve is 'in progress' and should be polled until a result has been received.</p></item>
+</list></p>
+
+<p>In addition, there is a means for controlling the cache:</p>
+
+<p><list>
+<item><p><reference type="swi" name="Resolver_CacheControl" /> can be used to perform various operations on the cache.</p></item>
+</list></p>
+</subsection>
+
+<subsection title="Host entries">
+<p>
+All results are returned in the form of NetBSD standard 'hostent' structures.
+These structures should be considered to be read only by the application.
+</p>
+
+<p>A hostent has the following structure:</p>
+
+<p><offset-table>
+<offset number="0" name="h_name">Pointer to host name</offset>
+<offset number="4" name="h_aliases">Pointer to 0 terminated list of pointers to aliases for this host</offset>
+<offset number="8" name="h_addrtype">Address type (usually AF_INET)</offset>
+<offset number="12" name="h_length">Address length (4 for AF_INET)</offset>
+<offset number="16" name="h_addr_list">Pointer to 0 terminated list of addresses</offset>
+</offset-table></p>
+</subsection>
+
+<subsection title="Automatic resolver detection">
+<p>
+The Resolver module can automatically detect the local systems which are acting
+as DNS servers. If the word 'auto' is appended to the list of resolvers the
+automatic search will be triggered. The method employed uses a broadcast
+request for a name resolution and a broadcast 'ping' of the local network. The
+systems responding to the broadcast 'ping' are directly queried for DNS
+services. As this option is only intended to be used on small networks, the
+traffic this incurs should be minimal. Larger networks should not use the
+automatic detection. Any host which responds is added to the list of servers,
+up to the maximum of 3. The automatic detection will be forced every hour, or
+when the *ResolverConfig command is issued.
+</p>
+</subsection>
+
+<subsection title="Resolver reordering">
+<p>
+The Resolver module can reorder the list of servers which it queries
+periodically if the <sysvar>Inet$ResolverReorder</sysvar> variable is set to 1.
+This means that if the primary server is responding slowly it will be moved
+lower down the list, giving the secondary (or tertiary) servers an opportunity
+to respond faster. As response times can change greatly based on the local and
+global network activity this can have both a detrimental as well as beneficial
+effect. The main benefit from this behaviour is to move a non-responsive server
+to the end of the list dynamically whilst in use. If a number of servers are
+known to be available but their availability is variable the automatic
+reordering of the servers may help. Similarly, if the system is moving between
+networks with different DNS servers the system can recover more quickly despite
+having not changed the servers which it uses.
+</p>
+
+<p>
+Because the option for reordering servers can have unexpected results, it is
+disabled by default.
+</p>
+</subsection>
+</section>
+
+<section title="System Variables">
+<p>
+The Resolver module uses a number of system variables for its configuration.
+These determine how and where it resolves Internet addresses from. In general,
+these variables are initialised during machine startup. They may be modified by
+the user once the Internet stack has started. They will be read when the
+re-configure call is made to the Resolver, either via the
+<reference type="swi" name="Resolver_CacheControl" /> SWI or by the
+*ResolverConfig command. In addition, they will be re-read whenever the
+InetDBaseChanged service is issued.
+</p>
+
+<sysvar-definition name="Inet$Resolvers"
+                   description="Space separated list of DNS servers to query">
+<use>
+<p>Space separated list of dotted IP addresses of DNS servers to query. Up to three addresses may be supplied. The word 'auto' may be appended to the name in order to perform automatic resolver detection.</p>
+</use>
+</sysvar-definition>
+
+<sysvar-definition name="Inet$Hostname"
+                   description="Local host name">
+<use>
+<p>Local host name, without any period.</p>
+</use>
+</sysvar-definition>
+
+<sysvar-definition name="Inet$LocalDomain"
+                   description="Local domain name">
+<use>
+<p>Local domain name. When applied to Inet$Hostname provides the Fully Qualified Domain Name of this host.</p>
+</use>
+</sysvar-definition>
+
+<sysvar-definition name="Inet$SearchDomains"
+                   description="Domains to search for unqualified addresses">
+<use>
+<p>Space separated list of IP domain names to search for unqualified addresses.</p>
+</use>
+</sysvar-definition>
+
+<sysvar-definition name="Inet$ResolverRetries"
+                   description="Number of retries to perform when lookups fail">
+<use>
+<p>Number of retries to perform when lookups fail.</p>
+</use>
+</sysvar-definition>
+
+<sysvar-definition name="Inet$ResolverDelay"
+                   description="Delay between retries when lookups fail">
+<use>
+<p>Delay in seconds between retry attempts when lookups fail.</p>
+</use>
+</sysvar-definition>
+
+<sysvar-definition name="Inet$ResolverServer"
+                   description="Whether the Resolver acts as a simple DNS server">
+<use>
+<p>Set if the Resolver module should act as a simple DNS server to other machines. Unset if it should not.</p>
+</use>
+</sysvar-definition>
+
+<sysvar-definition name="Inet$ResolverFreewayHosts"
+                   description="Whether the Resolver uses the names provided by Freeway">
+<use>
+<p>Set to 1 if the Resolver module should use the names provided by Freeway in order to provide its resolutions. If unset it is treated as enabled. Set to 0 to disable.</p>
+</use>
+</sysvar-definition>
+
+<sysvar-definition name="Inet$ResolverNetBIOSHosts"
+                   description="Whether the Resolver uses the names provided by LanManFS">
+<use>
+<p>Set to 1 if the Resolver module should use the names provided by LanManFS in order to provide its resolutions. If unset it is treated as enabled. Set to 0 to disable.</p>
+</use>
+</sysvar-definition>
+
+<sysvar-definition name="Inet$ResolverReorder"
+                   description="Whether the Resolver reorders the servers by response time">
+<use>
+<p>Set to 1 if the Resolver module should attempt to reorder the servers based on their response times. If unset or set to 0, it is treated as disabled.</p>
+</use>
+</sysvar-definition>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="Resolver_GetHostByName"
+                number="46000"
+                description="Resolve a host name, waiting for the result"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="1">Pointer to host name string, 0 terminated</register-use>
+</entry>
+<exit>
+ <register-use number="0">errno integer value if V flag is clear, or error block pointer if V flag is set</register-use>
+ <register-use number="1">Pointer to completed 'hostent' struct if successful, or 0 if failed</register-use>
+</exit>
+<use>
+<p>
+This SWI is provided primarily for backwards compatibility since new network
+applications can use the more flexible
+<reference type="swi" name="Resolver_GetHost" /> SWI as described below.
+</p>
+
+<p>
+The main use of this SWI is by the simple ports of unix applications using the
+gethostbyname() function call.
+</p>
+
+<p>
+Interrupt status is undefined. Fast interrupts are enabled. Processor is in
+SVC mode. The SWI is not reentrant, except where preempted with UpCall 6.
+</p>
+</use>
+<related>
+<reference type="swi" name="Resolver_GetHost" />
+</related>
+</swi-definition>
+
+<swi-definition name="Resolver_GetHost"
+                number="46001"
+                description="Resolve a host name in the background"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="1">Pointer to host name string, 0 terminated</register-use>
+</entry>
+<exit>
+ <register-use number="0">errno integer value if V flag is clear, or error block pointer if V flag is set</register-use>
+ <register-use number="1">Pointer to completed 'hostent' struct if successful, or 0 if failed</register-use>
+</exit>
+<use>
+<p>
+This SWI provides a DNS resolution facility that runs in the background (unlike
+<reference type="swi" name="Resolver_GetHostByName" />) above. Applications must
+poll the Resolver module for the state of the resolution. Sample code for this
+is given below.
+</p>
+
+<p>
+If the hostname is a valid cache item or present in the hosts file on disc it
+is returned immediately in R1, with R0 set to 0.
+</p>
+
+<p>
+If the hostname is a cache item, marked as failed, then R1 is set to 0 and R0
+is either -1 (host not found), or -2 (remote failure, eg. configured resolver
+didn't respond).
+</p>
+
+<p>
+If the hostname is a cache item, marked as pending, then R1 is set to 0 and R0
+is EINPROGRESS (36 decimal). Items are marked as pending when a remote resolver
+lookup is in progress. The calling program is expected to periodically call
+Resolver_GetHost until a valid hostent is returned, or an error condition
+occurs.
+</p>
+
+<p>
+Because name lookups can take anything up to 20 seconds or so it is important
+to be able to give feedback to the user on the status of the lookup, as well as
+giving the foreground application time to perform other tasks.
+</p>
+
+<p>
+Cache sweeps occur periodically - pending items are marked as failed (remote
+failure) after a short period, failed items are removed after a longer period,
+and valid items are removed after their designated TTL has expired and remain
+valid for a further 90 seconds.
+</p>
+
+<p>
+Previous documents have stated that cache entries remain valid for 24 hours,
+however this is not the case. Until version 0.94 entries would expire only when
+queried and only then after the server-declared TTL had expired. This
+effectively meant that the hostent structures were of variable lifetime. From
+0.94 onward the cache will be checked regularly and entries expired only after
+TTL+90 seconds has expired - this means that you are guaranteed that the
+hostent structure will exist for 90 seconds after the SWI call, no matter what
+the returned TTL value was or when the original cache entry was read.
+</p>
+
+<p>
+If there is a configuration error (such as <sysvar>Inet$Resolvers</sysvar> not
+being set) then a RISC OS error block pointer is returned in R0, and the V flag
+is set on exit.
+</p>
+
+<p>
+Interrupt status is undefined. Fast interrupts are enabled. Processor is in
+SVC mode. The SWI is not reentrant.
+</p>
+</use>
+<example>
+<p>The calling program should run something like:</p>
+<p><extended-example type="pseudo">
+<userinput>REM 'EINPROGRESS' error number is 36 decimal</userinput><br/>
+<userinput>REPEAT</userinput><br/>
+<userinput>  SYS "Resolver_GetHost","host.net" TO status,hostent;flags</userinput><br/>
+<userinput>  error = (flags AND 1) == 1</userinput><br/>
+<userinput>  REM Perhaps inform user of the state of this lookup</userinput><br/>
+<userinput>UNTIL (error) OR (status != EINPROGRESS)</userinput><br/>
+<userinput>REM hostent is a valid pointer, or 0</userinput>
+</extended-example></p>
+</example>
+<related>
+<reference type="swi" name="Resolver_GetHostByName" />
+</related>
+</swi-definition>
+
+<swi-definition name="Resolver_GetCache"
+                number="46002"
+                description="Internal call"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+<use>
+<p>This call is for internal use only; you must not use it in your own code.</p>
+</use>
+</swi-definition>
+
+<swi-definition name="Resolver_CacheControl"
+                number="46003"
+                description="Control the Resolver cache"
+                irqs="undefined"
+                fiqs="enabled"
+                processor-mode="SVC"
+                re-entrant="no">
+<entry>
+ <register-use number="0">Reason code:
+  <value-table head-number="Reason" head-value="Meaning">
+   <value number="0">Flush cache of failed lookups</value>
+   <value number="1">Flush cache of all items</value>
+   <value number="2">Flush cache of hosts file items</value>
+   <value number="3">Re-read configuration</value>
+   <value number="8">Disable caching of failed lookups</value>
+   <value number="9">Enable caching of failed lookups</value>
+  </value-table>
+  Other reason codes are reserved
+ </register-use>
+</entry>
+<exit>
+ <register-use number="0-1" state="preserved"/>
+</exit>
+<use>
+<p>
+This SWI is provided to allow a calling application to control the Resolver
+cache in a limited way. Currently, the only reason codes supported are to force
+flushes of certain cache entries, and enabling or disabling of the caching of
+lookups that fail.
+</p>
+
+<p>
+Caching of lookup failures is disabled by default. You might wish to enable the
+caching of lookup failures if you are sure that any failures are genuine bad
+host errors and not due to packet loss, remote server timeouts, etc.
+</p>
+
+<p>
+All registers are preserved. Interrupt status is undefined. Fast interrupts are
+enabled. Processor is in SVC mode. The SWI is not reentrant.
+</p>
+</use>
+<related>
+<reference type="swi" name="Resolver_GetHostByName" />
+</related>
+</swi-definition>
+</section>
+
+<section title="Events">
+<vector-definition name="EventV"
+                   number="10"
+                   reason="102"
+                   reasonname="Internet_DNSResolveComplete"
+                   description="A DNS resolution has completed"
+                   irqs="undefined"
+                   fiqs="enabled"
+                   processor-mode="SVC"
+                   re-entrant="no">
+<entry>
+ <register-use number="0">19 (Event_Internet)</register-use>
+ <register-use number="1">&hex;102 (Event_Internet_DNSResolveComplete, 258)</register-use>
+ <register-use number="2">Pointer to name being resolved</register-use>
+ <register-use number="3">IP address requested in Network Byte Order, if a numeric request failed:
+  <value-table head-number="Value" head-value="Meaning">
+   <value number="&hex;00000000">A numeric request was not made</value>
+   <value number="&hex;FFFFFFFF">A numeric request was made and has been satisfied by this result</value>
+  </value-table>
+ </register-use>
+ <register-use number="4">Error code (as returned by Resolver_GetHost)</register-use>
+ <register-use number="5">Pointer to a 'hostent' structure, or NULL if failed</register-use>
+</entry>
+<exit>
+ <register-use number="0-5" state="preserved"/>
+</exit>
+<use>
+<p>
+This event is raised by the Resolver module when a resolution request
+completes, either successfully or by timing out.
+</p>
+
+<p>
+This event should not be claimed by any module. Other modules may be interested
+in the resolution and a claim would prevent them from seeing the resolution
+results. Modules should take care when using the information provided within
+this event not to assume that the non-match of the string in R2 means that the
+resolution was for another address. For example, resolution requests will be
+converted to lower case by the module before being processed, numeric lookups
+may be converted to their canonical form, and the results may be returned for a
+different cache entry in cases where the address returned is an alias. In
+general, most clients will merely re-issue the Resolver_GetHost request to
+obtain the state of the resolution, using this event as an indication that some
+resolution has completed.
+</p>
+
+<p>
+Interrupt status is undefined. Fast interrupts are enabled. Processor is in
+SVC mode.
+</p>
+</use>
+<related>
+<reference type="swi" name="Resolver_GetHost" />
+</related>
+</vector-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+ </revision>
+ </history>
+
+</meta>
+</riscos-prm>
