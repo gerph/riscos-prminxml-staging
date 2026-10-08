@@ -1,0 +1,88 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Physical Mapping of Dynamic Areas">
+<section title="Introduction and Overview">
+<p>
+OS_DynamicArea 0 (Create Area) has been extended to support dynamic areas which contain a physical mapping of memory. This facility is required for certain hardware drivers to be able to access their hardware. The interface is similar to that for dynamic areas with handlers for 'specific' pages, but with a number of minor changes.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="New API">
+<p>
+A Physically Mapped Area can be created by setting bit 15 in the Area Flags on creation. The area may be :
+</p>
+<p><list>
+<item><p>Sparse</p></item>
+<item><p>Doubly mapped</p></item>
+<item><p>Cacheable</p></item>
+<item><p>Bufferable</p></item>
+<item><p>Any access level</p></item>
+</list></p><p>
+It may not be :
+</p>
+<p><list>
+<item><p>Heap</p></item>
+<item><p>Require specific pages (this is implicit)</p></item>
+<item><p>Shrinkable</p></item>
+<item><p>Locked</p></item>
+<item><p>Application bound</p></item>
+<item><p>User draggable</p></item>
+</list></p><p>
+The PreGrow handler will be called for any changes to the area. The page block supplied to the handler should be filled in a similar manner to the original handler :
+</p>
+<p><list>
+<item><p>The Page Number field may be given a standard value. If this is the number of a physical page (as used by all other RISC OS interfaces), the mapped page will be a reference to the RAM with that page number. Care should be used when using this form of mapping as cache coherency may be an issue if the page is accessed from multiple logical mappings.</p></item>
+<item><p>The Page Number field may be given an extended physical address value. This is a physical address space page number (ie physical address &gt;&gt; 12) with bit 30 set. This form of addressing is intended to allow clients to access the new physical mappings through the legacy RISC OS interfaces.</p></item>
+<item><p>The Physical Address field may be given a physical address value. This is the recommended interface.</p></item>
+</list></p><p>
+It is recommended that clients do not map RAM using this interface. It is recommended that clients disable caching and buffering when using this interface.
+</p>
+<p>
+No limit is placed on the size of the Physically Mapped Dynamic Area. The dynamic area may be larger than the memory fitted to the machine.
+</p>
+</subsection>
+
+<subsection title="Legacy interfaces">
+<p>
+Where possible it is expected that older clients will function correctly in the light of the possibility of physically mapped memory.
+</p>
+<p>
+The OS_FindMemMapEntries interface has been updated to return details about the page mapping, using the above extended physical address space page number (bit 30 set with the page number).
+</p>
+<p>
+The OS_Memory 0 interface has limited capabilities for operating on the extended page numbers.
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected 'at with that page number' to 'with that page number', and 'cacheing' to 'caching'.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
