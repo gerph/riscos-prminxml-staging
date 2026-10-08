@@ -117,6 +117,10 @@
     <section title="Hardware" dir="hardware">
         <page href='timermanager'>Hardware timer device driver (TimerManager)</page>
         <page href='nvramv'>NVRAM vector</page>
+        <page href="irqhandler">Hardware IRQ handler</page>
+        <page href="portable">The Portable module</page>
+        <page href="videohwvf">Acceleration and support provided by VideoHWVF</page>
+        <page href="videohwvidc">Acceleration and support provided by VideoHWVIDC</page>
     </section>
     <section title="Time" dir="time">
         <page href="rtc">Real Time Clock</page>
@@ -194,6 +198,78 @@
         <page href="backgrounderror">Background errors</page>
         <page href="diagdump">DiagnosticDump overview</page>
         <page href="btsdump">Back Trace Structure Dump tool</page>
+    </section>
+    <section title="Core" dir="core">
+        <page href="aborttrap">Abort trapping</page>
+        <page href="buffers">Buffers</page>
+        <page href="changeredirection">OS_ChangeRedirection</page>
+        <page href="codevariables">Code variables</page>
+        <page href="environment">Environment handlers</page>
+        <page href="evaluateexpression">EvaluateExpression</page>
+        <page href="osdelinkapplication">OS_DelinkApplication</page>
+        <page href="oserrors">Hardware errors</page>
+        <page href="osmmucontrol">OS_MMUControl</page>
+        <page href="osmodule">OS_Module changes</page>
+        <page href="osplatformfeatures">OS_PlatformFeatures</page>
+        <page href="osprettyprint">OS_PrettyPrint</page>
+        <page href="osreadsysinfo">OS_ReadSysInfo</page>
+        <page href="ossetenv">OS_SetEnv</page>
+        <page href="readline">OS_ReadLine</page>
+    </section>
+    <section title="Memory" dir="memory">
+        <page href="daoverview">Dynamic Areas overview</page>
+        <page href="logicalmemorymap">Memory Map</page>
+        <page href="misc">Miscellaneous memory changes</page>
+        <page href="osmemory">OS Memory</page>
+        <page href="osvalidateaddress">OS_ValidateAddress</page>
+        <section title="Dynamic areas" dir="dynamicareas">
+            <page href="aborttrapping">Abort-Trapping dynamic areas</page>
+            <page href="clamps">Clamps</page>
+            <page href="dmaabledas">DMA-able dynamic areas</page>
+            <page href="domaindas">Domain-based dynamic areas</page>
+            <page href="dynamicchanges">Dynamic area changes</page>
+            <page href="fixedpagedas">Fixed page dynamic areas</page>
+            <page href="heapdas">Dynamic areas with automatic heap extension</page>
+            <page href="invisibledas">Non-User-Visible Dynamic Areas</page>
+            <page href="lockeddas">Lockable Dynamic Areas</page>
+            <page href="osdynamicarea">Dynamic areas</page>
+            <page href="physicaldas">Physical Mapping of Dynamic Areas</page>
+            <page href="shrinkabledas">Shrinkable dynamic areas</page>
+            <page href="sparsedas">Sparse Dynamic Areas</page>
+        </section>
+    </section>
+    <section title="Filing systems" dir="filesystems">
+        <page href="filecore">FileCore</page>
+        <page href="fileswitch">FileSwitch</page>
+        <page href="fsnumberabuse">Filesystem registrant abuse</page>
+        <page href="pathvariables">Path variables</page>
+        <page href="pipefs">PipeFS</page>
+        <page href="ramfs">RAMFS</page>
+    </section>
+    <section title="Startup" dir="startup">
+        <page href="bootmenu">Boot Menu</page>
+        <page href="resettypes">Types of Reset</page>
+        <page href="systeminit">System initialisation</page>
+        <page href="systemspeed">System speed</page>
+    </section>
+    <section title="Legacy" dir="legacy">
+        <page href="dummymodules">DummyModules</page>
+        <page href="legacybbc">LegacyBBC module</page>
+        <page href="legacyscreen">LegacyScreen</page>
+    </section>
+    <section title="Toolbox" dir="toolbox">
+        <page href="gadgethandlers">Gadget handlers</page>
+        <page href="gadgetmousescroll">Changes for Window_GadgetMouseScroll</page>
+        <page href="gadgetregistration">Gadget registration</page>
+        <page href="numberrange">NumberRange gadget</page>
+        <page href="scrolllist">ScrollList</page>
+        <page href="slidergadget">Slider Gadget changes</page>
+        <page href="submenus">Sub-Menus</page>
+        <page href="toolboxfilter">Toolbox filter delivery</page>
+        <page href="toolboxgadgets">Toolbox Gadgets</page>
+        <page href="toolboxtimers">Toolbox Timers</page>
+        <page href="windowsupportexternal">Window_SupportExternal</page>
+        <page href="writablegadget">Writable Gadget</page>
     </section>
     <section title="Boot sequence" dir="boot">
         <page href="configure-plugins">Configure plugins</page>
