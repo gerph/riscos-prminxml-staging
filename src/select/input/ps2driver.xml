@@ -1,0 +1,123 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="PS2Driver">
+<section title="Introduction">
+<p>
+The PS2Driver module provides support for PS 2 mice and keyboards as documented within PRM 5a-229. The driver has been extended to support the 'scroll wheel' and '5 button' mice commonly in use. This extension is documented within the <reference type="document" href="../select/kernel/io/pointer-supplement" name="Pointer devices" /> document.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Additional keys">
+<p>
+From RISC OS 4, a number of additional keys have been returned by the PS 2 Driver (and other keyboard drivers). The following keys are now provided through the internal interfaces :
+</p>
+<p><value-table head-number="Key" head-name="Low level key" head-value="Internal and HID values">
+<value number="Windows left" name="&amp;68">Internal (decimal) 125; HID &amp;700E4</value>
+<value number="Windows right" name="&amp;69">Internal (decimal) 126; HID &amp;700E7</value>
+<value number="Menu" name="&amp;6A">Internal (decimal) 127; HID &amp;70065</value>
+<value number="No convert" name="&amp;6B">Internal (decimal) 109; HID &amp;7008B</value>
+<value number="Convert" name="&amp;6C">Internal (decimal) 110; HID &amp;7008A</value>
+<value number="Kana" name="&amp;6D">Internal (decimal) 111; HID &amp;70088</value>
+<value number="Yen/Bar" name="&amp;1D">Internal (decimal) 46; HID &amp;70089</value>
+<value number="\ _" name="&amp;6E">Internal (decimal) 95; HID &amp;70087</value>
+</value-table></p>
+<p>
+The following keys have HID values only:
+</p>
+<p><value-table head-number="Key" head-value="HID">
+<value number="ASPI Power">&amp;10081</value>
+<value number="ASPI Sleep">&amp;10082</value>
+<value number="ASPI Wake">&amp;10083</value>
+<value number="Scan next track">&amp;C00B5</value>
+<value number="Scan previous track">&amp;C00B6</value>
+<value number="Stop">&amp;C00B7</value>
+<value number="Play/pause">&amp;C00CD</value>
+<value number="Mute">&amp;C00E2</value>
+<value number="Vol+">&amp;C00E9</value>
+<value number="Vol-">&amp;C00EA</value>
+<value number="Media select">&amp;C0183</value>
+<value number="Mail">&amp;C018A</value>
+<value number="Calculator">&amp;C0192</value>
+<value number="My computer">&amp;C0194</value>
+<value number="Browser search">&amp;C0221</value>
+<value number="Browser home">&amp;C0223</value>
+<value number="Browser back">&amp;C0224</value>
+<value number="Browser forward">&amp;C0225</value>
+<value number="Browser stop">&amp;C0226</value>
+<value number="Browser refresh">&amp;C0227</value>
+<value number="Browser favourites">&amp;C0228</value>
+</value-table></p><p>
+The Yen/Bar key is to the left of backspace (ie where the £ sign was on Archimedes keyboards). It hence resurrects the old &amp;1D low level code.
+</p>
+<p>
+The \ _ key is to the left of the right shift key (analogous to the \ | key on UK keyboards).
+</p>
+<p>
+HID values can be used through the KeyInput interfaces. Multimedia keys have not been exposed to the regular keyboard interfaces, for example, the wimp key processing.
+</p>
+<p>
+Within the desktop environment, the following key codes will be returned for the additional keys :
+</p>
+<p><value-table head-number="Key" head-name="Key code" head-value="Shifted key codes">
+<value number="Windows left" name="&amp;1C0">Shift &amp;1D0, Ctrl &amp;1E0, Shift-Ctrl &amp;1F0</value>
+<value number="Windows right" name="&amp;1D0">Shift &amp;1C0, Ctrl &amp;1F0, Shift-Ctrl &amp;1E0</value>
+<value number="Menu" name="&amp;1C1">Shift &amp;1D1, Ctrl &amp;1E1, Shift-Ctrl &amp;1F1</value>
+<value number="No convert" name="&amp;1C2">Shift &amp;1D2, Ctrl &amp;1E2, Shift-Ctrl &amp;1F2</value>
+<value number="Convert" name="&amp;1C3">Shift &amp;1D3, Ctrl &amp;1E3, Shift-Ctrl &amp;1F3</value>
+<value number="Kana" name="&amp;1C4">Shift &amp;1D4, Ctrl &amp;1E4, Shift-Ctrl &amp;1F4</value>
+</value-table></p>
+<p><fixme>The codes for the right Windows key duplicate the Shift- and Ctrl- variants of the left Windows key; these values need to be confirmed.</fixme></p>
+</subsection>
+
+<subsection title="'Windows' and 'Menu' keys">
+<p>
+In order to be consistent, the Windows and Menu keys should operate in the following manner :
+</p>
+<p><value-table head-number="Key" head-name="Domain" head-value="Effect">
+<value number="Windows-alone" name="OS-specific">Display a system menu [1]</value>
+<value number="Windows-Shift/Ctrl" name="OS-specific">Reserved</value>
+<value number="Windows-0-9" name="Hardware">Reserved</value>
+<value number="Windows-&lt;nonshift&gt;" name="User">User expansion</value>
+<value number="Menu-alone" name="OS-specific">Display a context menu [1]</value>
+<value number="Menu-Shift/Ctrl" name="Application">Application expansion</value>
+<value number="Menu-&lt;nonshift&gt;" name="Reserved">Reserved</value>
+</value-table></p>
+<p>
+[1] Not presently implemented
+</p>
+<p>
+Left and right Windows keys should be treated identically, but may be distinguished by user-expansion software where necessary. This behaviour is consistent with the recommended behaviour on other systems and should ensure that the users expectations are met when transferring between environments.
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
