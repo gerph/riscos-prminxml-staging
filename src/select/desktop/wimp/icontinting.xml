@@ -1,0 +1,62 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Tinting validation">
+<section title="Introduction and Overview">
+<p>
+The (T)inting validation string is used to apply a simple tint to an icon. Select 1 only supported tint type 0 for the sprite. Under Select 2, the tint included the text and could be combined with faded and selected icons. Under Select 3, problems with tints 'bleeding' into other sprites have been corrected and the tint types have been extended to use the ColourMap module.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+The general form of the tint validation is :
+</p>
+<p><extended-example type="format">
+<userinput>T&lt;type&gt;,&lt;parameters&gt;</userinput>
+</extended-example></p><p>
+Where &lt;type&gt; is the decimal ColourMap type, as defined in the documentation for the <reference type="document" href="../../graphics/colourmap" name="Colour Map module" />. &lt;parameters&gt; consists of a comma separated list of hexadecimal values to pass to the ColourMap module for the ColourMap type.
+</p>
+<p>
+Under Select 1 and 2, only type 0 was supported, and then in a modified form of the above :
+</p>
+<p><extended-example type="format">
+<userinput>T0,BBGGRR</userinput>
+</extended-example></p><p>
+Where BBGGRR describes the colour to blend 50% to. This form is still supported, but it is recommended that clients use the fully specified form of this tint :
+</p>
+<p><extended-example type="format">
+<userinput>T0,BBGGRR00,80</userinput>
+</extended-example></p><p>
+Effective: Wimp 4.90
+</p>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Captured in the original HTML as part of the Icon ESGs page, and separated into its own document.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
