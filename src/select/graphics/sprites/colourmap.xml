@@ -1,0 +1,305 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="ColourMapping of deep sprites">
+<section title="Introduction and Overview">
+<p>
+Deep sprites - those of 16bpp or 24bpp depths - cannot be operated on using standard pixel translation tables. The tables necessary to operate on such sprites would be 2&lt;&lt;16 bytes (128k), or 4&lt;&lt;24 bytes (64M). Since such tables would be impractical at best, and the range of operations that are possible on such images is large, a manner in which these images can be manipulated has been implemented.
+</p>
+<p>
+For non-deep sprites pixel translation tables are generated using ColourTrans (q.v. <reference type="swi" name="ColourTrans_SelectTable" />, <reference type="swi" name="ColourTrans_GenerateTable" />) or manually. This initial scheme was suitable for paletted images. It was later extended to encompass more accurate plotting of paletted images in deep modes, and to allow the translation tables to be transformed through a transfer function. The transfer function allows arbitrary translation of an RGB value to another RGB value before that value is used in calculations.
+</p>
+<p>
+For deep sprites a similar method has been adopted. As before, a transfer function provides a conversion between one source RGB value and a destination RGB value. This allows any deep sprite to be colour transformed. Since this transformation must be performed on every pixel plotted the additional processing required for the colour transformation (henceforth called 'colour mapping', or more simply 'mapping' to distinguish it from a spatial transformations) may be much greater than a plain plot of the same graphic.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="API changes">
+<p>
+The interface for rendering colour mapped sprites is an extension of that used for plain plotting. Sprite operations PutSpriteScaled and PutSpriteTransformed, and JPEG operations JPEG_PlotScaled, JPEG_PlotFileScaled, JPEG_PlotTransformed and JPEG_PlotFileTransformed have updated APIs to handle the new form of colour mapping.
+</p>
+<p>
+Colour mapping functions only apply to deep sprites. Using the functions on non-deep sprites will generate an error. Such sprites should use pixel translation tables if they wish to be colour mapped.
+</p>
+</subsection>
+
+<subsection title="Colour mapping descriptor and transfer function">
+<p>
+The colour mapping descriptor is a small structure containing the workspace and transfer function pointer. The structure has the following layout :
+</p>
+<p><offset-table>
+ <offset number="0">Workspace to pass in R12 to transfer function</offset>
+ <offset number="4">Pointer to transfer function</offset>
+</offset-table></p>
+<p>
+The transfer function used by these operations is exactly the same as that used by the <reference type="swi" name="ColourTrans_SelectTable" /> calls (PRM 3-346). The function will be called in SVC mode with the usual supervisor stack limits. It is described under <reference type="entry" name="ColourMapTransfer" />.
+</p>
+</subsection>
+
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_SpriteOp"
+                number="2E"
+                reason="34"
+                reasonname="OS_SpriteOp_PutSpriteScaled"
+                description="Plot a deep sprite scaled, with colour mapping (PutSpriteScaled)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">52 + operation type (refer to the OS_SpriteOp documentation)</register-use>
+ <register-use number="1">Pointer to sprite area</register-use>
+ <register-use number="2">Pointer to sprite name, or sprite pointer</register-use>
+ <register-use number="3">X coordinate</register-use>
+ <register-use number="4">Y coordinate</register-use>
+ <register-use number="5">Plot action; valid bits:
+  <bitfield-table>
+   <bit number="3">Use mask</bit>
+   <bit number="6">Dithering on</bit>
+   <bit number="7">Use colour mapping (new flag for this call)</bit>
+  </bitfield-table>
+  All other values will be ignored, and may be explicitly faulted.</register-use>
+ <register-use number="6">Pointer to scale factors (refer to the OS_SpriteOp documentation)</register-use>
+ <register-use number="7">Pointer to colour mapping descriptor</register-use>
+</entry>
+<exit>
+ <register-use number="0-7">Preserved</register-use>
+</exit>
+<use>
+<p>
+This operation will plot a deep sprite using the colour mapping supplied.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_SpriteOp"
+                number="2E"
+                reason="38"
+                reasonname="OS_SpriteOp_PutSpriteTransformed"
+                description="Plot a deep sprite transformed, with colour mapping (PutSpriteTransformed)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">56 + operation type (refer to the OS_SpriteOp documentation)</register-use>
+ <register-use number="1">Pointer to sprite area</register-use>
+ <register-use number="2">Pointer to sprite name, or sprite pointer</register-use>
+ <register-use number="3">Flags (refer to the OS_SpriteOp documentation)</register-use>
+ <register-use number="4">Pointer to source rectangle within sprite</register-use>
+ <register-use number="5">Plot action; valid bits:
+  <bitfield-table>
+   <bit number="3">Use mask</bit>
+   <bit number="7">Use colour mapping (new flag for this call)</bit>
+  </bitfield-table>
+  All other values will be ignored, and may be explicitly faulted.</register-use>
+ <register-use number="6">Pointer to transformation matrix, or destination co-ordinates (refer to the OS_SpriteOp documentation)</register-use>
+ <register-use number="7">Pointer to colour mapping descriptor</register-use>
+</entry>
+<exit>
+ <register-use number="0-7">Preserved</register-use>
+</exit>
+<use>
+<p>
+This operation will plot a deep sprite using the colour mapping supplied.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="JPEG_PlotScaled"
+                number="49982"
+                description="Plot a JPEG scaled, using colour mapping"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to JPEG</register-use>
+ <register-use number="1">X coordinate</register-use>
+ <register-use number="2">Y coordinate</register-use>
+ <register-use number="3">Pointer to scale factors (refer to the JPEG_PlotScaled documentation)</register-use>
+ <register-use number="4">Length of image</register-use>
+ <register-use number="5">Plot flag bits:
+  <bitfield-table>
+   <bit number="0">Dither output when plotting 24bit JPEG at 16bpp or below</bit>
+   <bit number="1">Invalid</bit>
+   <bit number="3">Use colourmap (new flag for this call)</bit>
+  </bitfield-table></register-use>
+ <register-use number="6">Pointer to colour mapping descriptor</register-use>
+</entry>
+<exit>
+ <register-use number="0-6">Preserved</register-use>
+</exit>
+<use>
+<p>
+This operation plots a JPEG using the colour mapping supplied.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="JPEG_PlotFileScaled"
+                number="49983"
+                description="Plot a JPEG file scaled, using colour mapping"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to filename of JPEG file</register-use>
+ <register-use number="1">X coordinate</register-use>
+ <register-use number="2">Y coordinate</register-use>
+ <register-use number="3">Pointer to scale factors (refer to the JPEG_PlotFileScaled documentation)</register-use>
+ <register-use number="4">Plot flag bits:
+  <bitfield-table>
+   <bit number="0">Dither output when plotting 24bit JPEG at 16bpp or below</bit>
+   <bit number="1">Invalid</bit>
+   <bit number="3">Use colourmap (new flag for this call)</bit>
+  </bitfield-table></register-use>
+ <register-use number="5">Pointer to colour mapping descriptor</register-use>
+</entry>
+<exit>
+ <register-use number="0-5">Preserved</register-use>
+</exit>
+<use>
+<p>
+This operation plots a JPEG using the colour mapping supplied.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="JPEG_PlotTransformed"
+                number="49984"
+                description="Plot a JPEG transformed, using colour mapping"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to JPEG</register-use>
+ <register-use number="1">Transformation flag bits:
+  <bitfield-table>
+   <bit number="0">R2 is a pointer to a destination coordinate block, rather than a matrix</bit>
+   <bit number="1">Dither output when plotting 24bit JPEG at 16bpp or below</bit>
+   <bit number="2">Invalid</bit>
+   <bit number="4">Use colourmap (new flag for this call)</bit>
+  </bitfield-table></register-use>
+ <register-use number="2">Pointer to transformation matrix, or destination co-ordinates (refer to the JPEG_PlotTransformed documentation)</register-use>
+ <register-use number="3">Length of image</register-use>
+ <register-use number="4">Pointer to colour mapping descriptor</register-use>
+</entry>
+<exit>
+ <register-use number="0-4">Preserved</register-use>
+</exit>
+<use>
+<p>
+This operation plots a JPEG using the colour mapping supplied.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="JPEG_PlotFileTransformed"
+                number="49985"
+                description="Plot a JPEG file transformed, using colour mapping"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to filename of JPEG file</register-use>
+ <register-use number="1">Transformation flag bits:
+  <bitfield-table>
+   <bit number="0">R2 is a pointer to a destination coordinate block, rather than a matrix</bit>
+   <bit number="1">Dither output when plotting 24bit JPEG at 16bpp or below</bit>
+   <bit number="2">Invalid</bit>
+   <bit number="4">Use colourmap (new flag for this call)</bit>
+  </bitfield-table></register-use>
+ <register-use number="2">Pointer to transformation matrix, or destination co-ordinates (refer to the JPEG_PlotFileTransformed documentation)</register-use>
+ <register-use number="3">Pointer to colour mapping descriptor</register-use>
+</entry>
+<exit>
+ <register-use number="0-3">Preserved</register-use>
+</exit>
+<use>
+<p>
+This operation plots a JPEG using the colour mapping supplied.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+<section title="Entry Points">
+<entry-definition name="ColourMapTransfer"
+                  description="Colour mapping transfer function"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="SVC"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="0">Palette entry (&amp;BBGGRR00)</register-use>
+ <register-use number="12">Workspace value passed when call made</register-use>
+ <register-use number="13">Supervisor stack</register-use>
+ <register-use number="14">Return address</register-use>
+</entry>
+<exit>
+ <register-use number="0">Palette entry (&amp;BBGGRR00)</register-use>
+ <register-use number="12">May be corrupt</register-use>
+ <register-use number="14">May be corrupt</register-use>
+</exit>
+<use>
+<p>
+The transfer function should perform whatever processing is required on the
+palette entry passed to it. The routine may not change mode, perform any
+operation which might cause SpriteExtend to be threaded out of (eg VDU output)
+or cause the machine to block. You should return with <userinput>MOV pc,lr</userinput>.
+The transfer function will not be called for masked pixels.
+</p>
+</use>
+<related>
+<reference type="swi" name="ColourTrans_SelectTable" />
+</related>
+</entry-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>The Errors and Sprite Plot Actions sections of the original HTML page are now separate documents.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
