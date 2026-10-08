@@ -1,0 +1,144 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="OS_MMUControl">
+<section title="Introduction and Overview">
+<p>
+The OS_MMUControl SWI was updated for RISC OS 3.7 to add another reason code (reason code 1 to flush the cache). This has been extended with Kernel 9.80 to allow the write buffer to be drained. OS_MMUControl 0 has been extended to return errors if the MMU control register values are incompatible with the CPU or with the operating system.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_MMUControl"
+                number="6B"
+                description="Perform MMU operations"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Operation and flags:
+  <bitfield-table>
+ <bit number="0-7">Operation</bit>
+ <bit number="8-31">Flags (others dependent on operation)</bit>
+</bitfield-table></register-use>
+</entry>
+<exit>
+ <register-use number="">Dependent on operation</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to perform MMU operations. Consult the operation codes for more details.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_MMUControl"
+                number="6B"
+                reason="0"
+                reasonname="OS_MMUControl_SetControl"
+                description="Set MMU control register"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">0 (set MMU control register) + flags:
+  <bitfield-table>
+ <bit number="0-7">Operation (0)</bit>
+ <bit number="8-30">Reserved (must be zero)</bit>
+ <bit number="31">Do not mirror D Cache bit into I Cache bit</bit>
+</bitfield-table></register-use>
+ <register-use number="1">EOR value</register-use>
+ <register-use number="2">AND value</register-use>
+</entry>
+<exit>
+ <register-use number="1">Old MMU control register value</register-use>
+ <register-use number="2">New MMU control register value</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to change the state of the MMU control register in a processor independent manner. Any flags which are not changeable on the processor will return an error message. Any flags which are not changeable because the operating system does not support that configuration will return an error message.
+</p>
+<p>
+For compatibility with earlier systems, unless bit 31 of the flags in R0 is set, the D cache bit will be mirrored into the I cache bit. If bit 31 of the flags in R0 is set, the D cache bit will only control that one bit. For processors which do not provide an I cache, this has no effect.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_MMUControl"
+                number="6B"
+                reason="1"
+                reasonname="OS_MMUControl_Flush"
+                description="Cache and TLB operations"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">1 (cache and TLB operations) + flags:
+  <bitfield-table>
+ <bit number="0-7">Operation (1)</bit>
+ <bit number="8-27">Reserved (must be zero)</bit>
+ <bit number="28">Drain write buffer</bit>
+ <bit number="29">Flush a single entry (otherwise a complete flush)</bit>
+ <bit number="30">Flush processor TLBs</bit>
+ <bit number="31">Flush processor cache (both I and D cache)</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Logical address, if R0 bit 29 set</register-use>
+</entry>
+<exit>
+ <register-use number="0-1">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call implements platform independent cache and/or TLB flushing.
+</p>
+<p>
+Currently, bit 29 is ignored, so that only whole flushing of caches and/or TLBs are supported. A cache will be cleaned before flushing, where the processor supports a write-back cache.
+</p>
+<p>
+This reason code is not re-entrant. Interrupts are not disabled during the flush, so the cache or TLB flush can only be considered to be complete with respect to logical addresses that are not currently involved in interrupts.
+</p>
+<p>
+The 'drain write buffer' flag was introduced in Kernel 9.80.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the reason 0 operation field, which gave the operation as (1) rather than (0), and 'If bit 31 of the flags in R0 is clear' to 'is set' for the case where the D cache bit controls only that bit.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
