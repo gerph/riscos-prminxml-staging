@@ -1,0 +1,133 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Clipboard Holder">
+<section title="Introduction and Overview">
+<p>
+The clipboard has been present on RISC OS for some time but is much underused. This has been addressed in RISC OS 4.2; in particular the 'standard' applications Draw, Paint and Edit have been updated with clipboard-based Cut and Paste functions in an effort to lead the initiative to see more widespread use in RISC OS.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+To help with this, RISC OS 4.24 onwards provides two simple SWIs to provide copy and paste facilities to applications.
+</p>
+<p>
+Data pasted onto the clipboard is stored as a typed file - much as a selection saved to the RAM disc would be.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="ClipboardHolder_Copy"
+                number="54040"
+                description="Copy data to the clipboard"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+ <bit number="0-2">Type of copy to perform:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Memory copy</value>
+ <value number="1">File copy</value>
+ <value number="2-7">Reserved</value>
+</value-table></bit>
+ <bit number="3-31">Reserved, must be zero</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Filetype of data</register-use>
+ <register-use number="2">Pointer to block of memory if a memory copy; pointer to filename if a file copy</register-use>
+ <register-use number="3">Length of block of memory if a memory copy; undefined for all other uses</register-use>
+</entry>
+<exit>
+ <register-use number="0-3">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call is used to copy data to the clipboard. The data must be assigned a filetype; this allows receiving applications to understand what they are dealing with. Data may be passed to the clipboard as a file or as a block of memory.
+</p>
+<p>
+The application must, of course, implement 'cut' itself by using the <reference type="swi" name="ClipboardHolder_Copy" /> SWI and then removing its own data, leaving just the copy on the clipboard.
+</p>
+</use>
+<related>
+<reference type="swi" name="ClipboardHolder_Paste" />
+</related>
+</swi-definition>
+
+<swi-definition name="ClipboardHolder_Paste"
+                number="54041"
+                description="Request data to 'paste' from the clipboard"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+ <bit number="0-2">Type of paste to be performed:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Paste to memory</value>
+ <value number="1">Paste to file</value>
+ <value number="2-7">Reserved</value>
+</value-table></bit>
+ <bit number="3">Only check the status and filetype</bit>
+ <bit number="4-31">Reserved, must be zero</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Preferred filetype of data, or -1 to receive it in the format it was copied as</register-use>
+ <register-use number="2">Window handle to provide clipboard data to (or 0 for a new window)</register-use>
+ <register-use number="3">Private handle to identify request</register-use>
+</entry>
+<exit>
+ <register-use number="0">State:
+  <bitfield-table>
+ <bit number="0">Clipboard can be delivered to memory</bit>
+ <bit number="1">Clipboard can be delivered to file</bit>
+ <bit number="2">Clipboard must be delivered by the clipboard protocol</bit>
+ <bit number="3-31">Reserved, must be zero</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Filetype of data</register-use>
+ <register-use number="2">Pointer to block of memory if a memory copy; pointer to filename if a file copy</register-use>
+ <register-use number="3">Length of block of memory if a memory copy; preserved for file copies</register-use>
+</exit>
+<use>
+<p>
+This call is used to request data to paste from the clipboard. The data has been assigned a filetype when it was copied; this allows receiving applications to understand what they are dealing with.
+</p>
+</use>
+<related>
+<reference type="swi" name="ClipboardHolder_Copy" />
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the description of ClipboardHolder_Paste, which repeated the description of ClipboardHolder_Copy (including the paragraph on implementing 'cut'); it now describes the request for data. The overlapping reserved bit ranges in the ClipboardHolder_Copy flags were reconciled (type in bits 0-2, bits 3-31 reserved).</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
