@@ -1,0 +1,140 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Internet components overview">
+<section title="Introduction and Overview">
+<p>
+The Internet stack has been developed considerably since the version that was
+supplied with RISC OS 3.5. The components which are now a common part of the
+Internet stack are given a brief overview within this document in order that
+the structure will be clearer to users and developers.
+</p>
+</section>
+
+<section title="Components">
+<subsection title="MBufManager">
+<p>
+The MBufManager can, in some respects, be considered at the core of all the network stack as it provides all the managed memory allocation and control for device drivers, protocol drivers and other clients. It is effectively a central manager for memory for the Internet stack. It is documented as part of the DCI4 interface which is not publicly documented.
+</p>
+</subsection>
+
+<subsection title="Device drivers">
+<p>
+The device drivers are supplied by hardware manufacturers. They are generally aimed at Ethernet (standardised as IEEE 802.3), but other layers also exist, ranging from SLIP and PPP to ATM. The device drivers are generally given names prefixed by 'Ether' and provide interfaces starting with an 'e'. The Device Drivers communicate with Protocol drivers through the 'DCI4' interface. The DCI4 interface is not publicly documented, but may be obtained by contacting your supplier. Each device driver has its own features and limitations which are set by the manufacturer.
+</p>
+</subsection>
+
+<subsection title="Protocol drivers">
+<p>
+The Protocol drivers provide the interfaces to the data provided by the device drivers. The most widely known protocol driver on RISC OS is the Internet module, which handles IP (Internet Protocol), ARP and RevARP protocols. The other protocol drivers supplied with RISC OS are the AppleTalk stack, and the LanManFS limited NetBEUI implementation.
+</p>
+</subsection>
+
+<subsection title="Internet module">
+<p>
+The Internet module provides the IP (Internet Protocol) access to the rest of RISC OS components, most usually in the form of TCP or UDP (streams, or messages). The Internet module is based on the BSD sockets interface. Much more documentation on the Internet module can be found in PRM 5a-299, in the System Libraries distribution, and in the Internet documentation provided here.
+</p>
+</subsection>
+
+<subsection title="Freeway module">
+<p>
+The Freeway module provides a resource broker for objects on the local network. This means that clients (such as ShareFS) tell Freeway that they have objects (in this case, shared data) that they wish to be available to other users, and Freeway takes care of announcing this to other systems. When clients (such as ShareFS) wish to use those resources, they request details from Freeway. Freeway can be thought of as a coordinator for finding things on the network. Freeway is a RISC OS specific protocol. The known resources on the network can be displayed by the *FWShow command.
+</p>
+</subsection>
+
+<subsection title="FreewayHosts module">
+<p>
+The FreewayHosts module distributes the names of the hosts to the local network. There is no other data associated with the host name which is distributed. This is used both for diagnostics and also to provide a simple means of locating systems. The Resolver module uses the host names distributed by FreewayHosts in order to find RISC OS machines even without a DNS server.
+</p>
+</subsection>
+
+<subsection title="ShareFS module">
+<p>
+The ShareFS module provides a simple, and insecure, mechanism for sharing discs and directories between machines. The shared discs are located using Freeway and the filing system makes the devices appear as if the device was local. Running in the background, the ShareFS module should be transparent when in use, except that the server machine is interrupted for file access.
+</p>
+</subsection>
+
+<subsection title="LanManFS module">
+<p>
+The LanManFS module provides an implementation of the 'CIFS' protocol, more commonly known as LanMan, SMB or Samba. This allows access to shared discs on Windows and Linux systems. The filing system level does not allow 'long filenames'. The LanManFS module can use either the Internet module (using the 'IP' configuration, by default), or directly use the device drivers with 'NetBEUI' (provided the AppleTalk module is not present). Most servers support 'IP' configuration, and 'NetBEUI' is being phased out.
+</p>
+<p>
+The LanManFS module also provides NetBIOS name services which are used by the Resolver module to locate host names of Windows and Linux systems running the CIFS protocol suite even without a DNS server.
+</p>
+</subsection>
+
+<subsection title="AppleTalk module">
+<p>
+The AppleTalk module provides an implementation of the AppleTalk filing system and printing system. It is a complex layering of protocols which is not covered here.
+</p>
+</subsection>
+
+<subsection title="Resolver module">
+<p>
+The Resolver module performs host name to address conversions. Originally the Resolver module only translated names using the 'Hosts' file (InetDBase:Hosts) and by communicating with other DNS servers. The most recent versions of the Resolver module also use FreewayHosts to resolve local, RISC OS specific, systems and LanManFS to resolve non-native host names using the NetBIOS name services. Other name resolution methods will be supported as appropriate. The DNS component of the Resolver module can also act as a simple server, where it will attempt to perform the name conversion for requesting clients. The Resolver module is also capable of detecting servers within its local network and using them.
+</p>
+</subsection>
+
+<subsection title="DHCPClient module">
+<p>
+The DHCP ('Dynamic Host Configuration Protocol') protocol provides a means by which systems can be configured to use centrally managed address allocations, rather than each system having to be manually configured by the user. This builds upon an earlier protocol known as BootP which can be found in some RISC OS documentation, as well as being offered as an option within the configuration tools. DHCP allows a central server to provide details of the interface address, resolvers, gateways, and various other servers which are available. This removes the necessity for the user to provide any of this information.
+</p>
+</subsection>
+
+<subsection title="ZeroConf module">
+<p>
+The ZeroConf module provides an automatic configuration method similar to that of DHCP, except that it is not centrally managed. Instead the configuration of the address is effectively worked out by trial and error. Because it is intended for small numbers of hosts, this is not as unreliable as it sounds. However, because the configuration is only limited to the address of the host, other mechanisms such as RouterDiscovery and automatic resolver configuration must be used to locate gateways and DNS servers.
+</p>
+</subsection>
+
+<subsection title="RouterDiscovery module">
+<p>
+The RouterDiscovery module allows a gateway on the system to announce its presence and for it to be automatically configured. When active, and with a capable router on the system, the gateway (also known as the 'default route') can be automatically determined without the need for human intervention. This is more useful for unmanaged systems, as managed systems can use DHCP to provide such details.
+</p>
+</subsection>
+
+<subsection title="NetI module">
+<p>
+The NetI module is a little different to most other parts of the Internet stack in that it provides an implementation of the interface used by the older Econet networks, but which can be used with the Internet module. Instead of using physical Econet hardware, data is transmitted using the Internet protocols. Thus Econet components such as NetFS (not to be confused with the unix based NFS) can be used over more modern protocols. In addition, the NetI module can arbitrate between the two different network types when both 'econet-over-IP' is in use, and physical Econet hardware is present.
+</p>
+</subsection>
+
+<subsection title="MimeMap module">
+<p>
+The MimeMap module is not strictly a part of the Internet stack as it does not use any part of the interfaces provided by it. However, its purpose is to decode the 'MIME' types provided as part of many of the protocols used by the Internet clients. These types are managed by a body called IANA which gives standard names to different file formats such that they can be distinguished. The MimeMap module provides a translation from these types (for example 'text/html') to RISC OS filetypes (eg &amp;FAF), to file extensions (eg '.html') and to Mac-style data types (eg "TEXTMSIE").
+</p>
+</subsection>
+
+<subsection title="InetServices module">
+<p>
+The InetServices module is, like the MimeMap module, not strictly a part of the Internet stack. Its purpose is to provide a translation between the names of 'services' and the numbers which are used to connect to them. This is similar to the way in which host names are converted to addresses, but for the services that the systems provide - for example the 'domain' service used for looking up host names is provided by 'port 53'. In addition, the InetServices module provides error lookup for the Internet module.
+</p>
+</subsection>
+
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+ </revision>
+ </history>
+
+</meta>
+</riscos-prm>
