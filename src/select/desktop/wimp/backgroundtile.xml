@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Window background tiling">
+<section title="Introduction and Overview">
+<p>
+Tiled background windows were originally introduced in RISC OS 3.5 to improve the appearance of windows within the Desktop. The original tiling mechanism, documented in PRM 5a-488, will replace the lightest grey (grey 1) background with a tiled sprite 'tile_1', or 'tile_1-&lt;depth&gt;' where &lt;depth&gt; is the number of bits per pixel for the current mode.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+This was extended in RISC OS 4 to allow other window backgrounds to be tiled with other sprites. For example, a window with a black background (colour 7) would use 'tile_7' or 'tile_7-&lt;depth&gt;'. As well as this, the menu background could be changed from its default of white to a tiled background, using the sprite 'tile_m' or 'tile_m-&lt;depth&gt;'. A new default sprite was supplied for menu tiling.
+</p>
+<p>
+From Wimp 6.33, this behaviour has been extended further in order to function better with high resolution desktop modes. When a high resolution mode (one which uses eigen factors of 0, specified with 'EX0 EY0' in the mode string) is used the regular tile generally appears very poor in comparison to the desktop font. This is due to the default supplied tile being rendered at its natural resolution, being suitable for a normal 90 DPI mode (one which uses eigen factors of 1, specified with 'EX1 EY1' in the mode string). In this form, the tile is scaled up and thus appears blocky in the high resolution modes.
+</p>
+<p>
+The tiling mechanism has been extended to improve the appearance of such tiles by scaling them so that they match the resolution of the mode they are being displayed in. As users may have supplied a tile sprite which requires particular scaling in order to appear correctly, reusing the same tile name is not possible. Instead, new tiles named 'tile_&lt;colour&gt;r' and 'tile_&lt;colour&gt;r-&lt;depth&gt;' will be used. These will be searched for only after the original tiles in order that any original, user-specified, tiles are retained.
+</p>
+<p>
+Tiles will be rendered using the new <reference type="swi" name="OS_SpriteOp" reason="41" /> tiling operation, so take advantage of acceleration where available.
+</p>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
