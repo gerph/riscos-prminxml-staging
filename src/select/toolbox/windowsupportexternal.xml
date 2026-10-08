@@ -1,0 +1,410 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Window_SupportExternal">
+<section title="Overview">
+<p>
+The Window_SupportExternal SWI is used to provide additional functions to extension gadgets. These operations are listed below. Unless otherwise stated, the operations are present in all distributed versions of the Window module.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+The reason code is passed in R1. Flags in R0 should be zero unless otherwise stated, and R2 onward are specific to the reason code:
+</p>
+<p><value-table head-number="Reason" head-value="Meaning">
+<value number="0">Create icon</value>
+<value number="1">Reserved</value>
+<value number="2">Create object</value>
+<value number="3">Create gadget</value>
+<value number="4">Allocate memory</value>
+<value number="5">Free memory</value>
+<value number="6">Extend allocated memory</value>
+<value number="7">Simple move gadget</value>
+<value number="8">Remove icons</value>
+<value number="9">Add icons</value>
+<value number="10">Call after</value>
+<value number="11">Call every</value>
+<value number="12+">Reserved</value>
+</value-table></p></section>
+
+<section title="SWI Calls">
+<swi-definition name="Window_SupportExternal"
+                number="82887"
+                reason="0"
+                reasonname="Window_SupportExternal_CreateIcon"
+                description="Create icon"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="1">0 (Create icon)</register-use>
+ <register-use number="2">Pointer to wimp icon definition</register-use>
+</entry>
+<exit>
+ <register-use number="0">Icon handle or -1 if failed to create</register-use>
+</exit>
+<use>
+<p>
+This call creates a wimp icon from the given definition except when the Window module is in 'plotting' mode.
+</p>
+<p>
+A C equivalent is available:
+</p>
+<p><extended-example type="c">
+<userinput>int glib_create_icon(WimpCreateIconBlock *i);</userinput>
+</extended-example></p></use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Window_SupportExternal"
+                number="82887"
+                reason="2"
+                reasonname="Window_SupportExternal_CreateObject"
+                description="Create object"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags (bit 0 selects the form of R2)</register-use>
+ <register-use number="1">2 (Create object)</register-use>
+ <register-use number="2">Pointer to template name (R0 bit 0 clear), or pointer to in memory object definition (R0 bit 0 set)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Object id or zero if failed to create</register-use>
+</exit>
+<use>
+<p>
+This call creates a toolbox object and returns its Object id. The reason for using this as opposed to toolbox_create_object (SWI Toolbox_CreateObject) is that the Window module first checks for plotting rather than creation mode. If the Gadget provides a plot handler, then it may safely use Toolbox_CreateObject SWI in its add handler.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Window_SupportExternal"
+                number="82887"
+                reason="3"
+                reasonname="Window_SupportExternal_CreateGadget"
+                description="Create gadget"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="1">3 (Create gadget)</register-use>
+ <register-use number="2">Object id (must be current Object id)</register-use>
+ <register-use number="3">Pointer to gadget definition</register-use>
+ <register-use number="4">Tag (&amp;800 to &amp;FFF)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Component id or 0 if failed to create</register-use>
+</exit>
+<use>
+<p>
+This call, used for implementing composite gadgets, creates a gadget from the given template definition. The Window module generates a unique Component id for the gadget derived from the tag - It will be of the form &amp;?????ttt. The use of a tag allows improved reaction to events on composite gadgets in that if a Composite Gadget creates all its Gadgets with tag 999, then its event routines can return immediately if the Component id's lower bits do not equal 999. Tags do not require registration, but it is worth advising the maintainers of the Window module so that, where possible, clashes can be avoided. In order to receive Toolbox events a module must register an interest in them - this is described in application note 280. Note that the failure condition returns 0 rather than -1 as with other gadget calls.
+</p>
+<p>
+A C equivalent is available:
+</p>
+<p><extended-example type="c">
+<userinput>int create_gadget(int o,int *i,int f);</userinput>
+</extended-example></p></use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Window_SupportExternal"
+                number="82887"
+                reason="4"
+                reasonname="Window_SupportExternal_Allocate"
+                description="Allocate memory"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="1">4 (Allocate memory)</register-use>
+ <register-use number="2">Amount of memory to allocate in bytes</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to memory or NULL</register-use>
+</exit>
+<use>
+<p>
+This call allocates memory from the Window module's allocator using either the RMA or the Toolbox dynamic area.
+</p>
+<p>
+A C equivalent is available:
+</p>
+<p><extended-example type="c">
+<userinput>void *mem_allocate(int amount);</userinput>
+</extended-example></p></use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Window_SupportExternal"
+                number="82887"
+                reason="5"
+                reasonname="Window_SupportExternal_Free"
+                description="Free memory"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="1">5 (Free memory)</register-use>
+ <register-use number="2">Pointer to memory to free</register-use>
+</entry>
+<exit>
+ <register-use number="0-2">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call frees memory that was previously allocated by the Window modules allocator, such as with Window_SupportExternal 4.
+</p>
+<p>
+A C equivalent is available:
+</p>
+<p><extended-example type="c">
+<userinput>void mem_free(void *tag);</userinput>
+</extended-example></p></use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Window_SupportExternal"
+                number="82887"
+                reason="6"
+                reasonname="Window_SupportExternal_Extend"
+                description="Extend memory"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="1">6 (Extend memory)</register-use>
+ <register-use number="2">Pointer to memory to extend</register-use>
+ <register-use number="3">Change in size</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to memory or NULL if extend failed</register-use>
+</exit>
+<use>
+<p>
+This call reallocates memory that was previously allocated by the Window modules allocator, such as with Window_SupportExternal 4. The change may be positive or negative to grow or shrink the block accordingly. The pointer to the block may have to change and this is returned in R0. A failure will preserve the original data. Note that this is not an equivalent call to C's 'realloc' function.
+</p>
+<p>
+A C equivalent is available:
+</p>
+<p><extended-example type="c">
+<userinput>void mem_extend(void *tag, int change);</userinput>
+</extended-example></p></use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Window_SupportExternal"
+                number="82887"
+                reason="7"
+                reasonname="Window_SupportExternal_MoveGadget"
+                description="Simple move gadget"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="1">7 (Simple move gadget)</register-use>
+ <register-use number="2">Object id of parent object</register-use>
+ <register-use number="3">Component id of gadget to move</register-use>
+ <register-use number="4">Pointer to new bounding box</register-use>
+</entry>
+<exit>
+ <register-use number="1-4">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call moves all the icons associated with a gadget to the position specified by the new bounding box in the same manner as the internal gadgets. This call is only present in Window 1.98 and later. Versions of GLib before 0.05 do not use this operation and instead use a method of registering a temporary gadget, performing the move and then deregistering the gadget. The earlier form is strongly discouraged due to its adverse effects on certain versions of the Window module. If you use glib 0.05 or later you should ensure Window 1.98.
+</p>
+<p>
+The 'type' parameter of the C function is ignored in GLib 0.05 and later.
+</p>
+<p>
+A C equivalent is available:
+</p>
+<p><extended-example type="c">
+<userinput>void glib_move_gadget(int type, ObjectId obj, ComponentId id, BBox *box);</userinput>
+</extended-example></p></use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Window_SupportExternal"
+                number="82887"
+                reason="8"
+                reasonname="Window_SupportExternal_RemoveIcons"
+                description="Remove icons"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="1">8 (Remove icons)</register-use>
+ <register-use number="2">Object id of parent object</register-use>
+ <register-use number="3">Component id of gadget to remove</register-use>
+ <register-use number="4">Pointer to a list of icon handles, terminated by -1</register-use>
+</entry>
+<exit>
+ <register-use number="1-4">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call allows a gadget to inform the Window module that it no longer uses the icon handles given within the list. This allows gadgets to change the number of icons which they use dynamically during their life. This operation is present in Window 1.99 and later.
+</p>
+<p>
+A C equivalent is available:
+</p>
+<p><extended-example type="c">
+<userinput>void glib_remove_icons(ObjectId obj, ComponentId id, int *icons);</userinput>
+</extended-example></p></use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Window_SupportExternal"
+                number="82887"
+                reason="9"
+                reasonname="Window_SupportExternal_AddIcons"
+                description="Add icons"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="1">9 (Add icons)</register-use>
+ <register-use number="2">Object id of parent object</register-use>
+ <register-use number="3">Component id of gadget to add</register-use>
+ <register-use number="4">Pointer to a list of icon handles, terminated by -1</register-use>
+</entry>
+<exit>
+ <register-use number="1-4">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call allows gadgets to inform the Window module that the gadget has created the icon handles given within the list. This allows gadgets to change the number of icons which they use dynamically during their life. This operation is present in Window 1.99 and later.
+</p>
+<p>
+A C equivalent is available:
+</p>
+<p><extended-example type="c">
+<userinput>void glib_add_icons(ObjectId obj, ComponentId id, int *icons);</userinput>
+</extended-example></p></use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Window_SupportExternal"
+                number="82887"
+                reason="A"
+                reasonname="Window_SupportExternal_CallAfter"
+                description="Call after"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="1">10 (Call after)</register-use>
+ <register-use number="2">Object id of parent object</register-use>
+ <register-use number="3">Component id of gadget to register a timer event on</register-use>
+ <register-use number="4">Delay in centiseconds, or 0 to remove the call after</register-use>
+</entry>
+<exit>
+ <register-use number="1-4">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call is used to cause the Window module to call the gadget at its entry point after a number of centiseconds have passed (on a Wimp poll return, so the system is known to be unthreaded). Only a single CallAfter (or CallEvery) may be associated with a gadget. The timer will only begin its operation when the parent window object is shown. It will be removed when the window is hidden. This call is present in versions of Window after 2.03.
+</p>
+<p>
+A similar function can be used to explicitly remove such a timer:
+</p>
+<p><extended-example type="c">
+<userinput>void glib_gadget_timer_remove(ObjectId object, ComponentId component);</userinput>
+</extended-example></p><p>
+A C equivalent is available:
+</p>
+<p><extended-example type="c">
+<userinput>void glib_gadget_timer_after(ObjectId object, ComponentId component,</userinput><br/>
+<userinput>                             int delay);</userinput>
+</extended-example></p></use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Window_SupportExternal"
+                number="82887"
+                reason="B"
+                reasonname="Window_SupportExternal_CallEvery"
+                description="Call every"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="1">11 (Call every)</register-use>
+ <register-use number="2">Object id of parent object</register-use>
+ <register-use number="3">Component id of gadget to register a timer event on</register-use>
+ <register-use number="4">Delay in centiseconds, or 0 to remove the call every</register-use>
+</entry>
+<exit>
+ <register-use number="1-4">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call is identical to the CallAfter call except that the callback will recur after each trigger.
+</p>
+<p>
+A C equivalent is available:
+</p>
+<p><extended-example type="c">
+<userinput>void glib_gadget_timer_every(ObjectId object, ComponentId component,</userinput><br/>
+<userinput>                             int delay);</userinput>
+</extended-example></p></use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected 'Free free' in the reason code title, 'pointer to memory of NULL' (or), 'that the it no longer uses', and the C declarations that spelt the types 'Object id' and 'Component id' (ObjectId and ComponentId). The organisation named in the original as the contact for tag clashes is not named. The reason code names (such as Window_SupportExternal_CallEvery) are descriptive labels for the reason codes and not names defined by the operating system.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
