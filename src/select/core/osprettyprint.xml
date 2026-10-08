@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="OS_PrettyPrint">
+<section title="Introduction and Overview">
+<p>
+The OS_PrettyPrint SWI has been extended with a special case to return the OS dictionary table.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_PrettyPrint"
+                number="44"
+                description="Return the OS PrettyPrint dictionary"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">0</register-use>
+ <register-use number="1">0</register-use>
+ <register-use number="2">0</register-use>
+</entry>
+<exit>
+ <register-use number="1">Pointer to the OS PrettyPrint dictionary (see PRM 1-519)</register-use>
+</exit>
+<use>
+<p>
+This interface is present in OSSWIs version 0.10.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Captured in the original HTML as part of the Miscellaneous items page, and separated into its own document.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
