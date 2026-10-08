@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Window handles">
+<section title="Introduction">
+<p>
+In the past window handles have always been related to the internal window structure by a known algorithm. As of Wimp 5.93, this algorithm will no longer be used. There should be no clients which access the internal Wimp structures, so this should not be an issue.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Features of the handle">
+<p>
+Features of the previous algorithm were used by certain clients for their internal functioning, although this was never documented. For completeness, the following is true of the new algorithm and the old :
+</p>
+<p><list>
+<item><p>Bit 0 will always be set. This feature can be used in traversing menu structures. A menu pointer with bit 0 set is actually a window handle.</p></item>
+<item><p>Bit 31 will never be set. This feature has been used to check that the window handle is valid by never being negative.</p></item>
+<item><p>The handle will never be 0, -1, -2, or -3. These values may be safely used by clients to indicate the non-existence of a window internally. The special values -1, -2 and -3 are used by some interfaces to indicate iconbar, top, bottom and hidden windows. These values actually fall into the above two categories, but are explicitly documented here for clarity.</p></item>
+</list></p>
+<p>
+Despite being documented here, clients should not rely on the window handle having any meaning where possible.
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the slips 'non-existance' (non-existence), 'the above to categories' (two) and the missing full stop after 'hidden windows'.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
