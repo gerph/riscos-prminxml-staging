@@ -1,0 +1,205 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="The MimeMap module">
+<section title="Introduction and Overview">
+<p>
+The MimeMap module provides a central service for mapping between RISC OS file
+types, MIME content types, 'dot' extensions and Mac filetype/creator pairs.
+</p>
+
+<p>
+When the module is loaded it reads the file
+<filename>&lt;Inet$MimeMappings&gt;</filename> and stores the parsed file
+internally. If the system variable is changed, or the module is explicitly told
+to, the old version will be discarded and the file parsed again.
+</p>
+
+<p>The MimeMap module can handle 5 different file typing schemes:</p>
+
+<p><list>
+<item><p>RISC OS file type by number, eg &amp;FFF</p></item>
+<item><p>RISC OS file type by name, eg Text</p></item>
+<item><p>MIME content type string, eg text/plain</p></item>
+<item><p>File extension string, eg .txt</p></item>
+<item><p>Mac type/creator pair, eg "ttxtTEXT"</p></item>
+</list></p>
+
+<p>Any type can be converted to any other type.</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Mac type names">
+<p>
+Mac types are specified in the form: "XXXXxxxx" where XXXX is the filetype and
+xxxx is the vendor type. ? can be used as a single character wildcard. \? means
+a literal ?. \t, \v, \n, \r have their usual meanings. \DD (where DD are 2 hex
+digits) represents the character with ASCII code &amp;DD.
+</p>
+
+<p>
+There is a default Mac mapping defined, where "&amp;DDDAcrn" maps to filetype
+&amp;DDD (for hex digits DDD). This vendor name is registered with Apple. Within
+Mac mappings, the least number of wildcards is matched if multiple matches are
+possible.
+</p>
+
+<p>
+Mac mappings must be enclosed in double quotes (") when passed to the
+<reference type="command" name="MimeMap" /> command, and in the MimeMap file.
+</p>
+</subsection>
+
+<subsection title="File format">
+<p>
+The MimeMap file is split into 5 fields to provide the type mappings database.
+Entries within the file are searched in the same order in which they appear,
+with wildcards matched last. Fields are tab delimited, and consist of:
+</p>
+
+<p><extended-example type="format">
+<userinput>&lt;mimetype&gt; &lt;tab&gt; &lt;ro-text&gt; &lt;tab&gt; &lt;ro-hex&gt; &lt;tab&gt; &lt;extensions&gt; &lt;tab&gt; &lt;mactype&gt;</userinput>
+</extended-example></p>
+
+<p><value-table head-number="Field" head-value="Meaning">
+<value number="&lt;mimetype&gt;">Takes the form &lt;major&gt;/&lt;minor&gt; types as defined by IANA. &lt;minor&gt; may be a '*' wildcard to match anything with the &lt;major&gt; type. &lt;major&gt; may be a '*' wildcard to match any type.</value>
+<value number="&lt;ro-text&gt;">The textual form of &lt;ro-hex&gt;.</value>
+<value number="&lt;ro-hex&gt;">The hexadecimal RISC OS type.</value>
+<value number="&lt;extensions&gt;">A period (.) prefixed, tab separated list of file extensions.</value>
+<value number="&lt;mactype&gt;">A Mac type/creator pair as described above.</value>
+</value-table></p>
+</subsection>
+</section>
+
+<section title="System Variables">
+<sysvar-definition name="Inet$MimeMappings"
+                   description="The file of MIME type mappings read by MimeMap">
+<use>
+<p>
+The file named by this variable is read by the MimeMap module when it is
+loaded, and parsed into its internal database. If the variable is changed, or
+the module is told to re-read the file, the old version is discarded and the
+file parsed again.
+</p>
+</use>
+<related>
+<reference type="command" name="ReadMimeMap" />
+</related>
+</sysvar-definition>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="MimeMap_Translate"
+                number="50B00"
+                description="Translate between file type formats"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Input format</register-use>
+ <register-use number="1">Input data or pointer to buffer</register-use>
+ <register-use number="2">Output format</register-use>
+ <register-use number="3">Pointer to output data buffer (if needed, 128 bytes)</register-use>
+</entry>
+<exit>
+ <register-use number="0-2" state="preserved"/>
+ <register-use number="3">Result, or output buffer pointer</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to access the mapping translation database to convert from one
+type format to another.
+</p>
+
+<p>The 5 formats supported are:</p>
+
+<p><value-table head-number="#" head-name="Name" head-value="Meaning">
+<value number="0" name="MMM_TYPE_RISCOS">RISC OS file type passed as an int</value>
+<value number="1" name="MMM_TYPE_RISCOS_STRING">RISC OS file type passed as a pointer</value>
+<value number="2" name="MMM_TYPE_MIME">MIME content type passed as a pointer</value>
+<value number="3" name="MMM_TYPE_DOT_EXTN">File extension (no dot) as a pointer</value>
+<value number="4" name="MMM_TYPE_MAC">Mac type as a pointer</value>
+</value-table></p>
+</use>
+<related>
+<reference type="command" name="MimeMap" />
+</related>
+</swi-definition>
+</section>
+
+<section title="*Commands">
+<command-definition name="MimeMap" description="Read the mime file or display the translation of certain types">
+<syntax>
+ <optional><text>&amp;</text><userreplace>hex</userreplace></optional>
+</syntax>
+<syntax>
+ <optional><text>.</text><userreplace>extension</userreplace></optional>
+</syntax>
+<syntax>
+ <optional><userreplace>major</userreplace><text>/</text><userreplace>minor</userreplace></optional>
+</syntax>
+<syntax>
+ <optional><userreplace>typename</userreplace></optional>
+</syntax>
+<syntax>
+ <optional><text>"</text><userreplace>Mac_Type</userreplace><text>"</text></optional>
+</syntax>
+<use>
+<p>
+This command is used to read the mime file or display the translation of
+certain types. If issued with no parameters it will list all the known types.
+Alternatively, it can be followed by the type names as used in the types file:
+</p>
+
+<p><list>
+<item><p>a type name &amp;xxx to map a RISC OS file type in hexadecimal</p></item>
+<item><p>.ext to map a file name extension</p></item>
+<item><p>major/minor to map a MIME content type</p></item>
+<item><p>a simple string to look up for a RISC OS file type</p></item>
+<item><p>a Mac type pair in quotes</p></item>
+</list></p>
+</use>
+<related>
+<reference type="command" name="ReadMimeMap" />
+<reference type="swi" name="MimeMap_Translate" />
+</related>
+</command-definition>
+
+<command-definition name="ReadMimeMap" description="Re-read the MimeMap mappings file">
+<syntax>
+</syntax>
+<use>
+<p>This command causes the MimeMap module to re-read the mappings file.</p>
+</use>
+<related>
+<reference type="command" name="MimeMap" />
+</related>
+</command-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+ </revision>
+ </history>
+
+</meta>
+</riscos-prm>
