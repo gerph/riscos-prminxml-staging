@@ -48,6 +48,18 @@ Convert each page to `src/select/<area>/<name>.xml`, one commit per page.
 7. Add the page to `index.xml`, then lint, build and commit the XML and
    `index.xml` together.
 
+Write the text as documentation of the interface, not as a report on the
+conversion: do not say what "the original documentation" gave or lacked, which
+bit the capture lost, or how a section was split. Where information is missing
+or unclear, write a `<fixme>` stating what is missing about the interface. Notes
+on the conversion belong in the `<change>` elements of the history.
+
+Where the capture bundles several documents in one page, or the same material
+appears on several pages (for example a SWI repeated in a summary), give each
+SWI, service or message one definition, and refer to it from the others.
+Services are named without the `Service_` prefix, and references to them use
+that name.
+
 Format points which cause lint failures:
 
 * `<value-table>`, `<offset-table>` and `<bitfield-table>` must be inside a
