@@ -1,0 +1,108 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="ScreenModes">
+<section title="Introduction and Overview">
+<p>
+The ScreenModes module has been extended to pay attention to the limitations of the hardware as provided by the device descriptors. This allows hardware devices with different restrictions on the mode parameters to be catered for by the ScreenModes module. Similarly, the bandwidth restrictions now enforced by the ScreenModes module are provided by the video driver. The original <sysvar>VIDCBandwidthLimit</sysvar> is no longer functional in changing the limits.
+</p>
+<p>
+The ScreenModes module will always respond to mode enumeration commands with the configuration set by the currently used display. Thus changing the current display will cause a new <reference type="service" name="Service_ModeFileChanged" /> to be issued to cause clients to re-obtain their list of available modes.
+</p>
+<p>
+The <reference type="swi" name="ScreenModes_ReadInfo" /> SWI has been extended to read the DPMS details for the currently configured MDF.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="System Sprite Pool">
+<p>
+The system sprite pool is no longer controlled by the kernel. This area is now under the control of the SpriteUtils module. With this change, a legacy system call has been removed. This should not affect modern software.
+</p>
+<p>
+The system sprite area should not be used by modern applications, and this change should not affect any recent software.
+</p>
+</subsection>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="ScreenModes_ReadInfo"
+                number="487C0"
+                reason="1"
+                reasonname="ScreenModes_ReadInfo_DPMS"
+                description="Read the DPMS state of the current mode definition"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">1 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="0">DPMS state for current mode definition</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the DPMS state as configured by the currently
+selected MDF. This is used by the configuration tools.
+</p>
+</use>
+</swi-definition>
+
+<swi-definition name="OS_Byte"
+                number="6"
+                reason="A3"
+                reasonname="OS_Byte_ReadSystemSpriteArea"
+                description="Read the system sprite area details (OS_Byte 163, 242, 65)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">163</register-use>
+ <register-use number="1">242</register-use>
+ <register-use number="2">65</register-use>
+</entry>
+<exit>
+ <register-use number="1">Packed information (see PRM 1-655)</register-use>
+ <register-use number="2">0</register-use>
+</exit>
+<use>
+<p>
+This call no longer returns the size of the system sprite area. Applications
+should use <reference type="swi" name="OS_ReadDynamicArea" /> to obtain this
+information.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ReadDynamicArea" />
+</related>
+</swi-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
