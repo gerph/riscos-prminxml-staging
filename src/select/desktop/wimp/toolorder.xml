@@ -1,0 +1,92 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Window Manager Tool furniture ordering">
+<section title="Introduction and Overview">
+<p>
+<userinput>*WimpToolOrder</userinput> changes the way in which windows tools are rendered around windows.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+The settings are described by the positions that the tools are located, listing the tools from left (or top) to right (or bottom). The format that should be used to describe tool locations is a space separated list of components :
+</p>
+<p><extended-example type="format">
+<userinput>&lt;location&gt;=&lt;toollist&gt;</userinput>
+</extended-example></p><p>
+where &lt;location&gt; may be 'T', 'B', 'L' or 'R' for the 'Top', 'Bottom', 'Left' or 'Right' edges of the window. The tools which may be listed in a single string are :
+</p>
+<p><value-table head-number="Tool" head-value="Meaning">
+<value number="b">Back icon.</value>
+<value number="c">Close icon</value>
+<value number="t">Title text</value>
+<value number="i">Iconise icon</value>
+<value number="s">Toggle size icon</value>
+<value number="v">Vertical scrollbar</value>
+<value number="h">Horizontal scrollbar</value>
+<value number="r">Resize icon</value>
+</value-table></p><p>
+Certain combinations are nonsensical, and extreme care should be observed when selecting settings. Typical examples might be :
+</p>
+<p><value-table head-number="Setting" head-value="Layout">
+<value number="T=bctis R=tvr B=hr">Standard RISC OS style</value>
+<value number="B=bctir R=hvr T=hs">Upside down RISC OS style</value>
+<value number="T=btisc R=tvr B=hr">Typical of another well known OS</value>
+<value number="T=bcti R=svr B=hr">Strange titlebar below scrollbar</value>
+<value number="B=t L=bcisvh B=hr">Unuseful, but interesting tool layout</value>
+</value-table></p><p>
+In particular, it should be noted that the toggle size icon and the resize icon may not function as desired if they move away from their more common locations.
+</p>
+<p>
+<strong>Important:</strong> Avoid generating loops in the order lists. For example, an order such as 'T=bcbt' would generate a loop. Behaviour when loops are created is undefined.
+</p>
+<p>
+Certain tool orders may result in undesirable operation. For example, an order such as 'T=tc R=v' will cause the vertical scrollbar to be plotted over the close icon (or right edge of the title bar). Avoiding such tool orders is a matter of describing the tools correctly - the right hand edge should have been described as R=tv because the title will push the vertical bar down when it is present. Similarly, moving tools to less common locations may not work as expected, for example the resize icon will resize the bottom right corner which may not be ideal if it is placed in other locations.
+</p>
+</section>
+
+<section title="Commands">
+<command-definition name="WimpToolOrder"
+                    description="Change the way in which window tools are positioned around windows">
+<syntax><userreplace>location</userreplace><text>=</text><userreplace>toollist</userreplace><text> ...</text></syntax>
+<parameter name="location">T, B, L or R for the Top, Bottom, Left or Right edges of the window</parameter>
+<parameter name="toollist">Tools to be placed along that edge, from left (or top) to right (or bottom)</parameter>
+<use>
+<p>
+Changes the way in which windows tools are rendered around windows. See the Technical Details section for the tools which may be listed.
+</p>
+</use>
+<related>
+</related>
+</command-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
