@@ -1,0 +1,355 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="C99 support functions">
+<section title="Introduction and Overview">
+<p>
+The C99 support library (C99) provides a number of functions required by the
+C99 compiler and usable by other clients. The library has no data
+requirements. The library has a SharedCLibrary library chunk ID of 5.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Floating point support">
+<p>
+Many of the functions are provided in two variants, distinguished by a 'f' (or
+no) or 'd' suffix. These indicate the routine is expected to provide a float
+(32bit FP) or double (64bit FP) argument. Except where mentioned, floating
+point arguments are passed in ARM registers.
+</p>
+</subsection>
+
+<subsection title="'long long' support">
+<p>
+A number of 'long long' support functions are also provided. These provide
+additional support to that provided by the C99Low library explicitly for
+C99-specification support.
+</p>
+
+<p>
+A 'long long' is a 64bit value which can be signed or unsigned. It is
+represented by two 32bit little-endian words, with the low word stored first.
+When passed to functions, a 'long long' can be effectively represented as a
+structure thus:
+</p>
+<p><extended-example type="c">
+<userinput>typedef __value_in_regs struct longlong_s {long lo;</userinput><br/>
+<userinput>                                         unsigned long hi;</userinput><br/>
+<userinput>                                       } longlong_t;</userinput>
+</extended-example></p>
+
+<p>
+In this form, values are passed to functions as if there were two registers
+containing the lo and hi values.
+</p>
+</subsection>
+
+<subsection title="'intmax_t' support">
+<p>
+The 'intmax_t' type is provided in an identical manner to that of the 'long
+long' support. Parameters passed to functions and returned by this type are
+passed in two registers containing the low and high values.
+</p>
+</subsection>
+
+<subsection title="Calling conventions">
+<p>
+All functions within the library use APCS-R or APCS-32 (dependent on linkage)
+calling conventions.
+</p>
+</subsection>
+</section>
+
+<section title="Functions">
+<p>
+The entry numbers are those of the entries within the C99 library chunk.
+</p>
+<subsection title="Number classification">
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="0" name="int __fpclassifyf(float);">float version</value>
+<value number="1" name="int __fpclassifyd(double);">double version</value>
+</value-table></p>
+<p>Returns a classification of the floating point argument passed, as specified below:</p><p><value-table head-number="Value" head-value="Meaning">
+<value number="0">Value is zero</value>
+<value number="1">Value is a sub-normal FP value</value>
+<value number="2">Value is a normal FP value</value>
+<value number="3">Value is an infinity FP value</value>
+<value number="4">Value is Not-A-Number (NAN) FP value</value>
+</value-table></p>
+<p>Note: FP values are passed in FP registers.</p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="2" name="int __signbitf(float);">float version</value>
+<value number="3" name="int __signbitd(double);">double version</value>
+</value-table></p>
+<p>Returns the value of the sign bit for the floating point argument passed. 1 if the sign bit is set, 0 if the sign bit is clear.</p><p>Note: FP values are passed in FP registers.</p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="4" name="double copysign(double x, double y);">double version</value>
+<value number="5" name="float copysignf(float x, float y);">float version</value>
+</value-table></p>
+<p>Returns a floating point value whose sign matches that of y, and whose magnitude is that of x. Effectively, copies the sign of y into x and returns it.</p><p>Note: FP values are passed in FP registers.</p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="6" name="double nan(const char *tag);">double version</value>
+<value number="7" name="float nanf(const char *tag);">float version</value>
+</value-table></p>
+<p>Returns a Not-A-Number (NAN) FP value. The value of tag is implementation defined. Current implementations ignore the value of tag.</p>
+</subsection>
+<subsection title="Extra floating point functions">
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="8" name="double nextafter(double x, double y);">double version</value>
+<value number="9" name="float nextafterf(float x, float y);">float version</value>
+</value-table></p>
+<p>Returns the next representable value in the specified format after x in the direction of y.</p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="10" name="double fdim(double x, double y);">double version</value>
+<value number="11" name="float fdimf(float x, float y);">float version</value>
+</value-table></p>
+<p>Determines the positive difference between the arguments:</p><p><list>
+<item><p>if x &gt; y, returns x-y</p></item>
+<item><p>if x &lt;= y, returns +0</p></item>
+</list></p>
+<p>A range error may occur. Returns the positive difference value.</p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="12" name="double fmax(double x, double y);">double version</value>
+<value number="13" name="float fmaxf(float x, float y);">float version</value>
+</value-table></p>
+<p>Returns the higher of the two arguments.</p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="14" name="double fmin(double x, double y);">double version</value>
+<value number="15" name="float fminf(float x, float y);">float version</value>
+</value-table></p>
+<p>Returns the lower of the two arguments.</p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="16" name="float fabsf(float x);">Returns the absolute value of the argument.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="17" name="double hypot(double x, double y);">double version</value>
+<value number="18" name="float hypotf(float x, float y);">float version</value>
+</value-table></p>
+<p>Returns the square root of the sum of the squares of x and y, without undue overflow or underflow. A range error may occur.</p>
+</subsection>
+<subsection title="Floating Point Environment operations">
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="19" name="int feclearexcept(int exceptions);">Clears floating point exceptions. Returns the bit mask of the exceptions which could not be cleared.</value>
+</value-table></p>
+<p>The exceptions bit mask is:</p><p><value-table head-number="Bit" head-value="Exception">
+<value number="0">Invalid operation</value>
+<value number="1">Division by zero</value>
+<value number="2">Overflow</value>
+<value number="3">Underflow</value>
+<value number="4">Inexact</value>
+</value-table></p>
+
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="20" name="int fegetexceptflag(unsigned int *flagsp, int exceptions);">Reads the representation of the FP status flags indicated by the exceptions arguments. Returns zero if successful, non-zero if failed.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="21" name="int feraiseexcept(int exceptions);">Attempts to raise the floating point exceptions specified within the exceptions flags. Returns zero if successful, non-zero if failed.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="22" name="int fesetexceptflag(unsigned int *flagsp, int exceptions);">Attempts to set the status flags indicated by the exceptions argument to those stored in the value pointed to by flagsp. This function can be used together with fegetexceptflag() to preserve and restore floating point status flags. Returns zero if successful, or non-zero if failed.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="23" name="int fetestexcept(int exceptions);">Determines which of the exceptions specified in the argument are currently set. Returns the exceptions which are currently set, from those specified within the argument.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="24" name="int fegetround(void);">Reads the current rounding direction. Returns 0 indicating 'round to nearest'. The current implementation of the ARM FP system cannot change its rounding direction at runtime.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="25" name="int fesetround(int direction);">Changes the rounding direction. Returns 0 indicating success if the direction specified was 0, or 1 indicating a failure otherwise.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="26" name="int fegetenv(const fenv_t *envp);">Reads the current floating point environment into the structure specified. The structure must be 6 words long. Returns 0 if successful, or 1 if failed.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="27" name="int feholdexcept(const fenv_t *envp);">Reads the current floating point environment into the structure specified, clears any pending exceptions and disables all floating point exceptions. Returns 0 if successful, or 1 if failed.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="28" name="int fesetenv(const fenv_t *envp);">Attempts to set the floating point environment to that stored in the argument. No exceptions are raised. Returns 0 if successful, or 1 if failed.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="29" name="int feupdateenv(const fenv_t *envp);">Attempts to set the floating point environment to that stored in the argument. Exceptions are then raised. Returns 0 if successful, or 1 if failed.</value>
+</value-table></p>
+</subsection>
+<subsection title="Extended string operations">
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="30" name="int _snprintf(char *output, size_t max, const char *format, ...);">Integer-only form of sprintf, limited to max output bytes. Consult the C specification for details of the format parameters. Returns the number of bytes which have been written to the output buffer, or would have been written if the buffer had been long enough.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="31" name="int snprintf(char *output, size_t max, const char *format, ...);">Form of sprintf, limited to max output bytes. Consult the C specification for details of the format parameters. Returns the number of bytes which have been written to the output buffer, or would have been written if the buffer had been long enough.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="32" name="int vsnprintf(char *output, size_t max, const char *format, va_list ap);">Variadic arguments form of snprintf. Consult the C specification for details of the format parameters. Returns the number of bytes which have been written to the output buffer, or would have been written if the buffer had been long enough.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="33" name="int vfscanf(FILE *f, const char *format, va_list);">Variadic form of fscanf. Consult the C specification for details of the format parameters. Returns the number of arguments processed, or EOF if failed before any conversion.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="34" name="int vscanf(const char *format, va_list);">Variadic form of scanf. Consult the C specification for details of the format parameters. Returns the number of arguments processed, or EOF if failed before any conversion.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="35" name="int vsscanf(const char *string, const char *format, va_list);">Variadic form of sscanf. Consult the C specification for details of the format parameters. Returns the number of arguments processed, or EOF if failed before any conversion.</value>
+</value-table></p>
+</subsection>
+<subsection title="Rounding and remainder functions">
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="36" name="float ceilf(float x);">Returns the smallest integer not less than x.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="37" name="float floorf(float x);">Returns the largest integer not greater than x.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="38" name="double nearbyint(double x);">double version</value>
+<value number="39" name="float nearbyintf(float x);">float version</value>
+</value-table></p>
+<p>Rounds its argument to an integer value, using the current rounding direction. Does not raise the inexact exception.</p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="40" name="double rint(double x);">double version</value>
+<value number="41" name="float rintf(float x);">float version</value>
+<value number="42" name="long int lrint(double x);">double version, returning a long int</value>
+<value number="43" name="long int lrintf(float x);">float version, returning a long int</value>
+</value-table></p>
+<p>Rounds its argument to an integer value, using the current rounding direction. Raises "inexact" if the result differs from the argument.</p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="44" name="double round(double x);">double version</value>
+<value number="45" name="float roundf(float x);">float version</value>
+<value number="46" name="long int lround(double x);">double version, returning a long int</value>
+<value number="47" name="long int lroundf(float x);">float version, returning a long int</value>
+</value-table></p>
+<p>Rounds its argument to the nearest integer value, rounding halfway cases away from zero.</p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="48" name="double trunc(double x);">double version</value>
+<value number="49" name="float truncf(float x);">float version</value>
+</value-table></p>
+<p>Rounds its argument to the integer value, nearest to but no larger in magnitude than the argument.</p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="50" name="double remainder(double x, double y);">double version</value>
+<value number="51" name="float remainderf(float x, float y);">float version</value>
+</value-table></p>
+<p>Computes the remainder x REM y required by IEEE 754.</p>
+</subsection>
+<subsection title="Long Long operations">
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="52" name="long long llabs(long long j);">Returns the absolute value of j.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="53" name="lldiv_t lldiv(long long j, long long k);">Computes numer / denom and numer % denom in a single operation. Returns a structure of type lldiv_t, comprising both the quotient and the remainder.</value>
+</value-table></p>
+<p><extended-example type="c">
+<userinput>typedef struct lldiv_t { long long quot;</userinput><br/>
+<userinput>                       long long rem;</userinput><br/>
+<userinput>                     } lldiv_t;</userinput>
+</extended-example></p>
+</subsection>
+<subsection title="String conversion functions">
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="54" name="long long atoll(const char *s);">Returns the value of the string in s. This is equivalent to strtoll(s, (char **)NULL, 10); with the exception that errno is unaffected by the conversion.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="55" name="long long strtoll(const char *s, char **e, int b);">Returns the value of the string in s, given in base b, storing the end of the conversion in pointer at e. e may be NULL if no end pointer is required. b may be 0 to indicate that the number is decimal, octal, or hexadecimal based on the prefix - '0x' indicates hexadecimal, '0' indicates octal, and all other values are decimal. Leading spaces, as determined by isspace(), are skipped. If b is 16, the string may be prefixed by '0x' and this will be skipped. The base may be any value from 2 to 36. If the value cannot be converted because it is too large, it will return LLONG_MAX or LLONG_MIN, depending on whether the overflowing value was positive or negative, and errno will be set to ERANGE.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="56" name="unsigned long long strtoull(const char *s, char **e, int b);">Returns the value of the string in s as an unsigned value, given in base b, storing the end of the conversion in pointer at e. This function is identical to strtoll, except that underflow cannot be reported, and an overflow is indicated by ULLONG_MAX.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="57" name="long long imaxabs(long long i);">Returns the absolute value of a 64bit value. Equivalent to llabs.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="58" name="intmax_t imaxdiv(long long j, long long k);">Divides an intmax_t value by a second intmax_t value. Equivalent to lldiv.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="59" name="intmax_t strtoimax(const char *s, char **e, int b);">Equivalent to strtoll.</value>
+<value number="60" name="intmax_t strtouimax(const char *s, char **e, int b);">Equivalent to strtoull.</value>
+</value-table></p>
+</subsection>
+<subsection title="Core library support functions">
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="61" name="void __assert2(const char *message, const char *func, const char *file, int line);">Displays an error to stderr in response to an assertion, and then calls abort(). Never returns.</value>
+</value-table></p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="62" name="void _Exit(int status);">Terminates the program immediately, without calling the 'atexit' functions. This may mean under a C++ environment that destructors are not invoked. File descriptors opened by the standard stream functions will be closed.</value>
+</value-table></p>
+</subsection>
+<subsection title="Extended floating point functions">
+<p>The following entries are provided. Their behaviour is as specified by C99 for the functions of those names, with the 'f' suffix indicating the float variant.</p><p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="63" name="acosf"></value>
+<value number="64" name="asinf"></value>
+<value number="65" name="atanf"></value>
+<value number="66" name="atan2f"></value>
+<value number="67" name="cosf"></value>
+<value number="68" name="sinf"></value>
+<value number="69" name="tanf"></value>
+<value number="70" name="acosh"></value>
+<value number="71" name="acoshf"></value>
+<value number="72" name="asinh"></value>
+<value number="73" name="asinhf"></value>
+<value number="74" name="atanh"></value>
+<value number="75" name="atanhf"></value>
+<value number="76" name="expf"></value>
+<value number="77" name="exp2"></value>
+<value number="78" name="exp2f"></value>
+<value number="79" name="expm1"></value>
+<value number="80" name="expm1f"></value>
+<value number="81" name="frexpf"></value>
+<value number="82" name="ilogb"></value>
+<value number="83" name="ilogbf"></value>
+<value number="84" name="ldexpf"></value>
+<value number="85" name="logf"></value>
+<value number="86" name="log10f"></value>
+<value number="87" name="log1p"></value>
+<value number="88" name="log1pf"></value>
+<value number="89" name="log2"></value>
+<value number="90" name="log2f"></value>
+<value number="91" name="logb"></value>
+<value number="92" name="logbf"></value>
+<value number="93" name="modff"></value>
+<value number="94" name="fmodf"></value>
+<value number="95" name="scalbn"></value>
+<value number="96" name="scalbnf"></value>
+<value number="97" name="scalbln"></value>
+<value number="98" name="scalblnf"></value>
+<value number="99" name="cbrt"></value>
+<value number="100" name="cbrtf"></value>
+<value number="101" name="powf"></value>
+<value number="102" name="sqrtf"></value>
+<value number="103" name="erf"></value>
+<value number="104" name="erff"></value>
+<value number="105" name="erfc"></value>
+<value number="106" name="erfcf"></value>
+<value number="107" name="lgamma"></value>
+<value number="108" name="lgammaf"></value>
+<value number="109" name="tgamma"></value>
+<value number="110" name="tgammaf"></value>
+<value number="111" name="nexttoward"></value>
+<value number="112" name="nexttowardf"></value>
+<value number="113" name="fmaf"></value>
+</value-table></p>
+</subsection>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected evident slips in the original: the entries after tgamma were numbered 100 to 103 and are now 110 to 113; the group titled 'Limitations' now has a title describing its rounding and remainder functions; the prototypes of copysignf, remainder, strtoimax, strtouimax and feupdateenv, and the quot member of lldiv_t, now have the types they were evidently intended to have; floorf returns the largest integer not greater than its argument.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
