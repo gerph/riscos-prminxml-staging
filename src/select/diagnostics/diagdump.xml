@@ -1,0 +1,249 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="DiagnosticDump overview">
+<section title="Introduction">
+<p>
+Within modern versions of the Operating System a new module called DiagnosticDump has been added to provide much more feedback for developers than was previously available. The DiagnosticDump module uses the new APCS backtrace augmentation feature of the SharedCLibrary to record details about application failures. This means that should a failure occur (CPU exception, abort, or assertion) and a backtrace be triggered, a record of the failure will be written to disc.
+</p>
+<p>
+These records - known as Diagnostic Dumps, or DiagDump for short - can then be decoded by special tools to provide similar information as was displayed within the backtrace itself. Because these files are self-contained, they can either be interpreted by the user, or be transferred to the original developer of the application.
+</p>
+<p>
+The purpose of these DiagDumps is to provide a means by which better diagnostics of problems can be obtained by developers, even where they do not have access to the system upon which the failure occurs.
+</p>
+<p>
+By default, the module will record details about the failure and automatically open a Filer window displaying the saved dump. The filename of the dump will reflect the application run, together with the date and time of the failure.
+</p>
+<p>
+Because sections of memory are recorded which may not directly relate to the failure, users should be careful about who they give the dump files to. See the 'Security issues' section for more details.
+</p>
+<p>
+In addition to this the module may be called upon to explicitly write a diagnostic dump for the current system state through a SWI. Such a call will write a file (or buffer the file for later writing) which includes the full privileged stack and, if available, the non-privileged application space call trace. This can be used by developers in order to locate unexpected invocation paths or similar problems.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Details recorded">
+<p>
+The DiagnosticDump module will record details about the failure to disc. At present the following information is recorded (where available):
+</p>
+<p><list>
+<item><p>Call stack at point of failure</p></item>
+<item><p>Operating System and Platform version and features</p></item>
+<item><p>Processor type</p></item>
+<item><p>Time of failure</p></item>
+<item><p>Register set at point of failure</p></item>
+<item><p>Dynamic area names and extents</p></item>
+<item><p>Module names and extents</p></item>
+<item><p>Command line used to invoke application</p></item>
+<item><p>Data referenced by regions referred to within the Call stack.</p></item>
+</list></p><p>
+In addition to this information, the user may choose to expand the regions of memory recorded from just the call stack up to the entire application space of the failing application. It is only expected that this be necessary in a very limited number of cases.
+</p>
+</subsection>
+
+<subsection title="Reading Diagnostic Dump files">
+<p>
+The dump files are stored in a simple chunk format. This format can be obtained
+on request, although at the present time is subject to change. The BTSDump tool
+(version 0.35 and later) can be used to read these files. Typically, use:
+</p>
+<p><extended-example type="shell">
+<userinput>*BTSDump -i -R &lt;filename&gt;</userinput>
+</extended-example></p>
+<p>
+The BTSDump tool is the default run-type for the DiagData filetype and will
+cause the dump to be displayed within a TaskWindow.
+</p>
+</subsection>
+</section>
+
+<section title="System Variables">
+<sysvar-definition name="DiagnosticDump$Options"
+                   description="Controls the recording of diagnostic dumps">
+<use>
+<p>
+The DiagnosticDump module is controlled by this system variable. When a failure
+resulting in a backtrace occurs, the module will examine this variable and if
+enabled it will record the necessary details to a dump file.
+</p>
+
+<p>The options variable takes a number of arguments. The generalised form of the variable's value is:</p>
+<p><extended-example type="format">
+<userinput>&lt;optionchar&gt; := 'A'-'Z' 'a'-'z'</userinput><br/>
+<userinput>&lt;string&gt;     := any but ' '</userinput><br/>
+<userinput>&lt;option&gt;     := &lt;optionchar&gt; |</userinput><br/>
+<userinput>                &lt;optionchar&gt; '0'-'9' |</userinput><br/>
+<userinput>                &lt;optionchar&gt; '=' &lt;string&gt; ' '</userinput><br/>
+<userinput>&lt;optionlist&gt; := &lt;option&gt; | &lt;option&gt; &lt;optionlist&gt;</userinput>
+</extended-example></p>
+<p>The following options are supported at present:</p>
+
+<p><value-table head-number="Option" head-value="Meaning">
+<value number="Y[&lt;level&gt;]">Enable the module. Without a 'Y' option, dumps will not be generated. If not specified, the &lt;level&gt; defaults to 0. The &lt;level&gt; values determine the amount of information recorded from the application space, in increasing order of dump size: 0 = record backtrace details (usually ~30K); 1 = record backtrace details and application heap; 2 = record backtrace details, application heap and application statics; 3 = record entire application space.</value>
+<value number="O">Automatically open the dump directory if no other handler shows an interest in the dump.</value>
+</value-table></p>
+
+<p>
+By default the module is configured to use 'Y0O'. To disable the module's
+automatic recording of diagnostic data entirely, unset the variable.
+</p>
+</use>
+<related>
+<reference type="sysvar" name="DiagnosticDump$Dir" />
+</related>
+</sysvar-definition>
+
+<sysvar-definition name="DiagnosticDump$Dir"
+                   description="Directory in which diagnostic dumps are held">
+<use>
+<p>
+The dump files are held in the directory specified by this variable or, if it is
+unset, in <filename>&lt;Wimp$ScrapDir&gt;.DiagDump</filename>.
+</p>
+</use>
+<related>
+<reference type="sysvar" name="DiagnosticDump$Options" />
+</related>
+</sysvar-definition>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="DiagnosticDump_Write"
+                number="58B00"
+                description="Write a diagnostic dump of the current system state"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+   <bit number="0-1">Type of application space access:
+    <value-table head-number="Value" head-value="Meaning">
+     <value number="0">No application space access</value>
+     <value number="1">Can read data in application space</value>
+     <value number="2">Can read data and trace stack in application space</value>
+     <value number="3">Can read data, trace stack and records entire content of application space</value>
+    </value-table>
+   </bit>
+   <bit number="2">Name in R1 is an explicit filename to use</bit>
+   <bit number="3">Buffer file for writing on callback</bit>
+   <bit number="4">Open directory after writing dump</bit>
+   <bit number="5-31">Reserved, must be 0</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">0 to generate filename automatically; if R0 bit 2 is set, pointer to filename to write to; if R0 bit 2 is clear, pointer to a leaf name in the standard directory</register-use>
+ <register-use number="2">Pointer to a block of 16 (17 in 32bit mode) registers to record with the dump</register-use>
+</entry>
+<exit>
+ <register-use number="0-2" state="preserved"/>
+</exit>
+<use>
+<p>
+This SWI will write, or buffer for later writing, a diagnostic dump for the
+current system state. The dump can be tailored to the task at hand.
+</p>
+
+<p>
+The type of 'application space access' in R0 bits 0 and 1 can change the amount
+of data in the dump file. At level 0, no application space access will be
+performed at all. At level 1, application space is accessible (for example from
+referenced call stack elements) but a backtrace will not be generated for it. At
+level 2, application space is accessible and the module will attempt to unwind
+the C-call stack from user mode, generating more references. At level 3, all the
+earlier levels will be performed and the entire application space will be
+recorded to the file. Note that recording the entire application space will
+generate a much larger file and it may not be possible to buffer the file in
+memory.
+</p>
+
+<p>
+R0 bit 2 allows the caller to specify an explicit filename. This allows the
+caller to manage the dump files for their own purposes. If the caller expects to
+automatically transmit diagnostic data their documentation should state this
+clearly and include a mechanism to disable this feature.
+</p>
+
+<p>
+R0 bit 3 causes the dumped data to be recorded in a dynamic area, rather than
+recorded to disc immediately. A transient callback will be used to write the
+data when the system is next unthreaded. This should allow the call to be made
+when the system would be otherwise unable to write the data to disc
+immediately.
+</p>
+
+<p>Other bits are reserved for future expansion.</p>
+
+<p>The register dump, if supplied, will be included within the file.</p>
+
+<p>
+In order to ensure uniqueness for automatically generated files, even when many
+files are recorded within the space of a minute, a unique number is appended to
+the filename.
+</p>
+</use>
+<related>
+<reference type="sysvar" name="DiagnosticDump$Options" />
+<reference type="sysvar" name="DiagnosticDump$Dir" />
+</related>
+</swi-definition>
+</section>
+
+<section title="Security Issues">
+<p>
+Users transferring such files should be aware that whilst the information
+contained within the dumps should only relate directly to the regions which are
+in question there may be data remaining from other operations which the user may
+consider to be sensitive. That is, the record may contain information that the
+user would prefer not to provide to the original developer.
+</p>
+
+<p>
+The module will not transfer any information to other systems, or otherwise
+communicate with any other system, except when directed to do so because the
+dump file being saved resides on a network device.
+</p>
+
+<p>
+Data within the Diagnostic Dump file is not encrypted in any way and may be
+examined both by the user and by any other parties who obtain it. Where there is
+concern over the content of the dump file, users should refrain from sending it
+to any untrusted party.
+</p>
+
+<p>
+An example of an operation where there may be concern over the content of the
+dump might be a failure of a browser application during a session in which a
+password, user name, or other important information has been supplied (most
+typically credit card details).
+</p>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>In the description of DiagnosticDump_Write the condition on the contents of R1 referred to bit 3 of R0 where bit 2 (explicit filename) is meant; this is corrected.</change>
+ </revision>
+ </history>
+
+</meta>
+</riscos-prm>
