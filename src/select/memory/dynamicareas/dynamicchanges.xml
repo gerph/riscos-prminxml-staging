@@ -1,0 +1,217 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Dynamic area changes">
+<section title="Introduction and Overview">
+<p>
+From Kernel 9.06 onward there are a number of new dynamic areas which are provided by the operating system. These areas provide a legitimate mechanism for locating previously fixed regions of memory. The full list of dynamic areas is as follows :
+</p>
+<p><value-table head-number="Number" head-value="Area">
+<value number="-1">Application space</value>
+<value number="0">System Heap</value>
+<value number="1">Relocatable Module Area (RMA)</value>
+<value number="2">Screen Area</value>
+<value number="3">Sprite Area</value>
+<value number="4">Font Cache</value>
+<value number="5">RAM Filing System</value>
+<value number="6">Free pool</value>
+<value number="7">VRAM rescue</value>
+<value number="8">Kernel buffers</value>
+<value number="9">Reserved for future expansion</value>
+<value number="10">Abort SVC and IRQ stack copy</value>
+<value number="11">Operating system ROM</value>
+<value number="12">SWI dispatch and IRQ workspace</value>
+<value number="13">SVC stack</value>
+<value number="14">IRQ stack</value>
+<value number="15">UND stack</value>
+<value number="16">Level 2 Page Tables</value>
+<value number="17">Operating system page tables (SoftCAM)</value>
+<value number="256+">User dynamic area</value>
+</value-table></p><p>
+Each of these areas is described below. Where not expressly stated below, the address and size of the regions is variable with OS versions.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="System heap">
+<p>
+The system heap is a private area used by the Operating System for allocation of structures vital to the system's operation. This includes, but is not restricted to :
+</p>
+<p><list>
+<item><p>Timer information</p></item>
+<item><p>Dynamic area information</p></item>
+<item><p>Module information</p></item>
+<item><p>Dispatch hashes and tables</p></item>
+</list></p><p>
+Under earlier versions of the Kernel, the system heap was writable in USR mode. This has been changed in order to improve system stability by making the region read-only in USR mode.
+</p>
+<p>
+Under earlier versions of the Kernel, the system heap was used for system variable management and as FileSwitch workspace. This has been changed to remove such collusion. System variables (and the entire system variable system) is now managed by the SystemVars module. FileSwitch now uses a private dynamic area for its memory allocation.
+</p>
+<p>
+These changes have meant that the system heap no longer needs to be as large as it has been under earlier versions of the OS. It has been reduced in size from just under 3M to just under 2M.
+</p>
+<p>
+The system heap does not contain any executable components and may be outside of 26 bit space on 26 bit systems in future.
+</p>
+</subsection>
+
+<subsection title="Relocatable Module Area">
+<p>
+The RMA is unchanged in operation. On 26 bit systems it will remain within 26 bit space. On 32bit systems it will remain within 31 bit space (that is, it will not have an address which is negative if used in a signed context).
+</p>
+</subsection>
+
+<subsection title="Screen Area">
+<p>
+The Screen area is no longer provided by the Kernel. The LegacyScreen module provides a fake implementation of the screen area to ensure that clients which read the dynamic area do not fail. The contents of the area are not, however, the screen. Access to the screen should only be performed through the defined values returned by OS_ReadVduVariables.
+</p>
+</subsection>
+
+<subsection title="System Sprite area">
+<p>
+The system sprite area has, since Select, been managed by the SpriteUtils module. Its contents should be considered private to SpriteUtils.
+</p>
+</subsection>
+
+<subsection title="Font cache">
+<p>
+The font cache area has, since Select 2, been managed by the FontManager module. Its contents should be considered private to FontManager.
+</p>
+</subsection>
+
+<subsection title="RAM filing system">
+<p>
+The RAM filing system has, since Select 3, been managed by the RAMFS module. Its contents should be considered private to RAMFS.
+</p>
+</subsection>
+
+<subsection title="Free pool">
+<p>
+The free pool is unchanged in behaviour. This may change in the future.
+</p>
+</subsection>
+
+<subsection title="VRAM Rescue">
+<p>
+The VRAM rescue area was used under RISC OS 4 (and Select 1-3) to provide a mechanism for returning slower VRAM pages to the free pool, replacing them with DRAM. Since VRAM is now managed solely by the video driver modules, it is no longer available for use as normal memory. The VRAM rescue area has been removed.
+</p>
+</subsection>
+
+<subsection title="Kernel buffers">
+<p>
+The kernel buffers area provides a similar function to that of the system heap, but for more specialised tasks. It is private to the Kernel.
+</p>
+</subsection>
+
+<subsection title="Abort SVC and IRQ stack copy">
+<p>
+The Abort SVC and IRQ stack copy area is used by the Kernel to take a copy of the SVC and IRQ stacks when an abort occurs. This information is available to Privileged Backtrace Structure (PBTS) tools, such as BTSDump. During the processing of an abort within a privileged mode the dynamic area contains a copy of the entire SVC stack, followed by the entire IRQ stack. The registers and other parameters at the time of the abort can be obtained from the PBTS chain. The area is read only in USR mode, and should only be read by diagnostic tools.
+</p>
+<p>
+This area is not resizable.
+</p>
+</subsection>
+
+<subsection title="Operating system ROM">
+<p>
+The Operating System ROM area provides an explicit description of the location of the ROM and its extent. Diagnostic tools and other specific applications may use this information to provide a logical memory map without reliance on fixed constants. The contents are read only in all modes.
+</p>
+<p>
+This area is not resizable.
+</p>
+</subsection>
+
+<subsection title="SWI dispatch and IRQ workspace">
+<p>
+The SWI dispatch tables have been moved within the memory map due to an increase in the size of the IRQ stack. The tables are private to the Kernel and should not be manipulated by external applications except in unavoidable circumstances. Consult the <reference type="document" href="../../core/osreadsysinfo" name="OS_ReadSysInfo" /> document (reason 6) for the defined mechanism for reading the table address. Such use is strongly discouraged.
+</p>
+<p>
+This is the region which has previously been described as 'Cursor/System/Sound' within the Task Manager display.
+</p>
+<p>
+This area is not resizable.
+</p>
+</subsection>
+
+<subsection title="SVC stack">
+<p>
+The SVC stack area provides an explicit description of the location of the SVC stack and its extent. This is the preferred mechanism for locating the SVC stack. The stack will remain based at a 1M boundary, but its size may increase in future versions of the operating system. Execution of code from the SVC stack is strongly discouraged. Although the stack currently remains within 26bit space on 26bit systems it may be moved to higher memory in future.
+</p>
+<p>
+This area is not resizable.
+</p>
+</subsection>
+
+<subsection title="IRQ stack">
+<p>
+The IRQ stack area provides an explicit description of the location of the IRQ stack and its extent. This is the preferred mechanism for locating the IRQ stack. The stack will remain based at a 1M boundary, but its size may increase in future versions of the operating system. It is strongly discouraged that the IRQ stack be used for executing code. Although the stack currently remains within 26bit space on 26bit systems, it may be moved to higher memory in future.
+</p>
+<p>
+This area is not resizable.
+</p>
+</subsection>
+
+<subsection title="UND stack">
+<p>
+The UND stack area provides an explicit description of the location of the UND stack and its extent. This is the preferred mechanism for locating the UND stack. The stack will remain based at a 1M boundary, but its size may increase in future versions of the operating system. From RISC OS 4 onward it has not been possible to execute code in the UND stack.
+</p>
+<p>
+This area is not resizable.
+</p>
+</subsection>
+
+<subsection title="Level 2 Page Tables">
+<p>
+The level 2 page table area provides an explicit description of the location of the page tables. The address of the level 1 page tables can be inferred from the address of the ROM within the level 2 page tables. Because the ROM is mapped using Level 1 page table entries of 1M each, the space which would have been occupied by its Level 2 page table entries is 'spare'. This is where the Level 1 Page Table entries are mapped. Its size will appear to be 0 because it is sparsely managed by the Kernel. Future versions of the Kernel may explicitly state the size used by the page tables.
+</p>
+<p>
+This area is not resizable.
+</p>
+</subsection>
+
+<subsection title="Operating system page tables">
+<p>
+The operating system page tables area, or 'CAM map', provides a table of the mapping between page number and logical address. This area is not expected to be manipulated outside of the Kernel. Should such manipulation be necessary, other necessary details about the table can be read from OS_ReadSysInfo 6.
+</p>
+<p>
+This area is not resizable.
+</p>
+</subsection>
+
+<subsection title="Miscellaneous notes">
+<p>
+There is no defined ABT mode stack. All abort operations will be executed within the SVC stack, having first preserved the state of SVC mode.
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the description of the UND stack, which named the IRQ stack, and 'but it not restricted to'. The original HTML file for this page was named 'dynamicchnages'.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
