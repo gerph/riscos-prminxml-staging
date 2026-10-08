@@ -1,0 +1,85 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Clamps">
+<section title="Introduction and Overview">
+<p>
+With larger memory available to many systems it is necessary to limit the allocations of the maximum dynamic area size. The 'SetClamps' reason code provides that limitation.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_DynamicArea"
+                number="66"
+                reason="8"
+                reasonname="OS_DynamicArea_SetClamps"
+                description="Set clamps on the maximum size of dynamic areas created by subsequent calls to OS_DynamicArea 0"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">8</register-use>
+ <register-use number="1">Limit on maximum size of non-sparse areas created by OS_DynamicArea 0 with R5 = -1 (that is, areas with 'memory size' selected), 0 to read, or -1 for memory size</register-use>
+ <register-use number="2">Limit on maximum size of non-sparse areas created by OS_DynamicArea 0 with R5 = 0 (that is, areas which specify a size), 0 to read, or -1 for memory size</register-use>
+ <register-use number="3">Limit on maximum size of sparse areas created by OS_DynamicArea 0 with R4 bit 10 set (that is, Sparse Dynamic Areas), or 0 to read</register-use>
+</entry>
+<exit>
+ <register-use number="1">Previous limit for OS_DynamicArea 0 with R5 = -1</register-use>
+ <register-use number="2">Previous limit for OS_DynamicArea 0 with R5 > 0</register-use>
+ <register-use number="3">Previous limit for OS_DynamicArea 0 with R4 bit 10 set</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to change the 'clamping' levels on dynamic area creation. On machines with large amounts of memory clients which previously requested dynamic areas which could be as large as the memory of the machine could very quickly use up all the logical address space. This call allows dynamic area requests to be limited to set maximum sizes.
+</p>
+<p>
+This reason code is intended for configuration only. Because of its global effect it should only be used by configuration utilities and not by applications.
+</p>
+<p>
+Specifying -1 in R1 or R2 means that the respective clamp is the RAM limit of the machine (this is the kernel default). Specifying larger than the RAM limit in R1 or R2 is equivalent to specifying -1.
+</p>
+<p>
+Specifying -1 for R3 is invalid (there is no concept of RAM limit for Sparse areas). The kernel default is for no explicit limit on Sparse area maximum size. This means that the effective limit is then the size of the largest fragment of logical address space free at creation time.
+</p>
+<p>
+There is never any limit on the size of physically mapped dynamic areas which may be created.
+</p>
+<p>
+There is a minimum clamp limit of 1Mb; this is determined by the granularity of the machine's memory.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>The reason code name OS_DynamicArea_SetClamps is a descriptive label for the reason code and not a name defined by the operating system.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
