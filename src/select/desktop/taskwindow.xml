@@ -1,0 +1,125 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="TaskWindow module">
+<section title="Introduction and Overview">
+<p>
+The TaskWindow module has been updated significantly in order to address serious shortcomings of the environment provided by the module. Where possible, the behaviour of TaskWindows remains as close to previous versions. Where retaining earlier behaviour is not possible, the behaviour of non-TaskWindow use has been retained.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Buffered output">
+<p>
+Buffered output has been improved which allows buffered output up to the full length of the Wimp buffer. Previous versions would send output in messages that could be limited to 200 bytes, rather than the full 256 which is now used.
+</p>
+</subsection>
+
+<subsection title="Upcall handling">
+<p>
+Response to UpCall SleepNoMore has been fixed. The TaskWindow now claims this upcall passing back an error if an attempt is made to stop sleeping on a pollword which is currently being waited upon.
+</p>
+<p>
+UpCall 6 and pollidle for INKEY (<userinput>OS_Byte 129</userinput>) handling has improved:
+</p>
+<p>
+UpCall 6 is documented as accepting a pollword which can be scanned for being non-zero to return control to the process requesting to sleep. This was not being used within the TaskWindow module. The TaskWindow will now yield for the default slice time if either the pollword pointer specified was 0 or the pollword value was non-zero. If the pollword value was zero the TaskWindow module will return after the default timeslice has elapsed, or the pollword becomes non-zero. Use of OS_UpCall with pollwords or a 0 pointer can be used to allow other tasks processor time when no processing is required of the TaskWindow-based application.
+</p>
+<p>
+Escape is handled slightly differently from UpCall 6. See the section on Escape handling below.
+</p>
+</subsection>
+
+<subsection title="INKEY idle waiting">
+<p>
+When INKEY() (<userinput>OS_Byte 129</userinput>) is issued, TaskWindow will now wait for the specified time. Previous versions of TaskWindow would wait for an amount of time based on the current screen frequency (using VSync) by idling on Wimp_Poll.
+</p>
+</subsection>
+
+<subsection title="'MessageTrans bug'">
+<p>
+A significant fault in the exit sequence of a TaskWindow application could cause the machine to lock in an unescapable loop, requiring a reset to clear. More usually, however, this fault caused aborts to be observed in the MessageTrans module. Previous versions of TaskManager would fail to mark a critical operation and interaction with the preemptive feature of the TaskWindow would (occasionally) cause a dead-lock situation.
+</p>
+</subsection>
+
+<subsection title="Invocation of tasks from within TaskWindow">
+<p>
+Issuing a SWI Wimp_StartTask (or *WimpTask command) from within a TaskWindow could provoke unreliable responses and aborts on earlier versions of the TaskWindow module. This issue has been addressed within the TaskWindow and WindowManager. It may be observed that a new filter is placed on every TaskWindow running as part of the support for this fix.
+</p>
+</subsection>
+
+<subsection title="Redirection of output to sprite">
+<p>
+Attempting to switch output to sprites from within a TaskWindow could provoke unreliable output and aborts on earlier versions of the TaskWindow module. Support for sprite output is only reliable when the TaskWindow-based application provides a save area for redirection. When a save area is not used, the TaskWindow module will suspend preemption until either a preemption request is received (OS_UpCall 6), or input is required from the parent application.
+</p>
+<p>
+The purpose of a save area is to preserve the graphics context when output is switched away from the sprite. Without a save area, the two events given above will cause the sprite redirection to be restored when returning, but the graphics context will have been reset to its default settings. It is strongly recommended that all users of sprite redirection use a save area to avoid this and future problems.
+</p>
+<p>
+Where a save area is specified output to the TaskWindow will continue oblivious of the preemption by the TaskWindow module.
+</p>
+</subsection>
+
+<subsection title="Resizing task slot">
+<p>
+For command line based TaskWindows, whilst the TaskWindow command prompt is waiting for input it is now possible to resize the slot used by the TaskWindow. Whilst a task is running, TaskWindow will refuse to resize the slot. Tasks which are controlled by other processes (i.e. those which use the '-quit' flag when launching the TaskWindow) are not resizable by the user.
+</p>
+</subsection>
+
+<subsection title="Escape handling">
+<p>
+Escape handling within TaskWindow has improved in version 0.91 and later.
+</p>
+<p>
+The escape character can now be programmed using the <userinput>OS_Byte 220</userinput> mechanism. This allows the key which generates the escape action to be programmed independently of the other TaskWindow (and global) settings. It should be noted that this change does not affect the third-party LineEditor module which ignores the setting of this character.
+</p>
+<p>
+Pending escape events will no longer wait for more input at an OS_ReadC, ReadCV or timed <userinput>OS_Byte 129</userinput> call before being triggered. This mimics the behaviour of the Kernel input handling.
+</p>
+<p>
+Escape whilst within a timed INKEY (<userinput>OS_Byte 129</userinput>) request will now return -1, indicating that no key had been pressed. This mimics the behaviour of the Kernel input handling.
+</p>
+<p>
+Whilst an escape is pending acknowledgement input and output will remain buffered. The default escape side effect of flushing the buffer is now functional and will clear any remaining characters which had been buffered.
+</p>
+<p>
+The Escape Acknowledgement side effects are now followed correctly, flushing the input and output buffers and clearing the VDU queue. The only parts of the escape acknowledgements which are not followed are the termination of sound and the clearing of the paged line count. Sound is considered outside the scope of the environment which TaskWindow provides. The paged line count has no meaning under a TaskWindow environment.
+</p>
+<p>
+UpCall 6 will no longer explicitly return an Escape error if escapes are pending during its poll. Escapes are expected to be handled by the application's handler. This removes a race condition between the Kernel, program environment and TaskWindow itself.
+</p>
+<p>
+Consult PRM 1 for documentation of the Escape handling for more details of the interactions between escape handling and input streams.
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the slips 'could limited' (could be limited), 'See the section on Error handling' (the section is Escape handling) and 'Taskwindow'.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
