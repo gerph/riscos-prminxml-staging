@@ -125,6 +125,7 @@
     </section>
     <section title="Diagnostics" dir="diagnostics">
         <page href="bts">Back Trace Structures</page>
+        <page href="backgrounderror">Background errors</page>
     </section>
     <section title="Boot sequence" dir="boot">
         <page href="configure-plugins">Configure plugins</page>

@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Background errors">
+<section title="Introduction and Overview">
+<p>
+During the generation of error reports in the default handlers provided by the Kernel, a check will be made for errors which are not caused by the foreground task. This applies to:
+</p>
+<p><list>
+<item><p>Data abort</p></item>
+<item><p>Prefetch abort</p></item>
+<item><p>Branch through zero</p></item>
+<item><p>Undefined instruction</p></item>
+<item><p>Stack corruption handlers</p></item>
+</list></p>
+<p>
+The checks use the BTS embedded within the stack at the time of the exception
+to determine whether the cause was due to a foreground operation, or has been
+triggered by a component running in the background. The only ways that a
+background operation can be triggered is through an interrupt request (IRQ or
+FIQ) or a transient callback. Of the interrupts, only IRQ operations can be
+trapped.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+If, at the time of the exception occurring, a BTS chunk exists within the chain
+for either an 'Interrupt' or 'Transient callback' event, then the exception is
+deemed to have occurred in the background. Interrupts can occur at any time that
+IRQs are enabled. Transient callbacks can occur at any time that system is
+returning from an IRQ or system call to USR mode. Because the system may be
+threaded, for example within a network filing system which must trigger
+callbacks, these may not be the top most elements of the BTS chain.
+</p>
+
+<p>
+When such an event occurs, the string 'Background error:' will be prepended to
+the error message (retaining the error number). This should indicate to the user
+that it is not the foreground component which is at fault. Future versions of
+the operating system may treat such faults differently.
+</p>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+ </revision>
+ </history>
+
+</meta>
+</riscos-prm>
