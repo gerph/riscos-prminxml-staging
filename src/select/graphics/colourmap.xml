@@ -1,0 +1,205 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Colour Map module">
+<section title="Introduction">
+<p>
+The ColourMap module provides an interface for constructing combinations of colour mapping functions (as used by SpriteExtend, DrawFile and others). These functions allow colours within images to be manipulated to affect their rendering. Typical examples of colour mapping functions are to highlight or to fade elements (as used within the WindowManager). The colour mapping is performed through a colour mapping descriptor - a function pointer and workspace pair which are used to translate the colours.
+</p>
+<p>
+The ColourMap module can provide descriptors for commonly used colour operations allowing clients to perform mappings without recourse to repeatedly providing their own implementations.
+</p>
+<p>
+For details of how to use the colour maps with deep sprites, consult the <reference type="document" href="sprites/colourmap" name="Sprite colour mapping" /> document.
+</p>
+<p>
+For details of how to use the colour maps with paletted sprites, consult PRM 3-346 (transfer functions).
+</p>
+<p>
+For details of how to use the colour maps with Draw Files, consult the <reference type="document" href="colourmapdraw" name="ColourMapping in Drawfiles" /> document.
+</p>
+<p>
+For details of how to use the colour maps with ImageFileRender, consult the <reference type="document" href="imagefilerender" name="The Image File Renderer" /> document.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Using the module">
+<p>
+In order to provide a colour mapping descriptor, the ColourMap module must be given a block of workspace for its own use and informed of the mappings which the users wishes to be applied. The workspace block is provided by the client and its size can be determined through calls to the module. Should more space be required within the workspace block, this will be indicated through errors from the ColourMap module in a similar manner to other RISC OS interfaces (returning the size field as negative to indicate the size).
+</p>
+<p>
+The normal sequence of operations to create and use the ColourMap module would be :
+</p>
+<p><list type="ordered">
+<item><p>Call <reference type="swi" name="ColourMap_Start" />, requesting the initial size of the workspace. This will return the size of the workspace necessary to hold the standard information about the mappings requested and to hold at least one of the more common mapping functions (blend to colour).</p></item>
+<item><p>Allocate workspace of size requested.</p></item>
+<item><p>Call <reference type="swi" name="ColourMap_Start" />, passing the workspace pointer and the size of the workspace.</p></item>
+<item><p>Call <reference type="swi" name="ColourMap_ApplyMapping" />, passing details of the workspace and the mapping required.</p></item>
+<item><p>If an error occurred, and the size returned is negative resize the workspace appropriately and call <reference type="swi" name="ColourMap_ApplyMapping" /> again. If the size was positive still, report an error in the mapping.</p></item>
+<item><p>Repeat applying additional mappings as necessary.</p></item>
+<item><p>Call <reference type="swi" name="ColourMap_End" /> to obtain a colourmap descriptor which may be used with DrawFile, SpriteExtend or other clients.</p></item>
+<item><p>Release workspace if colourmapping is no longer required.</p></item>
+</list></p>
+</subsection>
+
+<subsection title="Workspace properties">
+<p>
+The workspace provided by the client may be freely relocated during the construction of the mappings. The workspace contents should be considered private and should not be modified by the client. The ColourMap module will not provide direct references during the construction of the mapping. Once <reference type="swi" name="ColourMap_End" /> has been called, the workspace should remain static. The descriptor returned will contain references to the current location of the workspace and relocating the workspace will make this invalid.
+</p>
+<p>
+If the workspace must be moved in memory, the <reference type="swi" name="ColourMap_End" /> call should be made once more to obtain a new colourmap descriptor. Clients may release the memory used by the workspace once the colour mappings it provides are no longer required. No references are made from the ColourMap module to the workspace. Multiple clients may use the ColourMap module.
+</p>
+<p>
+Clients should be aware that if the ColourMap module is killed, or reinitialised, the colourmap descriptor may be invalid.
+</p>
+<p>
+Although the workspace may be relocated in memory by the client during construction of the mappings and between calls to <reference type="swi" name="ColourMap_End" />, it should not be assumed that the format of the workspace will remain constant between updates of the module. Because of this, workspace blocks should not be stored in persistent storage (eg in data files, or embedded in applications). The workspace requirement for any given mapping will remain constant regardless of the parameters provided. This allows clients to reuse workspace blocks for similar mappings without any relocation requirements.
+</p>
+<p>
+Code will never be placed within the workspace, therefore it may be located outside the 26bit executable range.
+</p>
+</subsection>
+
+<subsection title="ColourTrans changes">
+<p>
+ColourTrans has been updated to operate faster within the standard paletted 256 colour modes where a fully specified palette is used. Under earlier versions of ColourTrans only VIDC1-compatible palettes on 256 colour modes were accelerated. A similar, but more efficient, translation function has also been added for grey scale paletted modes.
+</p>
+<p>
+ColourTrans is aware of CMYK sprites (see the <reference type="document" href="sprites/cmyk" name="CMYK sprites" /> document) and will generate suitable wide or regular tables for such output.
+</p>
+<p>
+When output is redirected to an alpha-channel mask, the palette is treated as effectively greyscale. This should allow simple plot operations to be performed.
+</p>
+</subsection>
+
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="ColourMap_Start"
+                number="567C0"
+                description="Initialise a colour mapping workspace"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags (reserved, must be 0)</register-use>
+ <register-use number="1">Pointer to workspace, or 0 to read initial size of workspace</register-use>
+ <register-use number="2">Size of workspace if not reading initial size</register-use>
+</entry>
+<exit>
+ <register-use number="2">Size of workspace used or required</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to initialise a block of memory as use as a ColourMap module mapping workspace, or to request the minimum size of the workspace. Larger workspaces than the minimum may be provided and will prevent reallocation requests on subsequent <reference type="swi" name="ColourMap_ApplyMapping" /> calls.
+</p>
+</use>
+<related>
+<reference type="swi" name="ColourMap_ApplyMapping" />
+<reference type="swi" name="ColourMap_End" />
+</related>
+</swi-definition>
+
+<swi-definition name="ColourMap_ApplyMapping"
+                number="567C1"
+                description="Apply a colour mapping to the workspace"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flag bits:
+  <bitfield-table>
+   <bit number="0-7">Type of mapping to apply</bit>
+   <bit number="8-31">Reserved, must be 0</bit>
+  </bitfield-table></register-use>
+ <register-use number="1">Pointer to workspace</register-use>
+ <register-use number="2">Size of workspace</register-use>
+ <register-use number="3...">Parameters for mapping</register-use>
+</entry>
+<exit>
+ <register-use number="2">Negative size of workspace required if an out of memory error occurred</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to apply a new colour mapping to those already held in the workspace. The new mapping will be applied after those already held in the workspace.
+</p>
+<p>
+Mapping types currently known to the ColourMap module are :
+</p>
+<p><value-table head-number="Type" head-name="Name" head-value="Parameters and meaning">
+<value number="0" name="Blend">R3 = &amp;BBGGRR00 colour; R4 = factor (0 for solid source colour, &amp;FF for solid blend colour). The colour will be blended toward the colour supplied by a given factor.</value>
+<value number="1" name="User">R3 = pointer to colourmap descriptor to use (a copy will be taken). A standard colourmap function will be invoked, allowing a number of mapping functions to be chained together. Refer to the section 'Colour mapping descriptor and transfer function' in the <reference type="document" href="sprites/colourmap" name="Sprite colour mapping" /> document.</value>
+<value number="2" name="Identity">No parameters. The identity mapping does not affect the colour.</value>
+<value number="3" name="Invert">No parameters. The colour value is inverted.</value>
+<value number="4" name="Monochrome">No parameters. The colour is converted to a greyscale.</value>
+<value number="5" name="Monochrome and scale">R3 = &amp;BBGGRR00 'black' colour; R4 = &amp;BBGGRR00 'white' colour. The colour is converted to a greyscale and then scaled to cover the range between the colours specified.</value>
+<value number="6" name="Gamma">R3 = 256 * gamma level (0-4). The colour has gamma correction applied to it. This takes the form of a mapping from the linear space to a logarithmic curve whose depth is determined by the gamma level.</value>
+<value number="7" name="Contrast">R3 = 256 * factor (0-4). The colour has its contrast increased or decreased according to the factor. Values for factor above 1 will increase the range of the colours, effectively increasing the contrast; conversely, values of less than 1 will decrease the range.</value>
+<value number="8" name="Brightness">R3 = value to add (-256 - 256). The colour will have the value supplied added to each of the R, G and B components, effectively brightening or darkening the image.</value>
+</value-table></p>
+</use>
+<related>
+<reference type="swi" name="ColourMap_Start" />
+<reference type="swi" name="ColourMap_End" />
+</related>
+</swi-definition>
+
+<swi-definition name="ColourMap_End"
+                number="567C2"
+                description="Read the colourmap descriptor for the workspace"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flag bits (reserved, must be 0)</register-use>
+ <register-use number="1">Pointer to workspace</register-use>
+ <register-use number="2">Size of workspace</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to colourmap descriptor, or 0 if no descriptor is necessary</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the colourmap descriptor which applies the mappings requested. If no mappings are held in the workspace, this will be indicated by returning a 0 value for the descriptor. Once this call has been made, the workspace should remain static. If changes are made to the workspace, or it is moved in memory, the descriptor returned by this call will be invalid. Calling ColourMap_End once more will return a valid descriptor.
+</p>
+</use>
+<related>
+<reference type="swi" name="ColourMap_Start" />
+<reference type="swi" name="ColourMap_ApplyMapping" />
+</related>
+</swi-definition>
+
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>The introduction paragraphs pointing to the colour mapping documentation for deep sprites, paletted sprites, Draw files and ImageFileRender, which the captured HTML lacked, were restored from the original documentation text.</change>
+    <change>The original gave the ColourTrans changes as a section of the same page; it is retained here.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
