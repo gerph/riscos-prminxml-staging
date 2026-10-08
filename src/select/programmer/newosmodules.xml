@@ -1,0 +1,159 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+
+<chapter title="New OS modules">
+
+<section title="Introduction">
+<p>This chapter lists the modules supplied as part of the operating system, a short summary of each one's function, and where its documentation can be found.</p>
+<p>Since RISC OS 3.6 was released, many new features have been added to RISC OS. These features are not documented within PRM 5a, which only documents up to RISC OS 3.6.</p>
+</section>
+
+<section title="Modularised Kernel components">
+<p>Many components have been moved out of the Kernel into separate modules. This allows them to be replaced should faults be located, or augmented if their behaviour needs to be changed. From an internal development standpoint, this separation increases the maintainability of both the separated component and the Kernel itself by isolating functionality. Many of these modules provide APIs which are unchanged from their original forms. Refer to the PRMs for details of the implementations.</p>
+<p><definition-table head-name="Module" head-value="Function and documentation">
+<definition name="Conversions">OS_Convert* SWI calls. No specific documentation; see PRM 1.</definition>
+<definition name="OSSWIs">Miscellaneous SWI calls. No specific documentation; see PRM 1.</definition>
+<definition name="EvaluateExpression">OS_EvaluateExpression SWI. See PRM 1-457, section EvaluateExpression.</definition>
+<definition name="SystemVars">Management of Sys$* variables. Version 0.08 and above handle all system variables. No specific documentation; see PRM 1.</definition>
+<definition name="ReadLine">Line input 'ReadLine vector'. See section ReadLine.</definition>
+<definition name="CLIV">*-command interpreter. No specific documentation; see PRM 1-929.</definition>
+<definition name="VideoTTX">Software implementation of Teletext mode. See section Teletext.</definition>
+<definition name="VideoSW">Software implementation of most text and graphics primitives. See section Graphics.MultiDrivers.</definition>
+<definition name="VideoHWVIDC">Hardware implementation of the video system for VIDC. See section Graphics.MultiDrivers.</definition>
+<definition name="FSCommands">Filing system *-commands previously located in the Kernel. No specific documentation; see PRM 1.</definition>
+<definition name="ModuleCommands">Module manipulation *-commands. No specific documentation; see PRM 1.</definition>
+<definition name="OSCommands">*-commands which do not fall into the FSCommands or ModuleCommands groups. No specific documentation; see PRM 1.</definition>
+<definition name="RTC">High level Real Time Clock functions. See PRM 1-399, section RTC, RTCV, OS_Word15.</definition>
+<definition name="RTCHW">Hardware access for the Real Time clock, for RiscPC, A7000, RiscStation and A9 systems. See section RTCV.</definition>
+<definition name="OSPointer">High level pointer functions. See PRM 5a-242, section PointerDevices, PS2Driver, WindowScroll.</definition>
+<definition name="PrinterBuffer">Configuration of the printer buffer. No specific documentation.</definition>
+<definition name="NVRAMHW">Hardware access to the non-volatile configuration memory. See PRM 1-363, section NVRAMV.</definition>
+<definition name="IRQ">Interrupt dispatch management. See PRM 1-121, section IRQHandler.</definition>
+<definition name="Timer">Hardware timer management. See section Timer.</definition>
+</definition-table></p>
+</section>
+
+<section title="Graphics components">
+<p>The increased support for non-native graphics formats and the extended functions provided by the existing systems have required a number of new modules. Many of these are described in more detail in the GraphicsSystem section and the Graphics.MultiDrivers section.</p>
+<p><definition-table head-name="Module" head-value="Function and documentation">
+<definition name="ColourMap">Colour translation and remapping. See sections ColourMap, ColourMap-DrawFile, Graphics.Sprites.ColourMap.</definition>
+<definition name="BlendTable">Support for transparent blending. See section BlendTable.</definition>
+<definition name="FontMap">Non-native font name translation. See section FontMap.</definition>
+<definition name="PNG">Library for decoding and encoding of PNG bitmap images. See section PNG.</definition>
+<definition name="ImageFileConvert">Generic image file conversion interface, providing ImageFileRender for converted files. See section ImageFileConvert.</definition>
+<definition name="ImageFileRender">Generic image rendering. See section ImageFileRender.</definition>
+<definition name="CompressJPEG">JPEG compression, decompression and transcoding functions, now part of the ROM rather than being disc based. See PRM 5a-609, section CompressJPEG.</definition>
+<definition name="ConvertPNG">PNG file conversion using ImageFileConvert. See section ConvertPNG, ImageFileConvert.</definition>
+<definition name="ConvertBMP">BMP file conversion using ImageFileConvert. See section ConvertBMP, ImageFileConvert.</definition>
+<definition name="ConvertICO">Windows .ico file conversion using ImageFileConvert. No specific documentation; see section ImageFileConvert.</definition>
+<definition name="ConvertPNM">PNM (PBM, PPM, PGM) file conversion using ImageFileConvert. No specific documentation; see section ImageFileConvert.</definition>
+<definition name="ConvertSprite">Sprite file conversion via ImageFileRender, using ImageFileConvert. See section ConvertSprite, ImageFileConvert.</definition>
+<definition name="ConvertSun">Sun raster file conversion using ImageFileConvert. No specific documentation; see section ImageFileConvert.</definition>
+<definition name="ConvertXBM">X bitmap file conversion using ImageFileConvert. No specific documentation; see section ImageFileConvert.</definition>
+<definition name="ConvertPCX">PCX file conversion using ImageFileConvert. No specific documentation; see section ImageFileConvert.</definition>
+<definition name="ConvertClear">Translator 'Clear' file conversion using ImageFileConvert. No specific documentation; see section ImageFileConvert.</definition>
+<definition name="ImageFileRender_Artworks">Artworks file rendering using ImageFileRender. No specific documentation; see ImageFileRender.</definition>
+</definition-table></p>
+</section>
+
+<section title="Desktop components">
+<p>The Desktop has been enhanced both visibly, through the new Icon Bordering interface, and behind the scenes by providing enhanced interfaces for various components.</p>
+<p><definition-table head-name="Module" head-value="Function and documentation">
+<definition name="RedrawManager">Managed, filter based redraw functions, allowing non-application components (for example Toolbox) to perform rendering within application windows. See section RedrawManager.</definition>
+<definition name="IconBorderPlain">Re-implementation of basic button style. No specific documentation.</definition>
+<definition name="IconBorderRound">Updated button style, allowing round buttons and other effects. A general IconBorder development kit and documentation are available on request.</definition>
+<definition name="ClipboardHolder">Clipboard support functions to aid application developers and used by the WindowManager to provide cut-and-paste within writable icons. See section ClipboardHolder.</definition>
+<definition name="WindowScroll">Support for scrolling windows using the alternate pointing device (for example, a scroll wheel). See section WindowScroll.</definition>
+</definition-table></p>
+</section>
+
+<section title="Toolbox components">
+<p>Although the Toolbox as a whole has been enhanced, only a few new modules are provided within the current version of the operating system.</p>
+<p><definition-table head-name="Module" head-value="Function and documentation">
+<definition name="GDivider">A semantic 'divider' gadget. No specific documentation; see toolbox headers.</definition>
+<definition name="ToolAction">Advanced version of the regular 'Action' buttons. No specific documentation; see toolbox headers.</definition>
+<definition name="TextGadgets">Text-based gadgets - scrolling lists and text input area. No specific documentation; see toolbox headers.</definition>
+<definition name="ImageFileGadget">Gadget for rendering ImageFiles within a window. No specific documentation; see toolbox headers.</definition>
+</definition-table></p>
+</section>
+
+<section title="Programmers components">
+<p><definition-table head-name="Module" head-value="Function and documentation">
+<definition name="ZLib">Library for compressing using the ZLib compression method. See section ZLib.</definition>
+<definition name="Zipper">Library for reading and creating Zip archives. See section Zipper.</definition>
+<definition name="DiagnosticDump">Diagnostic functions for Shared C library and other external implementations. See section DiagDump.</definition>
+<definition name="KeyInput">Extended keyboard input interfaces. See section KeyVExtendedInput.</definition>
+<definition name="BASIC64">Floating point version of the BASIC library, now part of the ROM, rather than being disc based. No specific documentation.</definition>
+<definition name="DDEUtils">Advanced developer functions such as longer command lines and editor throwback. No specific documentation.</definition>
+<definition name="PathUtils">System 'path' variable manipulation functions. No specific documentation.</definition>
+<definition name="SysLog">Centralised logging. No specific documentation.</definition>
+</definition-table></p>
+</section>
+
+<section title="Network components">
+<p>The network components have been enhanced considerably since their initial release with RISC OS 3.6. The network chapters contain more details of the specific functions of the new modules and of the enhancements to the existing modules.</p>
+<p><definition-table head-name="Module" head-value="Function and documentation">
+<definition name="InetServices">Translation between service names and numbers. No specific documentation.</definition>
+<definition name="Resolver">Translation between host names and addresses. See section Resolver.</definition>
+<definition name="MimeMap">Translation between MIME media types, filetypes, file extensions and Mac data types. See section MimeMap.</definition>
+<definition name="InetConfigure">Management for automatic network configuration on startup. See section AutomaticConfiguration.</definition>
+<definition name="DHCPClient">Automatic network configuration using the DHCP protocol. See section DHCPClient.</definition>
+<definition name="ZeroConf">Automatic network configuration using the Link-local addressing protocol. See section ZeroConf.</definition>
+<definition name="RouterDiscovery">Automatic gateway discovery using the ICMP router discovery protocol. See section RouterDiscovery.</definition>
+<definition name="FreewayHosts">Distribution of host names over Freeway, previously an internal function of the Freeway module. See section Networking.Overview.</definition>
+<definition name="LanManFS">Access to Windows (and other) filing systems. No specific documentation.</definition>
+<definition name="AppleTalk">Access to Apple filing systems. No specific documentation.</definition>
+</definition-table></p>
+</section>
+
+<section title="Legacy support components">
+<p>As the operating system has developed, a number of functions have become obsolete, or have required different handling. These functions have been moved to separate components so that they can easily be removed, and to make maintenance of the core components simpler.</p>
+<p><definition-table head-name="Module" head-value="Function and documentation">
+<definition name="LegacyBBC">Many of the obsolescent BBC interfaces are provided through this module. See section LegacyBBC.</definition>
+<definition name="LegacyScreen">With the advent of multiple display devices within a system, the single 'Screen' dynamic area no longer has any purpose. This module provides this dynamic area so that components which require the area still function. See section LegacyScreen.</definition>
+<definition name="CallASWI">As support for StrongARM (split cache) and 32bit systems, the CallASWI module was introduced. Its functionality is now part of the core operating system. This module merely prevents unsuitable versions of the module from being used. No specific documentation.</definition>
+</definition-table></p>
+</section>
+
+<section title="Miscellaneous components">
+<p>Finally, a few components do not fit easily into any of the above categories and are listed here.</p>
+<p><definition-table head-name="Module" head-value="Function and documentation">
+<definition name="OwnerBanner">Provides the new start up banners for both the Desktop and boot. No specific documentation.</definition>
+<definition name="LibraryHelp">Extends the *Help system to provide additional information for library commands and aliases. See section LibraryHelp.</definition>
+<definition name="FileTypes">A stub module which sets up many of the common filetypes and their execution formats on startup. Previously this was part of FileSwitch. No specific documentation.</definition>
+<definition name="AIF">In order to ensure the stability of the system, and to allow support for emulated execution of non-32bit safe programs, Absolute files are now checked and executed by the AIF module. Previously this task was a part of FileSwitch. See section Exec Formats.</definition>
+<definition name="TransientUtility">Provides support for transient utilities, similar to that for AIF-headered absolute files, primarily to enforce the new headered utility file format. See section Exec Formats.</definition>
+<definition name="ScrSaver">Provides management of desktop screen savers. No specific documentation.</definition>
+<definition name="SharedSound">Support for multiple clients of the 16bit sound system. No specific documentation.</definition>
+</definition-table></p>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected 'cmmands' to 'commands' in the LibraryHelp entry, and 'a many' to 'many' in the FileTypes entry.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
