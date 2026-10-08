@@ -1,0 +1,161 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Automatic network configuration">
+<section title="Introduction and Overview">
+<p>Automatic network configuration has been improved with each release of RISC OS:</p>
+
+<p><list>
+<item><p>RISC OS 3.6 introduced automatic network configuration using AUN network addresses (1.x.y.z).</p></item>
+<item><p>RISC OS Select release 1 introduced an option to disable this automatic allocation.</p></item>
+<item><p>RISC OS Select release 2 amalgamated this configuration, and the undocumented automatic DHCP configuration into a single configuration handled by the InetConfigure module.</p></item>
+<item><p>RISC OS Select release 3 added ZeroConf 'link local address allocation' to the dynamic address allocation.</p></item>
+<item><p>RISC OS Select release 4 extends this further by allowing the gateway and resolver addresses to be automatically configured.</p></item>
+</list></p>
+
+<p>
+The InetConfigure module performs all automatic address configuration
+facilities when the machine starts up. This facility can be configured from the
+desktop using the Interfaces configuration tool, or from the command line.
+</p>
+
+<p>On a CMOS reset the default configuration selects:</p>
+
+<p><list>
+<item><p>Dynamic address allocation (DHCP and ZeroConf)</p></item>
+<item><p>Enables automatic gateway discovery</p></item>
+<item><p>Enables automatic resolver discovery</p></item>
+<item><p>Enabled automatic AUN network mapping</p></item>
+</list></p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Dynamic network configuration">
+<p>
+With Select 3, the selection of 'Dynamic' IP addresses will also invoke support
+for ZeroConf link local addressing. ZeroConf is a networking address
+configuration system designed by a group focused on interoperability between
+networked devices. It is used by various computer systems under different
+names. Under Windows it is known as 'Automatic private address' configuration.
+On Apple systems, ZeroConf underlies its 'Bonjour' (previously known as
+'Rendezvous') implementation.
+</p>
+
+<p>
+When activated ZeroConf will configure a private address on an aliased
+interface. The address configuration will not clash with other addresses on the
+same network and can be used safely. Should another system be connected to the
+local network using the same address as a ZeroConf system it will back off and
+reconfigure to use another address. ZeroConf will always use aliased interface 9.
+</p>
+
+<p>
+In the event that no DHCP server is present on the local network the system
+will still have a ZeroConf (link local) address with which it may communicate
+with other hosts. As the link local address is never removed (except in the
+case of an address collision, which can only be caused by two separate networks
+being connected), connections established through the link local address will
+not become invalid if a DHCP appears on the network.
+</p>
+</subsection>
+
+<subsection title="Automatic resolver configuration">
+<p>
+The automatic resolver configuration uses a number of methods to locate a
+resolver on the local network. This should allow most systems which use a
+single gateway with a proxy DNS to discover their network address. The
+automatic resolver configuration will attempt to probe systems within the
+network to locate a DNS server. Depending on the DNS server's configuration,
+this may not locate the server. There is no defined way to perform this
+automatic resolver configuration and so the implementation is a best effort
+which should be suitable for most users.
+</p>
+
+<p>
+If DHCP is in use and provides a resolver address, it will override the
+automatic configuration.
+</p>
+</subsection>
+
+<subsection title="Automatic gateway configuration">
+<p>
+The automatic gateway configuration uses the standard 'Router Discovery'
+protocol to locate a system on the local network which provides a router. The
+deployment of systems which provide a Router Discovery service is limited, but
+should increase as the functions of home gateways are expanded.
+</p>
+</subsection>
+
+<subsection title="Automatic AUN network mapping">
+<p>
+The AUN system implemented by NetI can be configured (separately, through
+*Configure NetIAutoMap) to automatically map the network addresses assigned to
+the local interfaces into AUN Network Mappings. See the AUNIntro document for
+more details about AUN networks.
+</p>
+</subsection>
+</section>
+
+<section title="*Commands">
+<command-definition name="Configure InternetIP" description="Configure the automatic address configuration">
+<syntax>
+ <alternates><text>None</text><text>AUN</text><text>Dynamic</text></alternates> <optional><text>DNS </text><alternates><userreplace>address</userreplace><text>auto</text></alternates></optional> <optional><text>GW </text><alternates><userreplace>address</userreplace><text>auto</text></alternates></optional>
+</syntax>
+<syntax>
+ <text>Static</text> <userreplace>ip</userreplace><text>/</text><userreplace>prefix</userreplace> <optional><text>DNS </text><alternates><userreplace>address</userreplace><text>auto</text></alternates></optional> <optional><text>GW </text><alternates><userreplace>address</userreplace><text>auto</text></alternates></optional>
+</syntax>
+<use>
+<p>
+This command configures what automatic configuration will be applied to the
+first ethernet interface. The configuration is selected with one of:
+</p>
+
+<p><value-table head-number="Option" head-value="Meaning">
+<value number="None">No interface configuration</value>
+<value number="AUN">AUN address configuration (1.x.y.z)</value>
+<value number="Dynamic">DHCP interface configuration</value>
+<value number="Static">Static address configuration using the supplied address and network mask prefix in bits (eg 192.168.0.100/24)</value>
+</value-table></p>
+
+<p>and the resolver and gateway may be given with:</p>
+
+<p><value-table head-number="Option" head-value="Meaning">
+<value number="DNS address">Configures the default resolver to the given address</value>
+<value number="DNS auto">Configures the default resolver to be automatically discovered</value>
+<value number="GW address">Configures the gateway (default route) to be the given address</value>
+<value number="GW auto">Configures the gateway to be automatically discovered</value>
+</value-table></p>
+
+<p>
+We recommend that in most network circumstances the configuration be left set
+to 'dynamic' and no manual configuration be made.
+</p>
+</use>
+</command-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+ </revision>
+ </history>
+
+</meta>
+</riscos-prm>
