@@ -1,0 +1,97 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="PNG module">
+<section title="Introduction and Overview">
+<p>
+The PNG module supplies a shared interface to the PNG library. Due to the work of many developers, including Acorn, the PNG library is quite generic and can produce its output or read its input in a number of ways.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+In general the SWI interface is exactly the same as that of the PNG library. When there is time this will be documented more formally, but the general principles are :
+</p>
+<p><list>
+<item><p>Functions are split into categories which are accessed via SWIs.</p></item>
+<item><p>Each SWI has R0 giving the sub-code for the function being accessed. [Reason: There's not enough SWIs in a chunk for all of the functions to have one each]</p></item>
+<item><p>Input values are in the registers going into the SWI. Return values come out in R0. Output values are in the registers coming out of the SWI at the next free register (R0 if there is a return parameter, or R1 if not).</p></item>
+<item><p>Floating point values are returned (or passed) scaled by &amp;10000 (ie converted to fixed point values with the point at bit 16).</p></item>
+</list></p>
+<subsection title="Example">
+<p>
+The library function:
+</p>
+<p><extended-example type="c">
+<userinput>png_uint_32  png_get_gAMA  (png_structp png_ptr, png_infop info_ptr, double *file_gamma)  ;</userinput>
+</extended-example></p><p>
+Becomes the SWI <reference type="swi" name="PNG_GetChunkInfo" />, with R0 set to 2 (the reason code for get_gAMA).
+</p>
+</subsection>
+
+<subsection title="Caveats">
+<p>
+The cHRM (chromaticity) chunk is not currently supported. The implementation is such that this cannot work the way that the SWI interface is currently designed.
+</p>
+</subsection>
+
+<subsection title="More information">
+<p>
+Firstly, you should read the documentation supplied with PNGLib. This will provide you with most of the necessary information. More information, together with a development kit, is available on request.
+</p>
+</subsection>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="PNG_GetChunkInfo"
+                description="Read information from a PNG chunk (example: get_gAMA)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">2 (reason code for get_gAMA)</register-use>
+ <register-use number="1">Pointer to png structure returned from create_read_struct</register-use>
+ <register-use number="2">Pointer to png information structure returned from png_create_info_struct</register-use>
+</entry>
+<exit>
+ <register-use number="0">Returned value (0 if no gAMA chunk, non-0 if gAMA chunk present)</register-use>
+ <register-use number="1">Gamma value * &amp;10000</register-use>
+</exit>
+<use>
+<p>
+This SWI is given as an example of the way in which the functions of the PNG
+library are made available. The reason code in R0 selects the function.
+</p>
+</use>
+</swi-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the wording 'categories which will are accessed via SWIs' to 'categories which are accessed via SWIs'.</change>
+    <change>The SWI number is not given in the original and is not included.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
