@@ -1,0 +1,102 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Abort-Trapping dynamic areas">
+<section title="Introduction and Overview">
+<p>
+It is possible, with Kernel 8.19 and later, to mark dynamic areas as being 'abortable'. This means that aborts within their extent (up to their maximum size) will be reported through the Dynamic Area handler. The dynamic area handler may choose to handle the access or to return a failure. A returned failure will result in the access failing in a Data Abort, as normal.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+To create an Abortable dynamic area bit 16 on the Dynamic Area flags should be set.
+</p>
+<p>
+A typical use of the Abortable dynamic areas would be to implement a virtual memory system (for the data within the dynamic area). Such a system would map in the page(s) containing the data requested and fill in the data blocks before returning.
+</p>
+<p>
+Alternatively, such areas can be used to emulate hardware interfaces either where such interfaces are not present in physical hardware, or during development where hardware is not yet available.
+</p>
+<p>
+Under current versions of the operating system prefetch aborts will not be handled by the Abort-trapping system. Code run from such dynamic areas will not be treated any differently than non-Abort trapping areas. Execution of code from such areas will cause pre-fetch aborts which cannot be fixed up by the dynamic area handler.
+</p>
+</section>
+
+<section title="Entry Points">
+<entry-definition name="DynamicAreaHandler_Abort"
+                  description="Dynamic area handler: abort within the area"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="0">DAHandler_Abort (5)</register-use>
+ <register-use number="1">Flags:
+  <bitfield-table>
+ <bit number="0-3">Operation type:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Load from memory</value>
+ <value number="1">Store to memory</value>
+</value-table></bit>
+ <bit number="4">Set if this is a privileged operation, clear if this is an unprivileged operation</bit>
+</bitfield-table></register-use>
+ <register-use number="2">Pointer to data block for transfer</register-use>
+ <register-use number="3">Pointer to start of accessed area within dynamic area</register-use>
+ <register-use number="4">Size of access</register-use>
+ <register-use number="5">Current end of allocated space within dynamic area (for sparse dynamic areas this has no meaning)</register-use>
+</entry>
+<exit>
+ <register-use number="4">Amount of data processed</register-use>
+ <register-use number="0">VS if failed, R0 pointing to an error block</register-use>
+</exit>
+<use>
+<p>
+This handler reason is called when an abort occurs within a Dynamic Area region which is marked as aborting. The accessed region of the dynamic area is passed in R3, together with the amount of data which is being accessed. The size of the data access will be either 1, 2, 4 or a multiple of 4 for byte, half-word (not presently implemented), word, or multi-word accesses. In the case of word and multi-word accesses, clients need not concern themselves with alignment issues - the address supplied will always be aligned.
+</p>
+<p>
+For load operations, clients should fill in the block supplied in R2 with the data at the location supplied in R3.
+</p>
+<p>
+For store operations, clients should fill in the location supplied in R3 with the data at the block supplied in R2.
+</p>
+<p>
+Unrecognised operations or flags should be returned with errors.
+</p>
+<p>
+If the error block contains an error number for a hardware error (i.e. bit 31), it will be returned through the error generation mechanism rather than through the abort handler. In other words, it is similar to the instruction which faulted having been an error returning SWI. The exception registers and abort stack copies will still take place in this case. However, if the error is not claimed by ErrorV or the environment handler an explicit OS_Exit will be issued.
+</p>
+</use>
+<related>
+</related>
+</entry-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
