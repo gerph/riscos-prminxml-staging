@@ -85,8 +85,5 @@ send a DHCPDECLINE message and go back into the DHCP INIT state.
   </revision>
  </history>
 
- <related>
-    <reference type='link' href="http://home.gerph.org/~charles/Reference/RISCOS/LastRODocs/HTML/Networking/AddressCollision.html" />
- </related>
 </meta>
 </riscos-prm>

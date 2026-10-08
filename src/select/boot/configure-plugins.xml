@@ -1411,8 +1411,5 @@
    </revision>
   </history>
 
-  <related>
-   <reference type="link" href="http://home.gerph.org/~charles/Reference/RISCOS/acorn/www.art.acorn.co.uk/SALES/DEVELOPERS/resource/docs/api/ursula/configure.html" name="Ursula !Configure Changes functional specification"/>
-  </related>
  </meta>
 </riscos-prm>
