@@ -1,0 +1,107 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+
+<chapter title="Help extensions">
+
+<section title="Introduction">
+<p>To provide extensions to the *Help command for library commands, a service was added in RISC OS Select 2. The Help Query service allows modules to provide additional information about a requested command when the command is not present within the resident modules.</p>
+<p>Help requests are separated into four major groups:</p>
+<p><list type="unordered">
+<item><p>Aliased commands</p></item>
+<item><p>Module commands</p></item>
+<item><p>Library commands</p></item>
+<item><p>General information</p></item>
+</list></p>
+<p>Before Select 2 the only help returned was that of the module commands. The new service call allows additional help messages to be returned for other keywords. This facility is used by the LibraryHelp module to display details about library commands from a text file within the library.</p>
+</section>
+
+<section title="Library help">
+<p>The LibraryHelp module searches the path <userinput>Run:Help.&lt;keyword&gt;</userinput> to locate a text file containing the help text for a command. Library commands should therefore be distributed with a Help directory containing a file of the same name which describes the command's function. For example, the command 'Finger' is described in the file 'Help.Finger'. The format of the file is important for consistency with the rest of the operating system commands.</p>
+<p>The first line of the file must be of the form <userinput>&lt;command&gt;</userinput>, a tab, <userinput>&lt;x.yy&gt;</userinput>, a space, and then <userinput>(&lt;dd&gt; &lt;mmm&gt; &lt;yyyy&gt;)</userinput>. This allows the module to interpret the line and display it when a *Help Library command is issued. For example:</p>
+<p><extended-example type="format">
+<userinput>IfThere&lt;tab&gt;1.04 (20 Dec 2001)</userinput>
+</extended-example></p>
+<p>Subsequent lines of the file are printed in a formatted manner similar to that of <reference type="swi" name="OS_PrettyPrint" />. Lines following a tab are wrapped back to the offset of the tab. The usual form of command help is:</p>
+<p><extended-example type="format">
+<userinput>The *&lt;command name&gt; command is used to &lt;purpose&gt;. &lt;other usage information&gt;.</userinput><br/>
+<userinput>Syntax: *&lt;command name&gt; &lt;switches and parameters&gt;</userinput><br/>
+<userinput>Switches:</userinput><br/>
+<userinput>&lt;switch name&gt;&lt;tab&gt;&lt;switch description&gt;</userinput>
+</extended-example></p>
+<p>Authors should examine the supplied help files for other examples and aim for consistency where possible. As with all commands, the following conventions are expected:</p>
+<p><list type="unordered">
+<item><p><userinput>[]</userinput> indicates optional items</p></item>
+<item><p><userinput>{}</userinput> indicates repeated items</p></item>
+<item><p><userinput>&lt;&gt;</userinput> indicates user replaced items</p></item>
+<item><p>other text indicates literal text</p></item>
+</list></p>
+<p>Where the syntax of a command is complex, multiple lines should be used to describe alternate forms. For example, see the help output used by INetStat. Where the syntax is still too complex to describe, either indicate that more details can be obtained by using the command with a particular syntax, refer the user to external documentation, or simplify the command.</p>
+</section>
+
+<section title="Services">
+<service-definition name="HelpQuery"
+                    number="D6"
+                    description="A help query has been made for a keyword which the OSCommands module does not resolve">
+<entry>
+ <register-use number="0">Pointer to query token (space or ctrl terminated)</register-use>
+ <register-use number="1">&hex;D6 (Service_HelpQuery)</register-use>
+ <register-use number="2">
+  <bitfield-table>
+   <bit number="0-3">Query type:
+    <p><value-table head-number="Value" head-value="Meaning">
+     <value number="0">Pre-command (aliases)</value>
+     <value number="1">Post-command, pre-module (library commands)</value>
+     <value number="2">Post-module (generic information)</value>
+     <value number="3-15">Reserved for future expansion</value>
+    </value-table></p>
+   </bit>
+   <bit number="4-31">Reserved, must be 0</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="7">0 if no entries have been displayed yet, 1 if entries have been displayed</register-use>
+</entry>
+
+<exit>
+ <register-use number="0-2" state="preserved" />
+ <register-use number="7">1 if this module processed the query, otherwise preserved</register-use>
+</exit>
+
+<use>
+<p>This service is issued by the OSCommands module to inform clients that a help query has been made. You should examine the query token passed in R0 and display any help you can provide on it. Help messages should be prefixed by <userinput>==&gt; Help on keyword &lt;keyword&gt; (&lt;source&gt;)</userinput>. If R7 is 1 on entry, write a newline before printing this, so that messages are separated by blank lines. Abbreviated commands are indicated by a period ('.').</p>
+<p>This call should never be claimed.</p>
+</use>
+
+<related>
+</related>
+</service-definition>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Recorded the Help Query service as a service-definition with its query types, and gave the conventions for help text as a list.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>

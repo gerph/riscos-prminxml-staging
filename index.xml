@@ -195,6 +195,7 @@
         <page href="pathutils">PathUtils</page>
         <page href="zipper">Zipper module</page>
         <page href="newosmodules">New OS modules</page>
+        <page href="libraryhelp">Help extensions</page>
     </section>
     <section title="Diagnostics" dir="diagnostics">
         <page href="bts">Back Trace Structures</page>
