@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="OS_ChangeRedirection">
+<section title="Introduction and Overview">
+<p>
+The <reference type="swi" name="OS_ChangeRedirection" /> SWI can be used to change the default input (vector RdchV and <userinput>OS_Byte &amp;81</userinput>) and output (vector WrchV and all callers) streams used by the operating system. The Kernel has been updated to better support nested invocation of commands with redirection in place. This is known as 'managed redirection'. Clients are required to perform the management of the redirection where previously this would be handled automatically by the Kernel.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+Prior to Kernel 8.75, the operating system would immediately override the redirection and close the associated files when an OS_Exit was issued. Kernel 8.75 and later will no longer perform any additional behaviour on OS_Exit with regard to the redirection.
+</p>
+<p>
+In addition, the redirection file handles would be closed and redirection disabled when an error occurred on the stream. Kernel versions after 8.59 will no longer close the files or restore redirection. Instead, only a single operation will take place, either writing a character to the regular VDU stream, or reading a character from the keyboard, as was previously the case.
+</p>
+<p>
+Clients which are reliant on redirection being terminated by an OS_Exit will need to be updated to install environment handlers, or otherwise ensure that the files are closed correctly on return from the operation which required redirection. The only operating system component which is affected by this is CLIV. The CLIV module will install its own environment handlers sufficient to undo command line redirection on return from a command's execution.
+</p>
+<p>
+C-based applications should need to take no additional actions where they use the called CLI commands together with manual redirection of streams. However, where the chained CLI commands are used (that is, by _kernel_system with the 'chain' flag set, or by system with the 'CHAIN:' prefix) and the redirection is manually imposed, it will be necessary to update the application to use a call and to restore the redirection file handles on return from the command.
+</p>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
