@@ -1,0 +1,1224 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="ZLib">
+<section title="Introduction and Overview">
+<p>
+The ZLib module provides a shared interface to the ZLib compression library.
+It provides a simple SWI interface, and a direct library replacement
+interface. The simple SWI interface looks the same as that for Squash and
+will act in a similar manner. The direct replacement interface provides a
+number of SWIs which may be accessed as if they were the original C routines.
+</p>
+
+<p>
+To complement the SWI interface a C library is also provided as a set of
+veneer functions to allow the ZLib library to be called as if it had been
+statically linked.
+</p>
+
+<p>
+The 'zlib' compression library provides lossless in-memory compression and
+decompression functions, including integrity checks of the uncompressed data.
+Compression can be done in a single step if the buffers are large enough, or
+can be done by repeated calls of the compression function. In the latter case
+the caller must provide more input and/or consume the output, providing more
+output space, before each call.
+</p>
+
+<subsection title="Terminology">
+<p>
+ZLib (q.v. RFC 1950) is a standard, freely available library produced by
+Jean-loup Gailly and Mark Adler which provides compression based on the
+standard 'deflate' algorithm (q.v. RFC 1951). In addition, the ZLib library
+(and module) supports the GZip compression algorithm (q.v. RFC 1952) with
+extensions for RISC OS file information.
+</p>
+</subsection>
+</section>
+
+<section title="Technical Details">
+<p>
+The ZLib module provides two primary interfaces for the programmer. The first
+of these is a Squash-like interface to the ZLib library. Applications which
+already support the use of Squash can be changed to use ZLib by simply
+changing the SWIs that are called.
+</p>
+
+<p>
+The second interface that the module provides is that of a direct replacement
+for the ZLib C library. Because this is provided as a SWI interface this means
+that it is accessible to applications written in any language. At the present
+time the module uses ZLib 1.1.4 with backports for double-free fault.
+</p>
+
+<subsection title="Applications and modules">
+<p>
+The ZLib module was originally intended to be used by application clients.
+Because of this it was decided that the streams should be discarded if the
+application terminated before closing the streams. This is the default
+behaviour of the module. However, if the ZLib module is used by other module
+clients (for example the Zipper module and the PNG module), it is desirable
+that the stream be entirely under the control of the module. It is therefore
+required for module clients to change the 'association' between the task and
+the stream to prevent this automatic closure from occurring. Consult the
+<reference type="swi" name="ZLib_TaskAssociate" /> SWI for more details.
+</p>
+</subsection>
+
+<subsection title="ZLib SWI interface">
+<p>
+The SWIs that the module provides have equivalent (or similar) names to those
+of the C interface. A C interface library is provided to interact with the
+ZLib module such that it should not be necessary to use these calls directly
+from C.
+</p>
+</subsection>
+
+<subsection title="Informational SWIs">
+<p>
+The informational calls are not related to providing compression. These SWIs
+are the CRC32, Adler32 and Version SWIs.
+</p>
+</subsection>
+
+<subsection title="GZip SWIs">
+<p>
+The GZip calls provide GZip file compression. GZip files are compressed
+containers for a single file of data. GZip files contain additional
+information about the file they contain. This additional information is used
+to store RISC OS-specific file data such as the filetype, and datestamp.
+</p>
+</subsection>
+
+<subsection title="ZLib SWIs">
+<p>
+The ZLib calls provide deflate format data compression. Data compressed by the
+deflate algorithm is extractable by equivalent deflate decompressors. No
+additional data is included within the compressed data about its source. If
+further meta-data is required, it should be included in the output format in
+some application specific format. Zip files are one such example of a deflate
+format encapsulation.
+</p>
+</subsection>
+
+<subsection title="Stream Control Block">
+<p>
+In order to function, a 'stream control block' must be provided to the ZLib
+SWIs. This control block is a private structure which can be manipulated by
+both the client and the ZLib module. Initially, the table should be set to 0
+before being called (except where indicated).
+</p>
+<p><offset-table>
+<offset number="0" name="next_in">Pointer to the next available input byte. This value should be zero initially, and be updated by both the client and the ZLib module as data is processed.</offset>
+<offset number="4" name="avail_in">Amount of input data available for use by the ZLib module. This value should be zero initially, and be updated by both the client and the ZLib module as data is processed.</offset>
+<offset number="8" name="total_in">Total number of bytes read so far.</offset>
+<offset number="12" name="next_out">Pointer to the next output byte. This value should be zero initially, and be updated by both the client and the ZLib module as data is processed.</offset>
+<offset number="16" name="avail_out">Amount of space in the output buffer for use by the ZLib module. This value should be zero initially, and be updated by both the client and the ZLib module as data is processed.</offset>
+<offset number="20" name="total_out">Total number of bytes output so far.</offset>
+<offset number="24" name="msg">Pointer to the last error message, or 0 if no error has been generated.</offset>
+<offset number="28" name="state">Private value, controlled by the ZLib module. The client should not modify this value.</offset>
+<offset number="32" name="zalloc">Address of memory allocator function, or 0 for ZLib to control memory allocation.</offset>
+<offset number="36" name="zfree">Address of memory free function, or 0 for ZLib to control memory allocation.</offset>
+<offset number="40" name="opaque">Opaque handle to pass to allocator and free functions.</offset>
+<offset number="44" name="data_type">ZLib module's guess of the type of the data:<p><value-table head-number="Value" head-value="Meaning">
+<value number="0">Binary</value>
+<value number="1">ASCII</value>
+<value number="2">Unknown</value>
+</value-table></p></offset>
+<offset number="48" name="adler">Adler-32 value for uncompressed data processed so far.</offset>
+<offset number="52" name="reserved">Reserved for future expansion. Must be zero.</offset>
+</offset-table></p>
+</subsection>
+
+<subsection title="Flush types">
+<p>
+Where data is being written to a stream, a 'flush type' is provided to
+describe what sort of operations should be performed on writing the data.
+Flushing may degrade compression for some compression algorithms and so it
+should be used only when necessary.
+</p>
+<p><value-table head-number="Type" head-name="Name" head-value="Meaning">
+<value number="0" name="Z_NO_FLUSH">Do not flush data, but just write data as normal to the output buffer. This is the normal way in which data is written to the output buffer.</value>
+<value number="1" name="Z_PARTIAL_FLUSH">Obsolete. You should use Z_SYNC_FLUSH instead.</value>
+<value number="2" name="Z_SYNC_FLUSH">All pending output is flushed to the output buffer and the output is aligned on a byte boundary, so that the decompressor can get all input data available so far.</value>
+<value number="3" name="Z_FULL_FLUSH">All output is flushed as with Z_SYNC_FLUSH, and the compression state is reset so that decompression can restart from this point if previous compressed data has been damaged or if random access is desired. Using Z_FULL_FLUSH too often can seriously degrade the compression. <reference type="swi" name="ZLib_InflateSync" /> will locate points in the compression string where a full flush has been performed.</value>
+<value number="4" name="Z_FINISH">Notifies the module that the input has now been exhausted. Pending input is processed, pending output is flushed and calls return with Z_STREAM_END if there was enough output space.</value>
+</value-table></p>
+</subsection>
+
+<subsection title="Compression levels">
+<p>
+For compression calls, the compression level can be specified. This determines
+how much work is performed on trying to compress the input data. Lower
+compression levels indicate lesser compression, and greater speed. Higher
+levels indicate greater compression, but lesser speed.
+</p>
+<p><value-table head-number="Level" head-name="Name" head-value="Meaning">
+<value number="0" name="Z_NO_COMPRESSION">No compression should be used at all.</value>
+<value number="1" name="Z_BEST_SPEED">Minimal compression, but greatest speed.</value>
+<value number="9" name="Z_BEST_COMPRESSION">Maximum compression, but slowest.</value>
+<value number="-1" name="Z_DEFAULT_COMPRESSION">Select default compression level.</value>
+</value-table></p>
+</subsection>
+
+<subsection title="Compression strategy">
+<p>
+For compression calls, the compression strategy can be specified. This
+determines what type of processing is performed on the input data. If set
+incorrectly, the compression strategy will produce lesser compression ratios,
+but does not affect the correctness of the data.
+</p>
+<p><value-table head-number="Strategy" head-name="Name" head-value="Meaning">
+<value number="0" name="Z_DEFAULT_STRATEGY">The default strategy is the most commonly used. With this strategy, string matching and huffman compression are balanced.</value>
+<value number="1" name="Z_FILTERED">This strategy is designed for filtered data. Data which consists of mostly small values, with random distribution should use Z_FILTERED. With this strategy, less string matching is performed.</value>
+<value number="2" name="Z_HUFFMAN_ONLY">This strategy performs no string matching, only the huffman encoding is performed.</value>
+</value-table></p>
+</subsection>
+
+<subsection title="Compression method">
+<p>
+The compression method determines what algorithm is used to perform the
+compression. Presently only Z_DEFLATED is supported.
+</p>
+<p><value-table head-number="Method" head-name="Name" head-value="Meaning">
+<value number="8" name="Z_DEFLATED">Use deflate algorithm</value>
+</value-table></p>
+</subsection>
+
+<subsection title="Memory level">
+<p>
+The memory level determines how much memory should be allocated for the
+internal compression state. The default value is 8.
+</p>
+<p><value-table head-number="Level" head-value="Meaning">
+<value number="1">Uses minimal memory, but is slow and reduces the compression ratio.</value>
+<value number="9">Uses maximum memory for optimal speed.</value>
+</value-table></p>
+</subsection>
+
+<subsection title="Window bits">
+<p>
+Whilst searching for matching strings in the input data, a 'window' is used on
+to the previous data. This window is used to determine where matches occur.
+The value of the 'window bits' parameter is the base two logarithm of the size
+of the window. It should be in the range 9 to 15 for this version of the
+library. Larger values result in better compression at the expense of memory
+usage.
+</p>
+</subsection>
+
+<subsection title="ZLib return code">
+<p>
+Most ZLib SWIs return a 'return code'. This declares the state that the SWI
+encountered during the operation.
+</p>
+<p><value-table head-number="Code" head-name="Name" head-value="Meaning">
+<value number="0" name="Z_OK">No failure was encountered, the operation completed without problem.</value>
+<value number="1" name="Z_STREAM_END">No failure was encountered, and the input has been exhausted.</value>
+<value number="2" name="Z_NEED_DICT">A preset dictionary is required for the decompression of the data.</value>
+<value number="-1" name="Z_ERRNO">An internal error occurred</value>
+<value number="-2" name="Z_STREAM_ERROR">The stream structure was inconsistent</value>
+<value number="-3" name="Z_DATA_ERROR">Input data has been corrupted (for decompression).</value>
+<value number="-4" name="Z_MEM_ERROR">Memory allocation failed.</value>
+<value number="-5" name="Z_BUF_ERROR">There was not enough space in the output buffer.</value>
+<value number="-6" name="Z_VERSION_ERROR">The version supplied does not match that supported by the ZLib module.</value>
+</value-table></p>
+</subsection>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="ZLib_Compress"
+                number="53AC0"
+                description="Simple Squash-like compression"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+   <bit number="0">Continue previously started operation</bit>
+   <bit number="1">More input remains after this call</bit>
+   <bit number="2">Reserved, must be 0</bit>
+   <bit number="3">Return workspace required</bit>
+   <bit number="4">Workspace is not bound to an application</bit>
+   <bit number="5-10">Reserved, must be 0</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1-5">Dependent on flags</register-use>
+</entry>
+<exit>
+ <register-use number="0-5">Dependent on flags</register-use>
+</exit>
+<use>
+<p>This SWI is similar to Squash_Compress, providing a drop in replacement for the Squash module but using ZLib compression. There are two variants of this SWI - with bit 3 set, and with bit 3 clear. Normally, this call will be made first with bit 3 set to read the workspace size, and then with bit 3 clear to perform the compression.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_Compress" reason="bit 3 set" />
+<reference type="swi" name="ZLib_Compress" reason="bit 3 clear" />
+<reference type="swi" name="ZLib_Decompress" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_Compress"
+                number="53AC0"
+                reason="bit 3 set"
+                reasonname="ReadWorkspaceSize"
+                description="Simple Squash-like compression: read the workspace size"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+   <bit number="3">Return workspace required (set)</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">Input size, or -1 to omit maximum output size</register-use>
+</entry>
+<exit>
+ <register-use number="0">Required workspace size</register-use>
+ <register-use number="1">Maximum output size, or -1 if it cannot be determined or was not asked for</register-use>
+</exit>
+<use>
+<p>This SWI is used to read the size of the buffers to use for ZLib compression via the Squash-like interface.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_Compress" reason="bit 3 clear" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_Compress"
+                number="53AC0"
+                reason="bit 3 clear"
+                reasonname="Compress"
+                description="Simple Squash-like compression: compress data"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+   <bit number="0">Continue previously started operation</bit>
+   <bit number="1">More input remains after this call</bit>
+   <bit number="3">Return workspace required (clear)</bit>
+   <bit number="4">Workspace is not bound to an application</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">Pointer to workspace</register-use>
+ <register-use number="2">Pointer to input data</register-use>
+ <register-use number="3">Length of input data</register-use>
+ <register-use number="4">Pointer to output buffer</register-use>
+ <register-use number="5">Length of output buffer</register-use>
+</entry>
+<exit>
+ <register-use number="0">Status of compression process:<p><value-table head-number="Value" head-value="Meaning">
+<value number="0">Operation is complete</value>
+<value number="1">Input has been exhausted</value>
+<value number="2">Output space has been exhausted</value>
+</value-table></p></register-use>
+ <register-use number="1">Preserved</register-use>
+ <register-use number="2">Pointer to first unused byte of input data</register-use>
+ <register-use number="3">Size of unused data in input buffer</register-use>
+ <register-use number="4">Pointer to first unused byte of output buffer</register-use>
+ <register-use number="5">Size of unused data in output buffer</register-use>
+</exit>
+<use>
+<p>This SWI is used to compress data to a buffer.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_Compress" reason="bit 3 set" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_Decompress"
+                number="53AC1"
+                description="Simple Squash-like decompression"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+   <bit number="0">Continue previously started operation</bit>
+   <bit number="1">More input remains after this call</bit>
+   <bit number="2">Assume all output will fit into the buffer</bit>
+   <bit number="3">Return workspace required</bit>
+   <bit number="4">Workspace is not bound to an application</bit>
+   <bit number="5-10">Reserved, must be 0</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1-5">Dependent on flags</register-use>
+</entry>
+<exit>
+ <register-use number="0-5">Dependent on flags</register-use>
+</exit>
+<use>
+<p>This SWI is similar to Squash_Decompress, providing a drop in replacement for the Squash module but using ZLib decompression. There are two variants of this SWI - with bit 3 set, and with bit 3 clear. Normally, this call will be made first with bit 3 set to read the workspace size and then with bit 3 clear to perform the decompression.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_Decompress" reason="bit 3 set" />
+<reference type="swi" name="ZLib_Decompress" reason="bit 3 clear" />
+<reference type="swi" name="ZLib_Compress" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_Decompress"
+                number="53AC1"
+                reason="bit 3 set"
+                reasonname="ReadWorkspaceSize"
+                description="Simple Squash-like decompression: read the workspace size"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+   <bit number="3">Return workspace required (set)</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">Input size, or -1 to omit maximum output size</register-use>
+</entry>
+<exit>
+ <register-use number="0">Required workspace size</register-use>
+ <register-use number="1">Maximum output size, or -1 if it cannot be determined or was not asked for</register-use>
+</exit>
+<use>
+<p>This SWI is used to read the size of the buffers to use for ZLib decompression via the Squash-like interface.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_Decompress" reason="bit 3 clear" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_Decompress"
+                number="53AC1"
+                reason="bit 3 clear"
+                reasonname="Decompress"
+                description="Simple Squash-like decompression: decompress data"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+   <bit number="0">Continue previously started operation</bit>
+   <bit number="1">More input remains after this call</bit>
+   <bit number="3">Return workspace required (clear)</bit>
+   <bit number="4">Workspace is not bound to an application</bit>
+  </bitfield-table>
+ </register-use>
+ <register-use number="1">Pointer to workspace</register-use>
+ <register-use number="2">Pointer to input data</register-use>
+ <register-use number="3">Length of input data</register-use>
+ <register-use number="4">Pointer to output buffer</register-use>
+ <register-use number="5">Length of output buffer</register-use>
+</entry>
+<exit>
+ <register-use number="0">Status of decompression process:<p><value-table head-number="Value" head-value="Meaning">
+<value number="0">Operation is complete</value>
+<value number="1">Input has been exhausted</value>
+<value number="2">Output space has been exhausted</value>
+</value-table></p></register-use>
+ <register-use number="1">Preserved</register-use>
+ <register-use number="2">Pointer to first unused byte of input data</register-use>
+ <register-use number="3">Size of unused data in input buffer</register-use>
+ <register-use number="4">Pointer to first unused byte of output buffer</register-use>
+ <register-use number="5">Size of unused data in output buffer</register-use>
+</exit>
+<use>
+<p>This SWI is used to decompress data from a buffer.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_Decompress" reason="bit 3 set" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_CRC32"
+                number="53AC2"
+                description="Calculate a CRC32 checksum for a given data buffer (crc32)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">CRC-32 continuation value</register-use>
+ <register-use number="1">Pointer to start of block, or 0 to read the initial value to supply as a continuation value.</register-use>
+ <register-use number="2">Pointer to end of block</register-use>
+</entry>
+<exit>
+ <register-use number="0">CRC-32 value for block</register-use>
+ <register-use number="1-2">Preserved</register-use>
+</exit>
+<use>
+<p>This SWI is used to update a running CRC-32 checksum with data from a buffer. The returned CRC-32 value should be passed back to this SWI if the checksum needs to be updated further. ZLib_CRC32 is a slower call than OS_CRC, but more reliable.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_Adler32" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_Adler32"
+                number="53AC3"
+                description="Calculate an Adler32 checksum for a given data buffer (adler32)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Adler-32 continuation value</register-use>
+ <register-use number="1">Pointer to start of block, or 0 to read the initial value to supply as a continuation value.</register-use>
+ <register-use number="2">Pointer to end of block</register-use>
+</entry>
+<exit>
+ <register-use number="0">Adler-32 value for block</register-use>
+ <register-use number="1-2">Preserved</register-use>
+</exit>
+<use>
+<p>This SWI is used to update a running Adler-32 checksum with data from a buffer. The returned Adler-32 value should be passed back to this SWI if the checksum needs to be updated further. Adler-32 is a faster checksum to calculate than CRC-32.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_CRC32" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_Version"
+                number="53AC4"
+                description="Return the version of ZLib in use (zlib_version)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+</entry>
+<exit>
+ <register-use number="0">Pointer to read only version string</register-use>
+</exit>
+<use>
+<p>This SWI is used to read the version number of the ZLib library in use.</p>
+</use>
+<related>
+
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_ZCompress"
+                number="53AC5"
+                description="Compress a source buffer (compress)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to output buffer for compressed data</register-use>
+ <register-use number="1">Length of output buffer</register-use>
+ <register-use number="2">Pointer to input buffer of uncompressed data</register-use>
+ <register-use number="3">Length of input buffer</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+ <register-use number="1">Length of output buffer used</register-use>
+</exit>
+<use>
+<p>This SWI is used to compress a block of data in a single call. The output buffer must be at least 0.1% larger than the input, plus 12 bytes.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_ZCompress2" />
+<reference type="swi" name="ZLib_ZUncompress" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_ZCompress2"
+                number="53AC6"
+                description="Compress a source buffer (compress2)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to output buffer for compressed data</register-use>
+ <register-use number="1">Length of output buffer</register-use>
+ <register-use number="2">Pointer to input buffer of uncompressed data</register-use>
+ <register-use number="3">Length of input buffer</register-use>
+ <register-use number="4">Compression level</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+ <register-use number="1">Length of output buffer used</register-use>
+</exit>
+<use>
+<p>This SWI is equivalent to ZLib_ZCompress but allows the compression level to be specified.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_ZCompress" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_ZUncompress"
+                number="53AC7"
+                description="Uncompress a source buffer (uncompress)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to output buffer for uncompressed data</register-use>
+ <register-use number="1">Length of output buffer</register-use>
+ <register-use number="2">Pointer to input buffer of compressed data</register-use>
+ <register-use number="3">Length of input buffer</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+ <register-use number="1">Length of output buffer used</register-use>
+</exit>
+<use>
+<p>This SWI decompresses a buffer of data in a single call. The destination buffer must be large enough for the decompressed data.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_ZCompress" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_DeflateInit"
+                number="53AC8"
+                description="Initialise a stream for compression (deflateInit)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to Stream Control Block</register-use>
+ <register-use number="1">Compression level</register-use>
+ <register-use number="2">Pointer to ZLib version string expected ("1.1.4" at time of writing)</register-use>
+ <register-use number="3">Length of control block</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI is used to initialise the ZLib compression algorithm. You should clear the workspace block to zeros.</p><p>zalloc and zfree may point to routines to allocate and free memory. If these are not set then memory is allocated on a per application basis in the global dynamic area. zalloc and zfree will be entered within a C environment (ie APCS applies) with a small stack, in SVC mode. Because of this you cannot use longjmp, use functions that require large amounts of stack space, or perform any non-SVC mode operation.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_DeflateInit2" />
+<reference type="swi" name="ZLib_Deflate" />
+<reference type="swi" name="ZLib_DeflateEnd" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_InflateInit"
+                number="53AC9"
+                description="Initialise a stream for decompression (inflateInit)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to Stream Control Block</register-use>
+ <register-use number="1">Pointer to ZLib version string expected ("1.1.4" at time of writing)</register-use>
+ <register-use number="2">Length of control block</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI is used to initialise the ZLib stream decompression algorithm. You should clear the workspace block to zeros.</p><p>zalloc and zfree may point to routines to allocate and free memory. If these are not set then memory is allocated on a per application basis in the global dynamic area. zalloc and zfree will be entered within a C environment (ie APCS applies) with a small stack, in SVC mode. Because of this you cannot use longjmp, use functions that require large amounts of stack space, or perform any non-SVC mode operation.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_InflateInit2" />
+<reference type="swi" name="ZLib_Inflate" />
+<reference type="swi" name="ZLib_InflateEnd" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_DeflateInit2"
+                number="53ACA"
+                description="Initialise a stream for compression with control over parameters (deflateInit2)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to Stream Control Block</register-use>
+ <register-use number="1">Compression level</register-use>
+ <register-use number="2">Compression method</register-use>
+ <register-use number="3">Window bits for history buffer</register-use>
+ <register-use number="4">Memory level</register-use>
+ <register-use number="5">Compression strategy</register-use>
+ <register-use number="6">Pointer to ZLib version string expected ("1.1.4" at time of writing)</register-use>
+ <register-use number="7">Length of control block</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI is similar to ZLib_DeflateInit, but provides much greater control than that SWI.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_DeflateInit" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_InflateInit2"
+                number="53ACB"
+                description="Initialise a stream for decompression with control over parameters (inflateInit2)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to Stream Control Block</register-use>
+ <register-use number="1">Window bits</register-use>
+ <register-use number="2">Pointer to ZLib version string expected ("1.1.4" at time of writing)</register-use>
+ <register-use number="3">Length of control block</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI is similar to ZLib_InflateInit but provides much greater control than that SWI.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_InflateInit" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_Deflate"
+                number="53ACC"
+                description="Continue a stream compression (deflate)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to Stream Control Block</register-use>
+ <register-use number="1">Flush type</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI compresses as much data as possible and stops when the input buffer becomes empty or the output buffer becomes full. <userinput>next_in</userinput> and <userinput>avail_in</userinput> are read and updated after data has been processed. You should empty the output buffer when data appears there (<userinput>next_out</userinput> and <userinput>avail_out</userinput> will have been updated).</p><p>ZLib_Deflate performs one or both of the following actions:</p><p><list>
+<item><p>Compress more input starting at <userinput>next_in</userinput> and update <userinput>next_in</userinput> and <userinput>avail_in</userinput> accordingly. If not all input can be processed (because there is not enough room in the output buffer), <userinput>next_in</userinput> and <userinput>avail_in</userinput> are updated and processing will resume at this point for the next call of ZLib_Deflate.</p></item>
+<item><p>Provide more output starting at <userinput>next_out</userinput> and update <userinput>next_out</userinput> and <userinput>avail_out</userinput> accordingly. This action is forced if the parameter flush is non zero. Forcing flush frequently degrades the compression ratio, so this parameter should be set only when necessary (in interactive applications). Some output may be provided even if flush is not set.</p></item>
+</list></p><p>Before calling ZLib_Deflate the client should ensure that at least one of the actions is possible by providing more input and/or consuming more output, and updating <userinput>avail_in</userinput> or <userinput>avail_out</userinput> accordingly; <userinput>avail_out</userinput> should never be zero before the call. The client may consume the compressed output when it wants, for example when the output buffer is full (<userinput>avail_out</userinput> == 0) or after each call of ZLib_Deflate. If deflate returns Z_OK and with zero <userinput>avail_out</userinput> it must be called again after making room in the output buffer because there might be more output pending.</p><p>If the flush type is set to Z_SYNC_FLUSH all pending output is flushed to the output buffer and the output is aligned on a byte boundary so that the decompressor can get all input data available so far. In particular <userinput>avail_in</userinput> is zero after the call if enough output space has been provided before the call. Flushing may degrade compression for some compression algorithms and so it should be used only when necessary.</p><p>If the flush type is set to Z_FULL_FLUSH, all output is flushed as with Z_SYNC_FLUSH and the compression state is reset so that decompression can restart from this point if previous compressed data has been damaged or if random access is desired. Using Z_FULL_FLUSH too often can seriously degrade the compression.</p><p>If deflate returns with <userinput>avail_out</userinput> == 0 this function must be called again with the same value of the flush parameter and more output space (updated <userinput>avail_out</userinput>) until the flush is complete (ZLib_Deflate returns with non-zero <userinput>avail_out</userinput>).</p><p>If the flush type is set to Z_FINISH pending input is processed, pending output is flushed and ZLib_Deflate returns with Z_STREAM_END if there was enough output space; if ZLib_Deflate returns with Z_OK this function must be called again with Z_FINISH and more output space (updated <userinput>avail_out</userinput>) but no more input data until it returns with Z_STREAM_END or an error. After ZLib_Deflate has returned Z_STREAM_END the only possible operations on the stream are ZLib_DeflateReset or ZLib_DeflateEnd.</p><p>Z_FINISH can be used immediately after ZLib_DeflateInit if all the compression is to be done in a single step. In this case, <userinput>avail_out</userinput> must be at least 0.1% larger than avail_in plus 12 bytes. If ZLib_Deflate does not return Z_STREAM_END then it must be called again as described above.</p><p>ZLib_Deflate sets <userinput>adler</userinput> to the adler32 checksum of all input read so far (that is, <userinput>total_in</userinput> bytes).</p><p>ZLib_Deflate may update <userinput>data_type</userinput> if it can make a good guess about the input data type (Z_ASCII or Z_BINARY). If in doubt the data is considered to be binary. This field is only for information purposes and does not affect the compression algorithm in any manner.</p><p>ZLib_Deflate returns Z_OK if some progress has been made (more input processed or more output produced), Z_STREAM_END if all input has been consumed and all output has been produced (only when the flush type is set to Z_FINISH), Z_STREAM_ERROR if the stream state was inconsistent (for example if <userinput>next_in</userinput> or <userinput>next_out</userinput> was NULL), Z_BUF_ERROR if no progress is possible (for example <userinput>avail_in</userinput> or <userinput>avail_out</userinput> was zero).</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_DeflateInit" />
+<reference type="swi" name="ZLib_DeflateEnd" />
+<reference type="swi" name="ZLib_DeflateReset" />
+<reference type="swi" name="ZLib_Inflate" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_DeflateEnd"
+                number="53ACD"
+                description="Terminate a stream compression (deflateEnd)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to Stream Control Block</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI frees all the memory used by the compression algorithm, discarding any unprocessed input or output.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_DeflateInit" />
+<reference type="swi" name="ZLib_Deflate" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_Inflate"
+                number="53ACE"
+                description="Continue decompressing a stream (inflate)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to Stream Control Block</register-use>
+ <register-use number="1">Flush type</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI decompresses as much data as possible and stops when the input buffer becomes empty or the output buffer becomes full. <userinput>next_in</userinput> and <userinput>avail_in</userinput> are read and updated after data has been processed. You should empty the output buffer when data appears there (<userinput>next_out</userinput> and <userinput>avail_out</userinput> will have been updated).</p><p>ZLib_Inflate performs one or both of the following actions:</p><p><list>
+<item><p>Decompress more input starting at <userinput>next_in</userinput> and update <userinput>next_in</userinput> and <userinput>avail_in</userinput> accordingly. If not all input can be processed (because there is not enough room in the output buffer), <userinput>next_in</userinput> is updated and processing will resume at this point for the next call of ZLib_Inflate.</p></item>
+<item><p>Provide more output starting at <userinput>next_out</userinput> and update <userinput>next_out</userinput> and <userinput>avail_out</userinput> accordingly. ZLib_Inflate provides as much output as possible, until there is no more input data or no more space in the output buffer (see below about the flush parameter).</p></item>
+</list></p><p>Before the call of ZLib_Inflate the application should ensure that at least one of the actions is possible by providing more input and/or consuming more output and updating the <userinput>next_in</userinput>/<userinput>next_out</userinput> and <userinput>avail_in</userinput>/<userinput>avail_out</userinput> values accordingly. The application can consume the uncompressed output when it wants, for example when the output buffer is full (<userinput>avail_out</userinput> == 0), or after each call of ZLib_Inflate. If this SWI returns Z_OK and with zero <userinput>avail_out</userinput> it must be called again after making room in the output buffer because there might be more output pending.</p><p>If R1 is set to Z_SYNC_FLUSH ZLib_Inflate flushes as much output as possible to the output buffer. The flushing behaviour of inflate is not specified for values of the flush parameter other than Z_SYNC_FLUSH and Z_FINISH but the current implementation actually flushes as much output as possible anyway.</p><p>ZLib_Inflate should normally be called until it returns Z_STREAM_END or an error. However if all decompression is to be performed in a single step (a single call of ZLib_Inflate) the parameter flush should be set to Z_FINISH. In this case all pending input is processed and all pending output is flushed; <userinput>avail_out</userinput> must be large enough to hold all the uncompressed data. (The size of the uncompressed data may have been saved by the compressor for this purpose.) The next operation on this stream must be ZLib_InflateEnd to deallocate the decompression state. The use of Z_FINISH is never required but can be used to inform inflate that a faster routine may be used for the single ZLib_Inflate call.</p><p>If a preset dictionary is needed at this point (see ZLib_InflateSetDictionary below) ZLib_Inflate sets <userinput>adler</userinput> to the Adler-32 checksum of the dictionary chosen by the compressor and returns Z_NEED_DICT otherwise it sets <userinput>adler</userinput> to the Adler-32 checksum of all output produced so far (that is, <userinput>total_out</userinput> bytes) and returns Z_OK, Z_STREAM_END or an error code as described below. At the end of the stream ZLib_Inflate checks that its computed Adler-32 checksum is equal to that saved by the compressor and returns Z_STREAM_END only if the checksum is correct.</p><p>ZLib_Inflate returns Z_OK if some progress has been made (more input processed or more output produced), Z_STREAM_END if the end of the compressed data has been reached and all uncompressed output has been produced, Z_NEED_DICT if a preset dictionary is needed at this point, Z_DATA_ERROR if the input data was corrupted (input stream not conforming to the ZLib format or incorrect Adler-32 checksum), Z_STREAM_ERROR if the stream structure was inconsistent (for example if <userinput>next_in</userinput> or <userinput>next_out</userinput> was NULL), Z_MEM_ERROR if there was not enough memory, Z_BUF_ERROR if no progress is possible or if there was not enough room in the output buffer when Z_FINISH is used. In the Z_DATA_ERROR case the application may then call ZLib_InflateSync to look for a good compression block.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_InflateInit" />
+<reference type="swi" name="ZLib_InflateEnd" />
+<reference type="swi" name="ZLib_InflateSync" />
+<reference type="swi" name="ZLib_InflateSetDictionary" />
+<reference type="swi" name="ZLib_Deflate" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_InflateEnd"
+                number="53ACF"
+                description="Terminate a decompression stream (inflateEnd)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to Stream Control Block</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI frees all the memory used by the decompression algorithm, discarding any unprocessed input or output.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_InflateInit" />
+<reference type="swi" name="ZLib_Inflate" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_DeflateSetDictionary"
+                number="53AD0"
+                description="Initialise a string dictionary for a stream compression (deflateSetDictionary)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to Stream Control Block</register-use>
+ <register-use number="1">Pointer to dictionary block (a stream of bytes)</register-use>
+ <register-use number="2">Length of dictionary block</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI is used to initialise a compression dictionary. The dictionary should consist of strings (byte sequences) that are likely to be encountered later in the data to be compressed, with the most commonly used strings preferably put towards the end of the dictionary. Using a dictionary is most useful when the data to be compressed is short and can be predicted with good accuracy, the data can then be compressed better than with the default empty dictionary.</p><p>Depending on the size of the compression data structures selected by ZLib_DeflateInit or ZLib_DeflateInit2 a part of the dictionary may in effect be discarded, for example if the dictionary is larger than the window size in ZLib_DeflateInit or ZLib_DeflateInit2. Thus the strings most likely to be useful should be put at the end of the dictionary, not at the front.</p><p>Upon return of this function, <userinput>adler</userinput> is set to the Adler-32 value of the dictionary; the decompressor may later use this value to determine which dictionary has been used by the compressor. (The Adler32 value applies to the whole dictionary even if only a subset of the dictionary is actually used by the compressor.)</p><p>ZLib_DeflateSetDictionary returns Z_OK if success, or Z_STREAM_ERROR if a parameter is invalid (such as NULL dictionary) or the stream state is inconsistent (for example if ZLib_Deflate has already been called for this stream). ZLib_DeflateSetDictionary does not perform any compression: this will be done by ZLib_Deflate.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_InflateSetDictionary" />
+<reference type="swi" name="ZLib_Deflate" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_DeflateCopy"
+                number="53AD1"
+                description="Copy the compression state (deflateCopy)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to destination Stream Control Block</register-use>
+ <register-use number="1">Pointer to source Stream Control Block</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI is used to take a copy of the current compression state. This might be useful if you are attempting to filter the data in one of a number of ways.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_Deflate" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_DeflateReset"
+                number="53AD2"
+                description="Reset the internal compression state (deflateReset)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to Stream Control Block</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI is equivalent to ZLib_DeflateEnd followed by ZLib_DeflateInit.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_DeflateEnd" />
+<reference type="swi" name="ZLib_DeflateInit" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_DeflateParams"
+                number="53AD3"
+                description="Modifies the compression parameters (deflateParams)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to Stream Control Block</register-use>
+ <register-use number="1">Compression level</register-use>
+ <register-use number="2">Compression strategy</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI updates the compression level and strategy. You may do this part way through compression.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_DeflateInit2" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_InflateSetDictionary"
+                number="53AD4"
+                description="Initialise a string dictionary for a decompression stream (inflateSetDictionary)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to Stream Control Block</register-use>
+ <register-use number="1">Pointer to dictionary block (a stream of bytes)</register-use>
+ <register-use number="2">Length of dictionary block</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI is used to initialise a decompression dictionary. The dictionary must be the same as that used to compress the data (ZLib_DeflateSetDictionary).</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_DeflateSetDictionary" />
+<reference type="swi" name="ZLib_Inflate" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_InflateSync"
+                number="53AD5"
+                description="Re-synchronise decompression stream (inflateSync)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to Stream Control Block</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI will skip invalid data until a full flush point is found. This may be useful if you have data which is likely to be corrupted or is periodically synchronised and the data 'lost' is unimportant. An example might be a stream of graphical or audio data.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_Inflate" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_InflateReset"
+                number="53AD6"
+                description="Reset the decompression stream state (inflateReset)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to Stream Control Block</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI is equivalent to ZLib_InflateEnd followed by ZLib_InflateInit.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_InflateEnd" />
+<reference type="swi" name="ZLib_InflateInit" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_GZOpen"
+                number="53AD7"
+                description="Open a GZip file for reading or writing (gzopen)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to filename</register-use>
+ <register-use number="1">Pointer to the 'mode' of file operation. This consists of two parts; the access type and the modifiers. Only one access type may be used, but multiple modifiers may be added to the end.<p><value-table head-number="Access type" head-value="Meaning">
+<value number="rb">Open for reading</value>
+<value number="wb">Open for writing</value>
+</value-table></p><p><value-table head-number="Modifier" head-value="Meaning">
+<value number="0-9">Compression level</value>
+<value number="h">Huffman compression only</value>
+<value number="f">Data is 'filtered' (small values, randomly distributed)</value>
+<value number="R">RISC OS type information attached</value>
+</value-table></p></register-use>
+ <register-use number="2">Load address of file (if 'R' and 'wb' used)</register-use>
+ <register-use number="3">Exec address of file (if 'R' and 'wb' used)</register-use>
+ <register-use number="4">Length of file (if 'R' and 'wb' used)</register-use>
+ <register-use number="5">Attributes of file (if 'R' and 'wb' used)</register-use>
+</entry>
+<exit>
+ <register-use number="0">Opaque GZip handle</register-use>
+ <register-use number="2">Load address of file (if 'R' and 'rb' used)</register-use>
+ <register-use number="3">Exec address of file (if 'R' and 'rb' used)</register-use>
+ <register-use number="4">Length of file (if 'R' and 'rb' used)</register-use>
+ <register-use number="5">Attributes of file (if 'R' and 'rb' used)</register-use>
+</exit>
+<use>
+<p>This SWI opens a file for accessing GZip compressed data. The 'R' extension is intended for compressing RISC OS files completely losslessly. Expanding such files on other systems will result in the loss of RISC OS type information only, the file data itself will be intact.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_GZClose" />
+<reference type="swi" name="ZLib_GZRead" />
+<reference type="swi" name="ZLib_GZWrite" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_GZRead"
+                number="53AD8"
+                description="Read data from a GZip file (gzread)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Opaque GZip handle</register-use>
+ <register-use number="1">Pointer to destination buffer</register-use>
+ <register-use number="2">Amount of data to read</register-use>
+</entry>
+<exit>
+ <register-use number="0">Number of bytes read</register-use>
+</exit>
+<use>
+<p>This SWI reads data from a previously opened GZip file.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_GZOpen" />
+<reference type="swi" name="ZLib_GZWrite" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_GZWrite"
+                number="53AD9"
+                description="Write data to a GZip file (gzwrite)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Opaque GZip handle</register-use>
+ <register-use number="1">Pointer to source buffer</register-use>
+ <register-use number="2">Amount of data to write</register-use>
+</entry>
+<exit>
+ <register-use number="0">Number of bytes written</register-use>
+</exit>
+<use>
+<p>This SWI writes data to a previously opened GZip file.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_GZOpen" />
+<reference type="swi" name="ZLib_GZRead" />
+<reference type="swi" name="ZLib_GZFlush" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_GZFlush"
+                number="53ADA"
+                description="Flush all pending data to a GZip file (gzflush)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Opaque GZip handle</register-use>
+ <register-use number="1">Flush type</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI flushes all pending data to a previously opened GZip file.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_GZWrite" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_GZClose"
+                number="53ADB"
+                description="Close a GZip file (gzclose)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Opaque GZip handle</register-use>
+</entry>
+<exit>
+ <register-use number="0">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI closes a previously opened GZip file.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_GZOpen" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_GZError"
+                number="53ADC"
+                description="Return the last error from a GZip operation (gzerror)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Opaque GZip handle</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to last error message string</register-use>
+ <register-use number="1">ZLib return code</register-use>
+</exit>
+<use>
+<p>This SWI returns the last error message returned by a GZip operation.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_GZOpen" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_GZSeek"
+                number="53ADD"
+                description="Move to a specific location in a GZip file (gzseek)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Opaque GZip handle</register-use>
+ <register-use number="1">Position in decompressed data in bytes</register-use>
+ <register-use number="2">Type of seek to perform:<p><value-table head-number="Value" head-value="Meaning">
+<value number="0">Set absolute position (position = R1)</value>
+<value number="1">Set relative position (position = R1 + current position)</value>
+</value-table></p></register-use>
+</entry>
+<exit>
+ <register-use number="0">New position in file</register-use>
+</exit>
+<use>
+<p>This SWI changes the pointer within a GZip file. The position specified is located such that byte number R1 had just been read from the file. The operation cannot be performed on files being written.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_GZTell" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_GZTell"
+                number="53ADE"
+                description="Return the current position in a GZip file (gztell)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Opaque GZip handle</register-use>
+</entry>
+<exit>
+ <register-use number="0">Current position in decompressed data in bytes</register-use>
+</exit>
+<use>
+<p>This SWI returns the current position in the decompressed data in bytes as an offset from the start of the data.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_GZSeek" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_GZEOF"
+                number="53ADF"
+                description="Check whether the end of file has been reached (gzeof)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Opaque GZip handle</register-use>
+</entry>
+<exit>
+ <register-use number="0">1 if EOF condition has been reached, 0 otherwise</register-use>
+</exit>
+<use>
+<p>This SWI checks whether the end of the file has been reached.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_GZTell" />
+</related>
+</swi-definition>
+
+<swi-definition name="ZLib_TaskAssociate"
+                number="53AE0"
+                description="Change Wimp Task association for a stream"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to Stream Control Block</register-use>
+ <register-use number="1">Association:<p><value-table head-number="Value" head-value="Meaning">
+<value number="1">Associate with the current task</value>
+<value number="0">Dissociate with the current task</value>
+</value-table></p></register-use>
+</entry>
+<exit>
+ <register-use number="0-1">Preserved</register-use>
+</exit>
+<use>
+<p>This SWI is used to change the association of a ZLib stream with the current task. When associated, the task's death will cause the memory allocated to the stream to be released automatically. If dissociated, the stream will never be freed unless the deflateEnd or inflateEnd calls are issued. This allows ZLib operations to be used safely in circumstances when the client may be terminated abnormally - if the application crashes and the ZLib stream is associated then the ZLib streams will be automatically closed first.</p><p>By default all streams are associated with the task with which they were created and destroyed automatically should that task terminate. You may wish to disable this operation using this SWI. In particular module clients of the ZLib module must dissociate from the current task if they wish to operate outside the bounds of a single task.</p>
+</use>
+<related>
+<reference type="swi" name="ZLib_DeflateEnd" />
+<reference type="swi" name="ZLib_InflateEnd" />
+</related>
+</swi-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Separated the descriptions of the Squash-like compress and decompress calls, which the original had run together, and corrected evident slips: the third word of the stream control block is total_in, the descriptions of ZLib_ZUncompress, ZLib_ZCompress2, ZLib_GZFlush and ZLib_GZEOF named the wrong operation, and the dictionary note referred to the initialisation calls by the wrong names.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
