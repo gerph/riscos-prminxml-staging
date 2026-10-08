@@ -1,0 +1,128 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Window stacks">
+<section title="Overview">
+<p>
+When RISC OS 4 was released the concept of 'foreground windows' was introduced. These windows allow a separate stack of windows to be displayed which are always in front of the 'normal' windows. These windows are similar in principle to the 'furniture' windows provided by the Nested WindowManager releases. With RISC OS 4, furniture windows become a particular case of foreground windows when used within a nested window.
+</p>
+<p>
+At the same time, the 'backwindow' bit was updated to allow windows to appear behind 'normal' windows in a similar manner. Select 3 completes this background window work by creating a background window stack to complement the foreground window stack.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Window flags">
+<p>
+The type of window stack within which the window is placed is determined by the window flags:
+</p>
+<p><bitfield-table>
+ <bit number="11">Back: set for a background window (with bit 23 clear)</bit>
+ <bit number="23">Fore: set for a foreground or furniture window (with bit 11 clear)</bit>
+</bitfield-table></p>
+<p><value-table head-number="Bits" head-value="Window type">
+<value number="Bit 11 clear, bit 23 clear">Normal window</value>
+<value number="Bit 11 clear, bit 23 set">Foreground or furniture window</value>
+<value number="Bit 11 set, bit 23 clear">Background window</value>
+<value number="Bit 11 set, bit 23 set">Undefined, should not be used</value>
+</value-table></p></subsection>
+
+<subsection title="Moving windows">
+<p>
+Windows will move when dragged by the user or when positioned explicitly by program code. There are four classes of position which the window may be placed at - front, back, hidden, arbitrary position - indicated by the 'behind' value (window block + 24) value.
+</p>
+<subsubsection title="Front">
+<p>
+Placing a window at the front is achieved by using the 'behind' value of -1. This will move the window to be the foremost of the window stack it is declared in, obscuring all other windows in the stack. This operation is performed when the user drags the title or resize icons of a window with Select pressed.
+</p>
+</subsubsection>
+
+<subsubsection title="Back">
+<p>
+Placing a window at the back is achieved by using the 'behind' value of -2. This will move the window to be the rearmost of the window stack it is declared in, behind all other windows in the stack. This operation is performed when the user presses the 'back' icon of a window.
+</p>
+</subsubsection>
+
+<subsubsection title="Hidden">
+<p>
+'Hiding' a window is achieved by using the 'behind' value of -3. This ensures that the window will not be visible to the user, or through enumeration of the window stack. Hidden windows are used during the iconisation process. Windows from all stacks may be iconised, but child windows may not. On being reopened, the window will return to the stack it is declared in unless otherwise specified by the OpenWindow parameters.
+</p>
+</subsubsection>
+
+<subsubsection title="Arbitrary positions">
+<p>
+Windows may be placed at arbitrary positions within the window stack by using a window handle in the 'behind' value. This is the most commonly used operation when creating panes. It can be performed by the user by dragging the title or resize icons of a window with Adjust pressed.
+</p>
+<p>
+Moving windows outside their respective stacks (for example, opening a 'background' window behind a window with the 'foreground' type) will cause undefined behaviour. In normal use, this should not occur, but developers should be aware that this operation may cause windows to become unsequenced and certain operations may not function as desired.
+</p>
+</subsubsection>
+
+</subsection>
+
+<subsection title="Differences from earlier versions">
+<p>
+It is partly because of problems with the earlier implementation of background windows that this rationalisation of the window flags has taken place. The core difference between the Select 3 version of the WindowManager and earlier versions in this regard is that opening a background window at the front (-1 as the 'behind' value) will now open it at the front of the background window stack. Previous versions would open this window at the front of the normal stack. This could cause significant problems and the behaviour has been rationalised by the creation of a distinct window stack.
+</p>
+<p>
+Clients wishing to achieve the same effect as previous versions of the WindowManager with backwindows (without the problematic side effects) should move the windows between the stacks by modifying the window flags. This can be achieved through the use of the extended form of Wimp_OpenWindow to modify the window flags.
+</p>
+</subsection>
+
+<subsection title="Uses of background windows">
+<p>
+Background windows are intended to provide either a defined visible image for the user behind all active windows or to provide an accelerator mechanism. The Pinboard supplied with RISC OS provides both these functions. Through the background window stack, applications may now open windows which will be shown together with the main background and will not obscure normal or foreground windows. This facility may be used for additional accelerators or to provide transient background notifications.
+</p>
+</subsection>
+
+<subsection title="Window stack ordering">
+<p>
+The window stack ordering is more rational than under previous versions of the WindowManager. Operations moving windows to other parts of the stack will occur as expected. The following diagram describes the positioning of windows within the window stack. The windows 'behind' the 'Back most window' are part of the WindowManager implementation rather than a particular feature of the interface; they should not be relied on and are provided for information purposes only.
+</p>
+<p><extended-example type="format">
+<userinput>[Physical back of stack]</userinput><br/>
+<userinput>   Hidden windows (-3)</userinput><br/>
+<userinput>   Wimp-handled 'background' window (grey 2 window behind all windows)</userinput><br/>
+<userinput>[Back most window (most obscured)]</userinput><br/>
+<userinput>   Background window -2     \</userinput><br/>
+<userinput>   Background window stack   &gt;- Background window stack</userinput><br/>
+<userinput>   Background window -1     /</userinput><br/>
+<userinput>   Normal window -2         \</userinput><br/>
+<userinput>   Normal window stack       &gt;- Normal window stack</userinput><br/>
+<userinput>   Normal window -1         /</userinput><br/>
+<userinput>   Foreground window -2     \</userinput><br/>
+<userinput>   Foreground window stack   &gt;- Foreground window stack</userinput><br/>
+<userinput>   Foreground window -1     /</userinput><br/>
+<userinput>[Foremost window (most visible)]</userinput>
+</extended-example></p></subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected 'Fore most window' to 'Foremost window'.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
