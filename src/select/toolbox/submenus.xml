@@ -1,0 +1,215 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Sub-Menus">
+<section title="Introduction and Overview">
+<p>
+This section documents the ad hoc mechanism used by the Toolbox module to notify the Window module that a sub-menu is about to open (before delivery of a Wimp MenuWarning message), the necessity of this mechanism, and the way in which it has been extended to all object classes in Toolbox 1.86.
+</p>
+<p>
+It also describes the method used to update Wimp sub-menu pointers when showing objects of the FontMenu, Menu and ColourMenu classes, the flaws in this system, and a more robust mechanism to replace it (which requires support from Menu 0.51).
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Existing sub-menu warning mechanism">
+<p>
+When the Toolbox module's post-filter for Wimp events catches a MenuWarning (&amp;400C0) message (event code 17 or 18), it calls SWI <reference type="swi" name="Window_PreSubMenuShow" /> and then re-sends the message to the client task (thus deferring it). The initial message is intercepted so that neither client nor object modules see it. When the MenuWarning message returns it can be distinguished by the fact that its 'your ref' field is now non-zero.
+</p>
+<p>
+The reason for this SWI is to give the Window module a chance to hide any Window object that is showing transiently and more importantly raise a Window_HasBeenHidden event that will be delivered before the MenuWarning message. (When the latter is received by the Menu module it will show the object attached at that point in the menu tree, potentially causing an AboutToBeShown-type event.)
+</p>
+<p>
+This is not for the benefit of the Window module, since it can easily ensure that it generates a Window_HasBeenHidden event for any existing transient Window object before showing another one. The real reason is to give those object classes implemented using an underlying Window object (e.g. SaveAs) a chance to raise their own events (e.g. SaveAs_DialogueCompleted) in response to Window_HasBeenHidden, before the sub-menu object is shown.
+</p>
+<p>
+The Toolbox module also calls SWI Window_PreSubMenuShow before the relevant class SWI when showing an object as a sub-menu.
+</p>
+</subsection>
+
+<subsection title="Need for wider sub-menu warning">
+<p>
+The mechanism outlined above is exclusive to the Window module; other object class modules do not receive notification before a MenuWarning message is deferred. The requirement to be able to <strong>deliver</strong> a HasBeenHidden-type event before a MenuWarning message is specific to object classes on top of which other classes are implemented (and only Window falls into this category).
+</p>
+<p>
+However, forewarning of MenuWarning messages is also required in order to deduce that objects of any class have been hidden when an alternative sub-menu is about to open (not currently implemented, but desirable). In this case the notification could be immediately before the MenuWarning message is passed around the class modules, but it is simplest to combine this with the more stringent requirements of the Window class.
+</p>
+<p>
+Forewarning is required because there is no guarantee of the order in which filters are called for a Wimp message. For example if the Menu module's filter receives a MenuWarning message first then it will call SWI Toolbox_ShowObject to show any attached object, potentially raising an AboutToBeShown-type event. When the message arrives at another class module's filter, it will raise HasBeenHidden-type events if it believes any of its objects to be showing as a sub-menu.
+</p>
+<p>
+It can be seen that the event ordering is wrong. Worse, if the object about to be shown and the object deduced to have been hidden are the same then the class module is likely to become confused.
+</p>
+<p>
+The additional notification prior to calling the class SWI to show an object as sub-menu is redundant because SWI Window_PreSubMenuShow should already have been called on receipt of a MenuWarning message.
+</p>
+</subsection>
+
+<subsection title="Sub-menu pointers in Wimp menu data structures">
+<p>
+The Wimp interpretation of sub-menu pointers is as follows:
+</p>
+<p><value-table head-number="Value" head-value="Meaning">
+<value number="-1">No sub-menu arrow</value>
+<value number="1 - &amp;amp;7FFF">Wimp window handle (has sub-menu arrow)</value>
+<value number="&amp;gt;= &amp;amp;8000">Pointer to another Wimp menu block (has sub-menu arrow)</value>
+</value-table></p><p>
+To stop sub-menus from disappearing when a menu tree is re-opened after an ADJUST-click selection we must ensure that the Wimp sub-menu pointer is valid for the selected menu entry on each level.
+</p>
+<p>
+Currently the Wimp sub-menu pointer is only filled in after a submenu-show object attached to a menu entry has been auto-shown in response to a MenuWarning message. The value of R0 returned by SWI Toolbox_ShowObject (officially undefined, except in case of error) is implicitly treated as a Wimp window handle or pointer to a Wimp menu data structure. However this assumption is flawed since only the FontMenu, Menu and ColourMenu classes return a meaningful value in R0!
+</p>
+<p>
+The Wimp sub-menu pointer is never filled in for objects shown as sub-menu by the client task (e.g. in response to a Menu_SubMenu event). This is because clients are not aware of the significance of the value of R0 returned by SWI Toolbox_ShowObject when showing certain object classes as sub-menu. Also they do not know the address of the Wimp data structure for the parent menu.
+</p>
+<p>
+Finally, if a menu is re-built by a client task before being shown (e.g. upon receiving a Menu_AboutToBeShown event) then the Wimp sub-menu pointer will be invalidated if the base address of the Wimp menu data changes. The problem is that the sub-menu data pointer is returned immediately by the class SWI - before the object has actually been shown.
+</p>
+</subsection>
+
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="Window_PreSubMenuShow"
+                number="828BD"
+                description="Notify the Window module that a sub-menu is about to be shown"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+</entry>
+<exit>
+ <register-use number="0">0</register-use>
+ <register-use number="1-12">Preserved</register-use>
+</exit>
+<use>
+<p>
+No registers are significant on entry. The SWI decoding table in the Window module does not include a proper name for this SWI, where it is simply 'Window_61'. This is for compatibility with earlier versions.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+<section title="Service Calls">
+<service-definition name="ToolboxSubMenu"
+                    number="400C0"
+                    description="Sub-menu notification and linking">
+<entry>
+ <register-use number="0">Handle of client task</register-use>
+ <register-use number="1">&hex;400C0 (service number)</register-use>
+ <register-use number="3">Sub-reason code:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Notification that a MenuWarning message has been deferred.</value>
+ <value number="1">Request to link a sub-menu into the current menu tree.</value>
+ <value number="2+">Reserved</value>
+</value-table></register-use>
+ <register-use number="2, 4+">Depend upon the reason code (see below)</register-use>
+</entry>
+<exit>
+ <register-use number="0-12">Must be preserved</register-use>
+</exit>
+<use>
+<p>
+This service call is used by the Toolbox module and class modules to implement mechanisms relating to opening sub-menus. It provides an early warning that a sub-menu is about to open (before Wimp message &amp;400C0), and also carries requests to update Wimp sub-menu pointers (thus avoiding the need to poke private data structures).
+</p>
+</use>
+<related>
+<reference type="service" name="ToolboxSubMenu" />
+</related>
+</service-definition>
+
+<service-definition name="ToolboxSubMenu"
+                    number="400C0"
+                    reason="0"
+                    reasonname="ToolboxSubMenu_Warning"
+                    description="A sub-menu is about to open">
+<entry>
+ <register-use number="0">Handle of client task</register-use>
+ <register-use number="1">&hex;400C0 (service number)</register-use>
+ <register-use number="2">Pointer to menu state (as for Wimp_GetMenuState)</register-use>
+ <register-use number="3">0 (a sub-menu is about to open)</register-use>
+</entry>
+<exit>
+ <register-use number="0-12">Must be preserved</register-use>
+</exit>
+<use>
+<p>
+The Toolbox module circulates this service call with reason code 0 when it is about to defer a Wimp MenuWarning message (&amp;400C0). It must never be claimed.
+</p>
+<p>
+This notification may be used by class modules to mark as hidden any objects belonging to the specified task that were believed to be showing as a sub-menu and, if appropriate, generate HasBeenHidden-type events for them. If a module implements an object class that itself supports sub-menus (like 'Menu') then the Wimp menu state pointed to by R2 can be examined to ensure that objects are not assumed to have been hidden if they form part of the menu tree leading to the sub-menu arrow that is being traversed.
+</p>
+<p>
+For compatibility with existing versions of the Window module the Toolbox module also calls <reference type="swi" name="Window_PreSubMenuShow" />. However, new versions of Window will ignore this SWI in favour of the service call. Note also that the Toolbox module no longer calls this SWI before asking a class module to show an object as sub-menu.
+</p>
+</use>
+<related>
+</related>
+</service-definition>
+
+<service-definition name="ToolboxSubMenu"
+                    number="400C0"
+                    reason="1"
+                    reasonname="ToolboxSubMenu_Link"
+                    description="Request to link a sub-menu into the current menu tree">
+<entry>
+ <register-use number="0">Handle of client task</register-use>
+ <register-use number="1">&hex;400C0 (service number)</register-use>
+ <register-use number="2">Pointer to Wimp data for sub-menu (or window handle)</register-use>
+ <register-use number="3">1 (request to link a sub-menu into the current menu tree)</register-use>
+ <register-use number="4">Object ID of parent menu</register-use>
+ <register-use number="5">Component ID of parent menu entry</register-use>
+</entry>
+<exit>
+ <register-use number="1">0 if claiming service call</register-use>
+ <register-use number="0, 2-5">Must be preserved</register-use>
+</exit>
+<use>
+<p>
+Class modules should raise this service call with reason code 1 to request that the Wimp data structure for a sub-menu (or the handle of a window to be shown as sub-menu) be linked to the Wimp data structure for its parent. For backward compatibility, if no parent object was specified by the client then this service call should not be raised and no error returned.
+</p>
+<p>
+This reason code should be ignored by all class modules except those that implement objects that may have other Toolbox objects as sub-menus. Currently this includes only the Menu module, which responds by updating the relevant sub-menu pointer within the Wimp data structure for the parent Menu and claiming the service call. It must not be claimed if the parent object belongs to a different class, or the parent menu entry has no sub-menu arrow.
+</p>
+<p>
+If this service call returns unclaimed then none of the class modules were able to link the sub-menu onto the parent object and component specified by the client. The class module that is trying to show one of its objects as a sub-menu should respond by hiding the object (if it had already been shown) and returning an error message of the form "Component, 0x01234567 of object, 0x89abcdef, is unsuitable parent for submenu." This should aid programmers during application development.
+</p>
+</use>
+<related>
+</related>
+</service-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected 'ensure that generates a Window_HasBeenHidden event' (it generates), restored the emphasis on 'deliver', and the sub-menu pointer range '1 - &amp;7FFF', which the captured HTML had flattened. The sub-reason names (such as ToolboxSubMenu_Link) are descriptive labels for the sub-reason codes and not names defined by the operating system.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
