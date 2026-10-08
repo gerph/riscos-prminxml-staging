@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Wimp screen edge notifications">
+<section title="Introduction and Overview">
+<p>
+When the pointer idles at the edge of the screen a message is sent to all tasks. At present this message relies on the iconbar toggle being enabled. Future versions may not have this restriction.
+</p>
+</section>
+
+<section title="Messages">
+<message-definition name="ScreenEdgeNotification"
+                    number="400D2"
+                    description="The pointer has idled over the edge of the screen"
+                    source="WindowManager"
+                    destination="Tasks">
+<message-table>
+  <message offset="16">&amp;400D2 (Message_ScreenEdgeNotification)</message>
+  <message offset="20">Bit mask:
+  <bitfield-table>
+   <bit number="0">Left of screen</bit>
+   <bit number="1">Bottom of screen</bit>
+   <bit number="2">Right of screen</bit>
+   <bit number="3">Top of screen</bit>
+   <bit number="4-31" state="reserved"></bit>
+  </bitfield-table></message>
+</message-table>
+
+<use>
+<p>
+This message is sent by the WindowManager when the pointer idles over the edge of the screen. It is intended that shortcut applications might use this to activate themselves.
+</p>
+</use>
+<related>
+</related>
+</message-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
