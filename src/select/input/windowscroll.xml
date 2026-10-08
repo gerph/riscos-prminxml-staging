@@ -1,0 +1,217 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="WindowScroll module">
+<section title="Introduction and Overview">
+<p>
+The WindowScroll module provides scrolling facilities for applications within the desktop using the alternate positioning device ('scroll wheel'). The module runs as a desktop task in order to request changes in the positioning of windows of other tasks.
+</p>
+<p>
+The module provides one *Command to configure the behaviour of the window scrolling feature.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="'Pointer' type behaviour">
+<p>
+When the WindowScroll module is configured for use 'Pointer', the window under the pointer will always be selected.
+</p>
+</subsection>
+
+<subsection title="'Focus' type behaviour">
+<p>
+When the WindowScroll module is configured for use 'Focus' the window with the input focus will always be selected. If no window has the focus, no scroll operations will be performed.
+</p>
+</subsection>
+
+<subsection title="'Focus or pointer' type behaviour">
+<p>
+When the WindowScroll module is configured to use 'Focus or pointer' the window with the input focus will be selected. If no window has the focus, the window beneath the pointer will be scrolled.
+</p>
+</subsection>
+
+<subsection title="'Favour higher' type behaviour">
+<p>
+When the WindowScroll module is configured to 'favour higher windows', the window which is highest in the window stack out of the window with the focus and the window which the pointer is over will be selected.
+</p>
+<p>
+Where child windows are in use, a common window stack is determined and the front-most of the windows in either stack is treated as the position of the window. Should the window with focus be a child of the window over which the pointer is positioned (or vice-versa), the caret window will be selected for scrolling.
+</p>
+<p>
+Where the windows with common parents live in different stacks (having different 'back' and 'front' bits set), the front-most of these will be selected.
+</p>
+</subsection>
+
+<subsection title="'Line scroll' option">
+<p>
+The 'Line Scroll' configuration option is independent of the scroll type operations described above. The option affects windows which request scroll events for scrolling windows by a line (or column) at a time when the scroll buttons are pressed. When enabled, the line (or column) scrolling event will be used, rather than scrolling by an arbitrary amount. Certain document editors use this feature.
+</p>
+</subsection>
+
+<subsection title="Pane windows">
+<p>
+In any of the behaviours described above, the windows being considered are first examined to see whether they are scrollable through the use of panes. If the caret or pointer is positioned in a window marked as a pane and does not have scroll bars (or the new scroll request bit set), the window behind the pane is considered instead. If it too is marked as a pane (or the new scroll request bit is set), the process is repeated until the window being considered is not a pane.
+</p>
+</subsection>
+
+<subsection title="Programmers interface">
+<p>
+In order to take advantage of the new scroll features, new applications may request that events be delivered when the scroll wheel is triggered, rather than merely being scrolled.
+</p>
+<p>
+If the window being scrolled has bit 1 of the extended window flags byte set, it will be notified of scroll events using a new ScrollRequest. The new definition of the extended window flags byte (window information block offset 39) is thus :
+</p>
+<p><bitfield-table>
+ <bit number="0">True colour validation provided</bit>
+ <bit number="1">Extended ScrollRequest events requested</bit>
+ <bit number="2">3D disable</bit>
+ <bit number="3">3D enable</bit>
+ <bit number="4-7">Reserved, must be 0</bit>
+</bitfield-table></p>
+<p>
+<strong>Reason_ScrollRequest (10)</strong>
+</p>
+<p><offset-table>
+ <offset number="0-31">As previously</offset>
+ <offset number="32">Scroll x direction</offset>
+ <offset number="36">Scroll y direction</offset>
+ <offset number="40">Icon being scrolled, or -1 if no icon is scrolled (only applicable for the extended scroll requests; non-extended scroll requests will not contain this element)</offset>
+</offset-table></p>
+<p>
+Scroll direction values are defined such that multiples of 4 signify the extended scroll requests :
+</p>
+<p><value-table head-number="Value" head-value="Meaning">
+<value number="-8">Two extended scroll operations left or down</value>
+<value number="-4">One extended scroll operation left or down</value>
+<value number="-3">AutoScroll request for left or down</value>
+<value number="-2">Page left or down</value>
+<value number="-1">Line/column left or down</value>
+<value number="0">No operation</value>
+<value number="+1">Line/column right or up</value>
+<value number="+2">Page right or up</value>
+<value number="+3">AutoScroll request for right or up</value>
+<value number="+4">One extended scroll operation right or up</value>
+<value number="+8">Two extended scroll operations right or up</value>
+</value-table></p><p>
+Further multiples of 4 indicate linearly increasing numbers of scroll operations. Applications are strongly encouraged to check for bits 0 and 1 before applying a shift of two right to obtain the number of scroll operations to apply. This should allow for future expansion.
+</p>
+<p>
+Filters operating on applications to modify the action of scroll events are strongly encouraged to check only for values that they understand. In earlier documentation only values -2, -1, 0, +1 and +2 were defined. Values for -3 and +3 were added for RISC OS 4. Filters which operate only on these values will be unaffected by the new behaviour of ScrollRequest. Filters which operate on +ve or -ve values may experience undefined but acceptable behaviour with the new operation. Filters which perform operations based on the original values without checks for bounds may experience undefined and fatal behaviour. It is not expected that there be any filters in the latter category.
+</p>
+<p>
+In addition to windows requesting Extended ScrollRequest events icons may request such events be delivered if the pointer is over them and their window is selected for scrolling. Such icons can be used by filter tasks and by applications wishing to employ the standard scroll methods for all but selected regions of a window. In order to request extended scroll events, an icon should include a new validation command.
+</p>
+<p>
+The 'Y' validation command is defined to be used for boolean flags. Such flags are 'enabled' if a specific character is present following the command. The characters within the flag command may - as with validation commands - use upper or lower case letters 'A'-'Z' and 'a'-'z'. The only defined flag is :
+</p>
+<p><value-table head-number="Flag" head-value="Meaning">
+<value number="S">This icon wishes to receive scroll requests</value>
+</value-table></p><p>
+When such an icon is 'scrolled', the ScrollRequest message above will be delivered with the icon handle filled in.
+</p>
+<p>
+For completeness, the currently defined validation commands are :
+</p>
+<p><value-table head-number="Command" head-value="Meaning">
+<value number="A">Allow following chars</value>
+<value number="B">Border type used by 'Interface' module</value>
+<value number="C">24 bit colour selection</value>
+<value number="D">Display char following for password</value>
+<value number="F">Select font foreground/background hex colours</value>
+<value number="K">Allow wimp key processing</value>
+<value number="L">Set line spacing in OS units</value>
+<value number="M">Reserved</value>
+<value number="N">Used by various template editors for naming icons</value>
+<value number="P">Set pointer from sprite name and active position</value>
+<value number="R">Border type</value>
+<value number="S">Sprite name</value>
+<value number="T">Tinting sprites</value>
+<value number="U">Reserved</value>
+<value number="X">Wimp does not resize iconbar icons</value>
+<value number="Y">Flag operation</value>
+<value number="Z">RISC OS 3.00 border (replaced by 'R')</value>
+</value-table></p><p>
+Pseudo-code for handling scroll requests :
+</p>
+<p><extended-example type="c">
+<userinput>do_scroll_request</userinput><br/>
+<userinput>{</userinput><br/>
+<userinput>  if ((yscroll &amp; 3) == 0 &amp;&amp; (xscroll &amp; 3) == 0)</userinput><br/>
+<userinput>  {</userinput><br/>
+<userinput>    /* Extended scroll request */</userinput><br/>
+<userinput>    xscroll = xscroll / 4;</userinput><br/>
+<userinput>    yscroll = yscroll / 4;</userinput><br/>
+<userinput>    if (icon == -1)</userinput><br/>
+<userinput>    {</userinput><br/>
+<userinput>      /* Scroll request sent due to the extended scroll request bit being</userinput><br/>
+<userinput>         set in the window */</userinput><br/>
+<userinput>    }</userinput><br/>
+<userinput>    else</userinput><br/>
+<userinput>    {</userinput><br/>
+<userinput>      /* Scroll request sent due to the icon the pointer is over using</userinput><br/>
+<userinput>         the YS validation */</userinput><br/>
+<userinput>    }</userinput><br/>
+<userinput>  }</userinput><br/>
+<userinput>  else</userinput><br/>
+<userinput>  {</userinput><br/>
+<userinput>    /* Non-extended scroll request */</userinput><br/>
+<userinput>  }</userinput><br/>
+<userinput>}</userinput>
+</extended-example></p></subsection>
+
+<subsection title="Legacy application support">
+<p>
+Legacy Applications (i.e. applications unaware of the scroll wheel) should respond correctly to the scroll requests from the WindowScroll module. Such applications which use the 'Line scroll' method of scrolling their windows will see a number of scroll requests in rapid succession. These should not affect such applications as the scroll positions provided take account of changes performed by the application.
+</p>
+<p>
+Applications which handle window scrolling through mechanisms other than the window scroll bars may not behave as expected. The most common behaviour for such applications is that the window will be unaffected by the scroll wheel. The most prominent application which displays this behaviour is 'Eureka'. This application renders all its window furniture within its own redraw loop, and as such has no Wimp-visible furniture. This, and similar applications, are not handled by the WindowScroll module.
+</p>
+</subsection>
+
+</section>
+
+<section title="Commands">
+<command-definition name="WimpScroll"
+                    description="Configure the behaviour of the window scrolling feature">
+<syntax><optional><switch name="Type"><userreplace>type</userreplace></switch></optional><text> </text><optional><switch name="LineScroll"/></optional><text> </text><optional><switch name="Speed"><userreplace>speed</userreplace></switch></optional></syntax>
+<parameter switch="Type" name="type">Which window is selected for scrolling: Pointer, Focus, FocusOrPointer or FavourHigher</parameter>
+<parameter switch="LineScroll">Scroll by a line (or column) at a time for windows which request such scroll events</parameter>
+<parameter switch="Speed" name="speed">Speed of scrolling</parameter>
+<use>
+<p>
+Configures the behaviour of the window scrolling feature. The meanings of the type options are described in the Technical Details section.
+</p>
+</use>
+<related>
+</related>
+</command-definition>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the description of scroll direction +2, which was given as 'Line/column right or up' (the same as +1); by symmetry with -2 it is 'Page right or up'.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
