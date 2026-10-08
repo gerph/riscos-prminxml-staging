@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Path variables">
+<section title="Introduction and Overview">
+<p>
+The handling of path variables by FileSwitch has changed slightly from that documented by the PRMs. Primarily this is in order to align use with that of the regular filing systems.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+Path variables can now (as of FileSwitch 2.51) use a '$' specifier at their root, for example 'Choices:$'. This will be treated as being the top most level of the path variable. The use of un-specified path components in the use of path variables is thus discouraged. This change ensures that applications which attempt to process paths can do so in a consistent manner without requiring special cases. Previously it would have been necessary to check whether a path name terminates in a ':' character before appending a period and leaf name (that is 'Choices:' cannot have a regular '.Leaf' appended to it to create a valid filename). Similarly, the use of un-specified path components on true filing systems (eg 'ADFS:') is discouraged.
+</p>
+<p>
+The objects referred to in a path variables cannot, generally, be written to where they do not already exist. The exception to this is a path variable with only a single entry. However, since path variables are explicitly expected to be extended (otherwise a regular system variable with a '$Dir' suffix would have been used), reliance on this behaviour is strongly discouraged. From FileSwitch 2.56 onward, however, write operations on a path variable will check the '$Write' variant of the variable for a valid directory name. That is, the '$Path' suffix will be replaced by '$Write'. This should be a variable containing the directory name to which write operations to non-existent objects should be performed for this path variable. This does not make the use of path variables completely transparent, as (for example) enumeration operations are not applied to all members of the variable, but it does alleviate some issues with their use.
+</p>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
