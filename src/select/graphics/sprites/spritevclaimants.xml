@@ -1,0 +1,91 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="SpriteV claimants">
+<section title="Introduction and Overview">
+<p>
+With the advent of video drivers which may extend the SpriteV operations in order to provide acceleration it is necessary to be aware of the order of vector registration. Ensuring the ordering of vector claimants ensures that the system can be modularly extended, and restarted.
+</p>
+<p>
+The SpriteExtend module has been updated to issue a number of service calls in order to initialise extensions to the Sprite vector after it has claimed the vector itself. This allows those claimants to process the calls before SpriteExtend itself performs the usual software operations. Three classes of extensions are expected and are provided for :
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Type 0 - software vector extensions">
+<p>
+These are extensions, similar to SpriteExtend, which provide core software implementations of new vector calls. For example, should there be a sprite operation to render a sprite to a draw path, this would be where the implementation would register its vector.
+</p>
+</subsection>
+
+<subsection title="Type 1 - accelerated vector extensions">
+<p>
+These are extensions which accelerate existing operations. Hardware video drivers would fall in to this category, allowing them to accelerate the existing operations when rendering to their display device.
+</p>
+</subsection>
+
+<subsection title="Type 2 - monitor, or vector augmentation">
+<p>
+These are handlers which either monitor the calls passed through the vector for diagnostic purposes, or which modify the vector parameters in order to provide some different implementation. It is not expected that there be many handlers at this level.
+</p>
+</subsection>
+
+</section>
+
+<section title="Service Calls">
+<service-definition name="SpriteReregister"
+                    number="E1"
+                    description="SpriteExtend has claimed SpriteV; extensions should register">
+<entry>
+ <register-use number="0">Registrant type:
+  <value-table head-number="Value" head-value="Meaning">
+   <value number="0">Software vector extensions</value>
+   <value number="1">Accelerated vector extensions</value>
+   <value number="2">Monitor or vector augmentation</value>
+   <value number="3-&amp;FFFFFFFF">Reserved</value>
+  </value-table>
+ </register-use>
+ <register-use number="1">&hex;E1 (service number)</register-use>
+</entry>
+<exit>
+ <register-use number="0-1" state="preserved" />
+</exit>
+<use>
+<p>
+This service is issued by SpriteExtend after it claims SpriteV in order that
+other clients may register themselves in the correct order. It will be issued 3
+times, once for each of the registrant types, in ascending order. It must not be
+claimed.
+</p>
+</use>
+<related>
+</related>
+</service-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
