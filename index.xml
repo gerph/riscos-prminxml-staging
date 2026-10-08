@@ -249,6 +249,7 @@
         <page href="pathvariables">Path variables</page>
         <page href="pipefs">PipeFS</page>
         <page href="ramfs">RAMFS</page>
+        <page href="upcall19">UpCall 19</page>
     </section>
     <section title="Startup" dir="startup">
         <page href="bootmenu">Boot Menu</page>

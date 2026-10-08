@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+
+<chapter title="UpCall 19">
+
+<section title="Overview">
+<p>UpCall 19 ('Media Search End with Message') has been defined since RISC OS 4 as a modified form of UpCall 4 ('Media Search End'). It has the same semantics as UpCall 4, except that any notice to the user is updated to contain the new message supplied in R1.</p>
+<p>UpCall 19 replaces UpCall 4 for filing systems which provide such notifications. It is intended for use where the operation requested may take a significant amount of time, and feedback is needed to inform the user that the operation is continuing after the media failure.</p>
+</section>
+
+<section title="UpCall definition">
+<upcall-definition name="MediaSearchEndMessage"
+                   number="19"
+                   description="The media request has been satisfied; display the message supplied">
+<entry>
+ <register-use number="0">19 (&hex;13)</register-use>
+ <register-use number="1">Pointer to message to display</register-use>
+</entry>
+
+<exit>
+<register-use number="0-1"><fixme>The exit conditions for UpCall 19 are not stated. It is said to share the semantics of UpCall 4, whose exit conditions are not described here.</fixme></register-use>
+</exit>
+
+<use>
+<p>This UpCall is issued by a filing system to inform the user that the media request has been satisfied, by providing them with the message supplied in R1. It has the same semantics as UpCall 4.</p>
+</use>
+
+<related>
+<reference type="upcall" name="4" />
+</related>
+</upcall-definition>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
