@@ -110,6 +110,33 @@
         <page href="modes">Graphics modes specification</page>
         <page href="imagefilerender">Image file renderer</page>
         <page href="videov">Video drivers</page>
+        <page href="multidrivers">Display changes</page>
+        <page href="osscreenmode">OS_ScreenMode changes</page>
+        <page href="screenmodes">ScreenModes</page>
+        <page href="vduvariables">VDU variables</page>
+        <page href="teletext">Teletext</page>
+        <page href="videoguard">VideoGuard</page>
+        <page href="blendtable">BlendTable</page>
+        <page href="colourmap">Colour Map module</page>
+        <page href="colourmapdraw">ColourMapping in Drawfiles</page>
+        <page href="imagefileconvert">ImageFileConvert</page>
+        <page href="convertsprite">ConvertSprite</page>
+        <page href="convertbmp">ConvertBMP</page>
+        <page href="convertpng">ConvertPNG</page>
+        <page href="png">PNG module</page>
+        <page href="compressjpeg">CompressJPEG module</page>
+        <page href="inversetable">InverseTable</page>
+        <page href="fontmap">FontMap module</page>
+        <page href="graphicssystem">The graphics system</page>
+        <page href="sprites/alphachannel">Alpha-channel sprites</page>
+        <page href="sprites/alphamask">Alpha mask promotion and demotion</page>
+        <page href="sprites/cmyk">CMYK sprites</page>
+        <page href="sprites/colourmap">ColourMapping of deep sprites</page>
+        <page href="sprites/errors">Sprite errors</page>
+        <page href="sprites/plotactions">Sprite Plot Actions</page>
+        <page href="sprites/spritevclaimants">SpriteV claimants</page>
+        <page href="sprites/tiling">Tiled sprite plotting</page>
+        <page href="sprites/translucency">Translucent sprite operation</page>
     </section>
     <section title="Audio" dir="audio">
         <page href="soundscheduler">SoundScheduler changes for 32bit</page>
