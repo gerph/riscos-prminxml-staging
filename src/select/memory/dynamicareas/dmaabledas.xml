@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="DMA-able dynamic areas">
+<section title="Introduction and Overview">
+<p>
+With RISC OS 4.04 a new bit was added to the OS_DynamicArea creation flags to allow areas to be forced into memory which may be used for DMA operations. This allows systems which have fast memory closer to the processor, such as the Kinetic CPU upgrade, to allocate memory from the base system memory which can be used for DMA operations.
+</p>
+<p>
+When bit 12 of the area flags is set during the creation of the dynamic area this forces all page allocations to be taken from memory which may be used for DMA operations. Prior to RISC OS 4.42 (Kernel version 8.77), this was achieved by replacing the dynamic area handler function, and as a result such areas could not be shrinkable or abortable. With Kernel version 8.77 and later the allocation of pages is performed internally within the PreGrow handler and the supplied dynamic area handler will be called for all other reason codes. This allows such areas to now be Abortable and to provide a TestShrink handler to allow the areas to be reduced when free memory is low.
+</p>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
