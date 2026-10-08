@@ -1,0 +1,154 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="VDU variables">
+<section title="Introduction and Overview">
+<p>
+The Mode (sub-128) and VDU variables (post-128) read by <reference type="swi" name="OS_ReadModeVariable" /> and <reference type="swi" name="OS_ReadVduVariables" /> have been expanded to cover more of the features provided by the operating system.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Mode flags (variable 0)">
+<p>
+The mode flags have been extended to allow the specification of data formats within the display. These are primarily for use when reading the data types within sprite redirection, but may be extended in the future to cover display formats as well.
+</p>
+<p>
+During sprite redirection and mode selection the Kernel will detect whether a grey scale palette has been used. This will be marked within the mode flags but may also be used during mode selection. In a similar manner to the selection of full palette modes (PRM 5a-135) the greyscale bit may be set to select a mode with the palette programmed to uniformly distributed grey levels. Colour 0 will be set to black, and the highest numbered colour within the mode will be set to white. This differs from the default palettes used in the Wimp 4 grey (white to black) and 16 grey modes (white to black for first 8 and then grey levels to fill the gaps in a manner similar to the original 16 colours).
+</p>
+<p>
+The full mode flags are :
+</p>
+<p><bitfield-table>
+ <bit number="0">Non-graphics mode (PRM 1-710)</bit>
+ <bit number="1">Teletext mode (PRM 1-710)</bit>
+ <bit number="2">Gap mode (PRM 1-710)</bit>
+ <bit number="3">BBC style gap mode (PRM 1-710)</bit>
+ <bit number="4">Hi-resolution mono mode (PRM 1-710)</bit>
+ <bit number="5">Double height text characters (PRM 1-710)</bit>
+ <bit number="6">Hardware scroll never used (PRM 1-710)</bit>
+ <bit number="7">Fully specified palette (PRM 5a-114)</bit>
+ <bit number="8">Interlaced mode (NC OS documentation)</bit>
+ <bit number="9">Greyscale palette (described above)</bit>
+ <bit number="10-11">Reserved</bit>
+ <bit number="12-15">Data format (see the SpriteExtend CMYK documentation):
+  <value-table head-number="Value" head-value="Meaning">
+   <value number="0">RGB data, regular RISC OS format</value>
+   <value number="1">CMYK data</value>
+   <value number="2-15">Reserved</value>
+  </value-table>
+ </bit>
+</bitfield-table></p>
+<p>
+Of these, the gap modes and double height text may not be supported by all graphics hardware.
+</p>
+</subsection>
+
+<subsection title="Total screen memory size (variable 150)">
+<p>
+This variable returns the total size of the memory provided by the current display driver, where this value is known. In the past it has been used to calculate the number of banks available. Because of limitations within graphics hardware, this may not be possible. The <reference type="swi" name="OS_ScreenMode" reason="7" /> call should be used to perform this operation. This variable may take the value 0 where the size available for the screen is not known.
+</p>
+</subsection>
+
+<subsection title="VIDC Clock Speed (variable 172)">
+<p>
+This variable is no longer supported.
+</p>
+</subsection>
+
+<subsection title="Current display number (variable 192)">
+<p>
+The current display device number is readable using the <reference type="swi" name="OS_ReadVduVariables" /> call, as well as through the <reference type="swi" name="OS_ScreenMode" reason="B" /> operation.
+</p>
+</subsection>
+
+<subsection title="Poly-HLine function (variable 193)">
+<p>
+This variable provides the address of a routine which may be used to plot a number of horizontal line segments to the display in a similar manner to that of HLineAddr (variable 166, PRM 1-705). It is described under <reference type="entry" name="PolyHLine" />.
+</p>
+</subsection>
+
+</section>
+
+<section title="Entry Points">
+<entry-definition name="PolyHLine"
+                  description="Plot a number of horizontal line segments (VDU variable 193)"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="SVC"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to buffer containing:
+  <offset-table>
+   <offset number="0">Number of lines in buffer</offset>
+   <offset number="4">Left x coordinate of first line</offset>
+   <offset number="8">Y coordinate of first line</offset>
+   <offset number="12">Right x coordinate of first line</offset>
+   <offset number="16">Left x coordinate of second line</offset>
+   <offset number="20">Y coordinate of second line</offset>
+   <offset number="24">Right x coordinate of second line</offset>
+   <offset number="28">... and so on for each further line</offset>
+  </offset-table>
+ </register-use>
+ <register-use number="3">Colour action:
+  <value-table head-number="Value" head-value="Meaning">
+   <value number="0">Plot with no action</value>
+   <value number="1">Plot using foreground colour and action</value>
+   <value number="2">Invert current screen colour</value>
+   <value number="3">Plot using background colour and action</value>
+   <value number="&gt;3">Pointer to OR-EOR colour block</value>
+  </value-table>
+ </register-use>
+ <register-use number="14">Return address</register-use>
+</entry>
+<exit>
+ <register-use number="0-14" state="preserved"/>
+</exit>
+<use>
+<p>
+The routine must be entered in SVC mode. All registers are preserved.
+</p>
+
+<p>
+All coordinates are in terms of pixels from the bottom left of the screen. Each
+line will be clipped against the current graphics window. The caller should have
+called <reference type="swi" name="OS_RemoveCursors" /> before this call, and
+should call <reference type="swi" name="OS_RestoreCursors" /> after it.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ReadVduVariables" />
+<reference type="swi" name="OS_RemoveCursors" />
+<reference type="swi" name="OS_RestoreCursors" />
+</related>
+</entry-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the Poly-HLine buffer layout: the entry at +20 was described as the y coordinate of the first line, and is the y coordinate of the second line.</change>
+    <change>Corrected the colour action table: the original gave '&gt;4' for a pointer to an OR-EOR block, leaving the value 4 undefined; it is '&gt;3'.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
