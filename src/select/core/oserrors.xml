@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Hardware errors">
+<section title="Introduction and Overview">
+<p>
+Hardware errors are returned when a component of the system can no longer operate and must return a serious failure. The error numbers allocated all have their top 8 bits set to &amp;80 and are reserved in groups of 256. Consult PRM 1-43 for a fuller description.
+</p>
+</section>
+
+<section title="Error Messages">
+<p>
+The following groups are reserved :
+</p>
+<p><value-table head-number="Error numbers" head-value="Group">
+<value number="&amp;amp;80000000">Machine exceptions</value>
+<value number="&amp;amp;80000100">Coprocessor exceptions</value>
+<value number="&amp;amp;80000200">Floating point exceptions</value>
+<value number="&amp;amp;80000300">Econet exceptions</value>
+<value number="&amp;amp;80000400">Reserved</value>
+<value number="&amp;amp;80000500">Reserved for interpreted exceptions</value>
+</value-table></p><p>
+The error numbers used within the machine exceptions are as follows :
+</p>
+<p><value-table head-number="Error number" head-value="Meaning">
+<value number="&amp;amp;80000000">Undefined instruction</value>
+<value number="&amp;amp;80000001">Abort on instruction fetch</value>
+<value number="&amp;amp;80000002">Abort on data transfer</value>
+<value number="&amp;amp;80000003">Address exception (no longer returned by the OS)</value>
+<value number="&amp;amp;80000004">Unknown IRQ (no longer returned by the OS)</value>
+<value number="&amp;amp;80000005">Branch through zero</value>
+<value number="&amp;amp;80000006">Privileged mode stack corruption (detected by PBTS)</value>
+<value number="&amp;amp;80000007">Privileged mode stack overflow (abort due to sp below threshold)</value>
+<value number="&amp;amp;80000008">Privileged mode stack corrupt (abort due to sp outside valid range)</value>
+</value-table></p></section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
