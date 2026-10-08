@@ -1,0 +1,222 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="C99 low level support functions">
+<section title="Introduction and Overview">
+<p>
+The C99 low level support library (C99Low) provides a number of low level
+functions required by the C99 compiler and usable by other clients. The
+library has no data requirements. The library has a SharedCLibrary library
+chunk ID of 4.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="'long long' support">
+<p>
+A 'long long' is a 64bit value which can be signed or unsigned. It is
+represented by two 32bit little-endian words, with the low word stored first.
+When passed to functions, a 'long long' can be effectively represented as a
+structure thus:
+</p>
+<p><extended-example type="c">
+<userinput>typedef __value_in_regs struct longlong_s {long lo;</userinput><br/>
+<userinput>                                         unsigned long hi;</userinput><br/>
+<userinput>                                       } longlong_t;</userinput>
+</extended-example></p>
+<p>
+In this form, values are passed to functions as if there were two registers
+containing the lo and hi values.
+</p>
+
+<p>Many of the functions are suffixed with characters indicating the argument types:</p>
+
+<p><value-table head-number="Suffix" head-value="Argument type">
+<value number="l">A 64bit argument</value>
+<value number="s">A 32bit signed argument</value>
+<value number="u">A 32bit unsigned argument</value>
+</value-table></p>
+
+<p>
+Many of the 64bit operations are never referenced by the compiler. These
+operations can be placed inline and thus are never referenced.
+</p>
+</subsection>
+
+<subsection title="Calling conventions">
+<p>
+All functions within the library use APCS-R or APCS-32 (dependent on linkage)
+calling conventions, except where stated.
+</p>
+</subsection>
+</section>
+
+<section title="Functions">
+<p>
+The entry numbers are those of the entries within the C99Low library chunk.
+</p>
+<subsection title="Runtime allocation">
+
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="0" name="void *__rt_allocauto(int size);">Allocates a block of memory of the size specified for a Variable Length Array. The current implementation will not be automatically freed on return from the calling function. Clients using longjmp should take care to retain their own lists of allocated storage as it is not guaranteed to be tracked by the implementation. Returns a pointer to the allocated space.</value>
+<value number="1" name="__rt_freeauto">Frees a block of memory allocated by the __rt_allocauto function. This call will be automatically added by the compiler as automatically allocated storage goes out of scope.</value>
+</value-table></p>
+</subsection>
+<subsection title="Long long conversion operations">
+
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="2" name="long long _ll_from_u(unsigned long x);">Converts from a 32bit unsigned value to a 64bit value.</value>
+<value number="3" name="long long _ll_from_l(long x);">Converts from a 32bit signed value to a 64bit value.</value>
+<value number="4" name="long _ll_to_l(long long x);">Converts from a 64bit value to a 32bit value.</value>
+</value-table></p>
+</subsection>
+<subsection title="Arithmetic operations">
+<subsubsection title="Addition">
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="5" name="long long _ll_add(long long x, long long y);">64bit + 64bit</value>
+<value number="6" name="long long _ll_addlu(long long x, unsigned long y);">64bit + unsigned 32bit</value>
+<value number="7" name="long long _ll_addls(long long x, signed long y);">64bit + signed 32bit</value>
+<value number="8" name="long long _ll_adduu(unsigned long x, unsigned long y);">unsigned 32bit + unsigned 32bit</value>
+<value number="9" name="long long _ll_addss(signed long x, signed long y);">signed 32bit + signed 32bit</value>
+</value-table></p>
+<p>Adds the two arguments together and returns the result as a 64bit value.</p>
+</subsubsection>
+<subsubsection title="Subtraction">
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="10" name="long long _ll_sub(long long x, long long y);">64bit - 64bit</value>
+<value number="11" name="long long _ll_sublu(long long x, unsigned long y);">64bit - unsigned 32bit</value>
+<value number="12" name="long long _ll_subls(long long x, signed long y);">64bit - signed 32bit</value>
+<value number="13" name="long long _ll_subuu(unsigned long x, unsigned long y);">unsigned 32bit - unsigned 32bit</value>
+<value number="14" name="long long _ll_subss(signed long x, signed long y);">signed 32bit - signed 32bit</value>
+</value-table></p>
+<p>Subtracts the second argument from the first and returns the result as a 64bit value.</p>
+</subsubsection>
+<subsubsection title="Reverse subtraction">
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="15" name="long long _ll_rsb(long long x, long long y);">64bit, 64bit</value>
+<value number="16" name="long long _ll_rsblu(long long x, unsigned long y);">64bit, unsigned 32bit</value>
+<value number="17" name="long long _ll_rsbls(long long x, signed long y);">64bit, signed 32bit</value>
+<value number="18" name="long long _ll_rsbuu(unsigned long x, unsigned long y);">unsigned 32bit, unsigned 32bit</value>
+<value number="19" name="long long _ll_rsbss(signed long x, signed long y);">signed 32bit, signed 32bit</value>
+</value-table></p>
+<p>Subtracts the first argument from the second and returns the result as a 64bit value.</p>
+</subsubsection>
+<subsubsection title="Multiplication">
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="20" name="long long _ll_mul(long long x, long long y);">64bit &times; 64bit</value>
+<value number="21" name="long long _ll_mullu(long long x, unsigned long y);">64bit &times; unsigned 32bit</value>
+<value number="22" name="long long _ll_mulls(long long x, signed long y);">64bit &times; signed 32bit</value>
+<value number="23" name="long long _ll_muluu(unsigned long x, unsigned long y);">unsigned 32bit &times; unsigned 32bit</value>
+<value number="24" name="long long _ll_mulss(signed long x, signed long y);">signed 32bit &times; signed 32bit</value>
+</value-table></p>
+<p>Multiplies the arguments and returns the result as a 64bit value.</p>
+</subsubsection>
+<subsubsection title="Unsigned division">
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="25" name="__value_in_regs ulldiv_t _ll_udiv(unsigned long long x, unsigned long long y);">Divides x by y</value>
+<value number="26" name="__value_in_regs ulldiv_t _ll_urdv(unsigned long long x, unsigned long long y);">Divides y by x (reverse divide)</value>
+<value number="27" name="unsigned long long _ll_udiv10(unsigned long long x);">Divides x by 10</value>
+</value-table></p>
+<p>
+<code type="c">_ll_udiv</code> and <code type="c">_ll_urdv</code> divide an unsigned
+64bit value by another unsigned 64bit value and return the quotient and
+remainder as unsigned 64bit values. The result is returned in R0-R3.
+</p>
+<p><extended-example type="c">
+<userinput>{quotient , remainder} = _ll_udiv(x,y) = x/y</userinput><br/>
+<userinput>{quotient , remainder} = _ll_urdv(x,y) = y/x</userinput><br/>
+<userinput>typedef struct ulldiv_t { unsigned long long quot;</userinput><br/>
+<userinput>                       unsigned long long rem;</userinput><br/>
+<userinput>                     } ulldiv_t;</userinput>
+</extended-example></p>
+<p>
+<code type="c">_ll_udiv10</code> divides an unsigned 64bit value by 10 and returns the
+result as a 64bit value.
+</p>
+</subsubsection>
+<subsubsection title="Signed division">
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="28" name="__value_in_regs slldiv_t _ll_sdiv(signed long long x, signed long long y);">Divides x by y</value>
+<value number="29" name="__value_in_regs slldiv_t _ll_srdv(signed long long x, signed long long y);">Divides y by x (reverse divide)</value>
+<value number="30" name="signed long long _ll_sdiv10(signed long long x);">Divides x by 10</value>
+</value-table></p>
+<p>
+<code type="c">_ll_sdiv</code> and <code type="c">_ll_srdv</code> divide a signed
+64bit value by another signed 64bit value and return the quotient and
+remainder as signed 64bit values. The result is returned in R0-R3.
+</p>
+<p><extended-example type="c">
+<userinput>{quotient , remainder} = _ll_sdiv(x,y) = x/y</userinput><br/>
+<userinput>{quotient , remainder} = _ll_srdv(x,y) = y/x</userinput><br/>
+<userinput>typedef struct slldiv_t { long long quot;</userinput><br/>
+<userinput>                       long long rem;</userinput><br/>
+<userinput>                     } slldiv_t;</userinput>
+</extended-example></p>
+<p>
+<code type="c">_ll_sdiv10</code> divides a signed 64bit value by 10 and returns the
+result as a signed 64bit value.
+</p>
+</subsubsection>
+</subsection>
+<subsection title="Simple arithmetic operations">
+
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="31" name="long long _ll_not(long long x);">Returns the binary inverse of the argument.</value>
+<value number="32" name="long long _ll_neg(long long x);">Returns 0-x.</value>
+<value number="33" name="long long _ll_and(long long x, long long y);">Returns the binary AND of the two arguments.</value>
+<value number="34" name="long long _ll_or(long long x, long long y);">Returns the binary OR of the two arguments.</value>
+<value number="35" name="long long _ll_eor(long long x, long long y);">Returns the binary EOR of the two arguments.</value>
+<value number="36" name="long long _ll_shift_l(long long x, int n);">Returns a 64bit value shifted left by n bits. Negative values are not supported.</value>
+<value number="37" name="long long _ll_ushift_r(long long x, int n);">Returns a 64bit value shifted right by n bits. Negative values are not supported.</value>
+<value number="38" name="long long _ll_sshift_r(long long x, int n);">Returns a 64bit value arithmetically shifted right by n bits. Negative values are not supported.</value>
+</value-table></p>
+</subsection>
+<subsection title="Comparisons">
+<p>These functions do not follow the APCS conventions. The values to be compared are passed in registers.</p>
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="39" name="_ll_cmpu">Compares two 64bit values in R0,R1 and R2,R3. The comparison sets the processor flags in the same manner as 'CMP'. Does not follow APCS conventions.</value>
+<value number="40" name="_ll_cmpge">Compares two 64bit values in R0,R1 and R2,R3. The result is the same as 'SUBS first, first, second'. R0,R1 are corrupted by the subtraction. Does not follow APCS conventions.</value>
+<value number="41" name="_ll_cmple">Compares two 64bit values in R0,R1 and R2,R3. The result is the same as 'RSBS first, first, second'. R0,R1 are corrupted by the subtraction. Does not follow APCS conventions.</value>
+</value-table></p>
+</subsection>
+<subsection title="Floating point conversions">
+
+<p><value-table head-number="Entry" head-name="Function" head-value="Description">
+<value number="42" name="double _ll_uto_d(unsigned long long x);">Converts an unsigned 64bit value to a double value.</value>
+<value number="43" name="double _ll_sto_d(signed long long x);">Converts a signed 64bit value to a double value.</value>
+<value number="44" name="float _ll_uto_f(unsigned long long x);">Converts an unsigned 64bit value to a float value.</value>
+<value number="45" name="float _ll_sto_f(signed long long x);">Converts a signed 64bit value to a float value.</value>
+<value number="46" name="unsigned long long _ll_ufrom_d(double x);">Converts from a double to an unsigned 64bit value.</value>
+<value number="47" name="signed long long _ll_sfrom_d(double x);">Converts from a double to a signed 64bit value.</value>
+<value number="48" name="unsigned long long _ll_ufrom_f(float x);">Converts from a float to an unsigned 64bit value.</value>
+<value number="49" name="signed long long _ll_sfrom_f(float x);">Converts from a float to a signed 64bit value.</value>
+</value-table></p>
+</subsection>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Grouped the floating point conversion entries by the type they convert, as the original combined the descriptions of unrelated entries, and gave the unsigned division structure its own type.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
