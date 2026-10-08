@@ -48,7 +48,7 @@ services which must be monitored by various clients:
 <item><p>Clients of ResourceFS should monitor <reference type="service" name="ResourceFSStarted" href="?" /> and <reference type="service" name="ResourceFSDying" href="?" /> for either accessing or registering their files.</p></item>
 <item><p>Freeway resource using components should monitor <reference type="service" name="FreewayStarting" href="?" /> and <reference type="service" name="FreewayTerminating" href="?" /> to register their resources.</p></item>
 <item><p>Desktop extensions should monitor <reference type="service" name="RedrawManagerInstalled" href="?" /> and <reference type="service" name="RedrawManagerDying" href="?" /> if they use the RedrawManager.</p></item>
-<item><p>Display device driver support components should monitor <reference type="service" name="DisplayStatus" href="?" /> if they must track drivers.</p></item>
+<item><p>Display device driver support components should monitor <reference type="service" name="DisplayStatus" /> if they must track drivers.</p></item>
 <item><p>Toolbox objects should monitor <reference type="service" name="ToolboxStarting" href="?" /> and <reference type="service" name="ToolboxDying" href="?" /> to register their objects.</p></item>
 <item><p>ImageFileRender clients should monitor <reference type="service" name="ImageFileRender_Started" href="?" /> and <reference type="service" name="ImageFileRender_Dying" href="?" />.</p></item>
 <item><p>ImageFileConvert clients should monitor <reference type="service" name="ImageFileConvert_Started" href="?" /> and <reference type="service" name="ImageFileConvert_Dying" href="?" />.</p></item>
