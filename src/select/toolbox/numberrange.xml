@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="NumberRange gadget">
+<section title="Introduction and Overview">
+<p>
+The NumberRange gadget has, in the past, been a source of annoyance for developers because it has never consistently reported values of the range gadget within the bounds that have been set for it. The gadget has been updated with Window 1.85 to provide more reliable bounds to the application and to provide a useful input interface for users.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Bounding inconsistencies">
+<p>
+In the previous versions of the gadget, entering values into the writable field would result in an event being delivered to the application with the unbounded, raw value entered by the user. The new operation is to bound that value and report the new value to the application if it has changed. The text of the writable field is not updated, however. The displayed value of the field is updated when the user moves from the icon if it contains a value outside the bounds. The displayed value will be forced to show a value within the bounds when the gadget's value is read.
+</p>
+<p>
+This behaviour may appear to provoke an inconsistency between the value reported to the application. Indeed, the displayed value will differ from that which the application has received until it attempts to read the value directly. It can be seen that if the displayed value were always to be bounded then certain values for number ranges would become impossible to enter. An example of this class of impossible values could be obtained by using a lower bound of '5', upper bound of '12' and initial value of '5'. Deleting the '5' would result in an empty field, with a value of '0' - which would then be replaced immediately by '5' in order to reflect the boundaries. Thus it would be impossible to enter '10', '11', or '12' into the icon.
+</p>
+<p>
+The actual value displayed in the NumberRange is forced to correspond to bounds under the following circumstances :
+</p>
+<p><list>
+<item><p>Caret moves to another icon in the same window by keyboard navigation.</p></item>
+<item><p>Caret moves to another icon in the same window by clicking another icon.</p></item>
+<item><p>Caret moves to another icon in the same window by any application manipulating the caret.</p></item>
+<item><p>Caret moves to another icon in a different window by user clicking another icon.</p></item>
+<item><p>Caret moves to another icon in a different window by any application manipulating the caret (including the task itself, for example through Wimp_SetCaretPosition or Gadget_SetFocus).</p></item>
+<item><p>Icon is 'confirmed' by the user pressing the Return key.</p></item>
+<item><p>Application requests the value of the field using NumberRange_GetValue.</p></item>
+<item><p>Application changes the bounds of the field using NumberRange_SetBounds.</p></item>
+<item><p>Application updates the value in the field using NumberRange_SetValue.</p></item>
+</list></p><p><value-table head-number="Term" head-value="Meaning">
+<value number="'another icon'">Includes the '-1' case, where the icon is part of the window body.</value>
+<value number="'another window'">Includes the '-1' case, where the caret is associated with no window.</value>
+<value number="'any application'">Includes the task owning the gadget itself.</value>
+<value number="'manipulating the caret'">Includes the calls to Wimp_SetCaretPosition (in either its standard form, or the extended forms) and to any library provided calls which reduce to Wimp_SetCaretPosition (for example, Gadget_SetFocus).</value>
+</value-table></p><p>
+This change affects the following composite gadgets and components: Scale, PrintDBox, FontDBox.
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
