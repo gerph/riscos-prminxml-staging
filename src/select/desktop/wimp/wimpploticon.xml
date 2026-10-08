@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Wimp_PlotIcon">
+<section title="Introduction and Overview">
+<p>
+Wimp_PlotIcon has been extended to allow its use more reliably outside of the redraw loop, such as might be required for drawing icons during drag operations. These changes have been made to address a number of issues :
+</p>
+<p><list>
+<item><p>The new shaded icon operations fade sprites, backgrounds and buttons toward the background colour of the window; without information about the background colour, the fade would not function correctly outside of the redraw loop.</p></item>
+<item><p>Without information about the window, sprites rendered from an area associated with a window would generate an error when used outside the redraw loop.</p></item>
+<item><p>A future version of the Window Manager may provide facilities for highlighting of icons when the pointer is over them. The changes allow for this to be indicated.</p></item>
+</list></p><p>
+The call has been extended in a similar manner to other Wimp SWI extensions, using a magic word in a previously unused register. In order to allow flexibility without requiring additional magic values, a flags word is used to indicate the extra facilities required. Under systems which use earlier versions of the WindowManager the behaviour will be unaffected by the new flags, however where sprites are taken from a private pool supplied in the extensions the operation will be faulted. Where such operations are expected, alternate measures should be taken to ensure the correct rendering of icons is performed.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="Wimp_PlotIcon"
+                number="400E2"
+                description="Plot an icon, optionally outside of the redraw loop"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="1">Pointer to icon block</register-use>
+ <register-use number="2">&amp;5441534B ('KSAT')</register-use>
+ <register-use number="3">Context flags:
+  <bitfield-table>
+ <bit number="0">If set: R6 contains background colour and R7 contains sprite area. If clear: R6 contains a window handle to use for the colours and sprite area</bit>
+ <bit number="1">If set: icon should be treated as if the pointer were over it. If clear: icon should be treated as if the pointer were elsewhere</bit>
+ <bit number="2-31">Reserved, must be 0</bit>
+</bitfield-table></register-use>
+ <register-use number="4">X origin to offset icon by (if outside redraw loop)</register-use>
+ <register-use number="5">Y origin to offset icon by (if outside redraw loop)</register-use>
+ <register-use number="6">Window handle to use as context, or background colour</register-use>
+ <register-use number="7">Sprite area</register-use>
+</entry>
+<exit>
+ <register-use number="0">Corrupted</register-use>
+ <register-use number="2">0</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to plot an icon. If used within a redraw loop the origin will be that given by the window. If used outside a redraw loop the origin must be supplied by the user. The context flags provide information about the context under which the icon is being rendered.
+</p>
+<p>
+<strong>Note:</strong> Under earlier versions of the Window Manager this extension was incorrectly implemented. The incorrect form could have undefined effects when used outside a redraw loop. In order to address this problem, the value used as a magic word has been changed, and the order of registers corrected.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
