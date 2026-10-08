@@ -1,0 +1,85 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="VideoGuard">
+<section title="Introduction">
+<p>
+The VideoGuard module provides protection against the user being left with no display due to an absent display driver. In normal use the system is actively displaying graphics on a display that is currently present. Under some circumstances, however, it is possible for the system to be using a display device which is absent. The two circumstances under which this can occur are :
+</p>
+
+<p>
+<strong>System startup</strong>
+</p>
+<p>
+If the system has been configured to use a display device but no such device is yet present there is no useful display to use. This is the case during the early system initialisation before the display driver has initialised. Such cases will not usually be visible to users. More commonly, however, the system may be configured to use device 1, which is present on an expansion card but the card has been removed. Usually this can be over-ridden by holding the '0' key during system startup (see the ResetTypes document for more details).
+</p>
+
+<p>
+<strong>Device driver removal</strong>
+</p>
+<p>
+If the display driver for the current display is killed then the display no longer exists. This is uncommon, but may occur during testing. Future device drivers may be dynamic and thus may provide devices which come and go as necessary.
+</p>
+<p>
+When the current display driver is removed, or not present during the system startup, the graphics system takes no additional action except to mark the frame buffer as absent. The address of the screen will be read as 0. Graphics drivers should check for this case.
+</p>
+<p>
+The VideoGuard module will recover from these circumstances by selecting the native (display 0) device.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+The VideoGuard module monitors the display services (see the <reference type="document" href="multidrivers" name="Display changes" /> document) in order to detect the removal of a device. When a device is removed, or started, the VideoGuard module will restart its checks for the current display being valid. If the display is not valid the VideoGuard module will become active. If the display is valid, the VideoGuard module will deactivate itself.
+</p>
+<p>
+When active, the module monitors the keyboard input routines (<userinput>OS_Byte &amp;79</userinput>, <userinput>&amp;7A</userinput>, <userinput>&amp;81</userinput> and <userinput>OS_ReadC</userinput>) and the Wimp error box service. If these are called and the display is valid, the module will become inactive. Alternatively if they are called in a manner which indicates that the system will be waiting for user input the system will attempt to switch to the native device.
+</p>
+<p>
+In order to be deemed to be waiting for a user input one of the following conditions must be true :
+</p>
+<p><list>
+<item><p><userinput>OS_ReadC</userinput> called</p></item>
+<item><p>Error box being displayed</p></item>
+<item><p><userinput>OS_Byte &amp;81</userinput> to read key within time limit, where the time limit is cumulatively greater than 2 seconds</p></item>
+<item><p><userinput>OS_Byte &amp;79</userinput>, <userinput>&amp;7A</userinput>, <userinput>&amp;81</userinput> to perform a keyboard scan, within 5cs of a previous operation, repeatedly for 2 seconds.</p></item>
+</list></p><p>
+This will trap the majority of cases where the system is idle waiting for user input and no driver is present whilst allowing activity to take place (such as may occur during the boot sequence) where the system is expecting a driver to be loaded.
+</p>
+<p>
+Once the VideoGuard module has detected a case where the system is waiting for input in this way it will attempt to force the display to the native driver. How this is achieved depends on whether the desktop is active or not :
+</p>
+<p><list>
+<item><p>When within the desktop, the Wimp mode will be reset to the current mode. This will force a full redraw of the screen and ensures that the desktop mode matches the last used mode for the display driver.</p></item>
+<item><p>When outside the desktop, the VDU4 and VDU5 cursors will be split (VDU4), the text and graphics windows will be reset (VDU26) and the screen cleared (VDU12). A Ctrl-@ character will be inserted into the keyboard buffer. This may hint to menu interfaces that they should update their display, even if this is only to display 'invalid input' and provide some feedback to the user of the current state. The text 'Display device &lt;number&gt; unavailable, selecting native display device' is also displayed at the top of the screen. This should ensure that the change is noticed by the user should the ctrl-@ operation have no effect.</p></item>
+</list></p><p>
+The recovery from a failed display driver is never going to be ideal, but this behaviour has been determined from user feedback and regular use. It has been found to be suitable for most cases where the video driver is not present, particularly with regard to the absent expansion card.
+</p>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
