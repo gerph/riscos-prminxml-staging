@@ -1,0 +1,324 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Abort trapping">
+<section title="Introduction">
+<p>
+In order to provide for more extensible memory area handling and to allow more non-core functions to move out of the kernel, the handlers for trapping aborts have now been completed. These handlers were planned and designed for RISC OS 4 but were incomplete and had been deferred until they could be finished. The SWI OS_AbortTrap allows areas of memory to be associated with a handler. These handlers may be used to provide a demand page mapping system of the users choice.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Implementation details">
+<p>
+The registration system allows contiguous regions of memory to be associated with abort handlers. Each region is defined by a low and a high address. If a data abort occurs between these addresses, the handler will be invoked. The handler is expected to perform the aborted data transfer and return with the V flag clear, or if this is not possible then return an error by the normal mechanism. Usually the handler will first map in the relevant page.
+</p>
+<p>
+The Kernel will have pre-decoded the instruction which caused the abort in order to decide what operation is being performed upon the memory. The operation type (whether it is a read, or a write) and user privilege on execution will be flagged to the handler. Block data transfers (for example caused by LDM and STM instructions) will also have been decoded by the Kernel. The handler must only satisfy the data transfer to a temporary memory block. For load operations (block and single register), the Kernel will marshal the temporary block into the relevant registers once the handler has returned.
+</p>
+<p>
+If the region of memory handled by a registered AbortTrap is not known to the Kernel (i.e. it is not a 'aborting' mapped dynamic area) - for example a sparse dynamic area whose unmapped regions will be mapped on demand - it will be necessary for the handler to also provide a Service_ValidateAddress entry point. Refer to the PRMs for more details on this service call, and to the example below for an implementation.
+</p>
+<p>
+The Kernel can handle multiple claimants of AbortTrap regions. When a Dynamic Areas creation requests that the region handle aborts within its region (see the abort trapping dynamic areas document) it is handled by a veneer registered through the OS_DynamicArea creation code. It is strongly recommended that clients use the OS_DynamicArea abort trapping rather than directly implementing an AbortTrap region.
+</p>
+</subsection>
+
+<subsection title="Example code">
+<p>
+Because Service_ValidateAddress has no knowledge of the internal construct used by external AbortTrap handlers, it will be necessary that parties interested in unmapped regions perform checks in addition to those for just their region. Assuming a single area is provided by a module, the region being validated may be in one of 4 memory locations :
+</p>
+<p><list type="ordered">
+<item><p>Requested region totally outside our area.</p></item>
+<item><p>Requested region totally inside our area (including spanning the whole area).</p></item>
+<item><p>Requested region partially overlaps our area (overlaps the start, or the end of our area).</p></item>
+<item><p>Requested region totally encloses our area.</p></item>
+</list></p>
+<p>
+The ValidateAddress service does not allow for partitioning of space. It may require further processing by other such clients once a part of the region has been validated. In order to achieve this, the regions which are outside the controlled area must be re-parsed by the OS_ValidateAddress in order to decide on the behaviour.
+</p>
+<p>
+The following C code implements such a validation scheme for a single handled region. Clients with multiple regions may apply a similar method once they have determined the region within which the validation falls. Clients with multiple regions may wish to recheck the regions before issuing the OS_ValidateAddress in case a continuous area spanning multiple regions has been requested. This optimisation may not be significant in practice, however.
+</p>
+<p>
+Within this code, the following is assumed:
+</p>
+<p><list>
+<item><p>Standard CMHG service entry sequence is used.</p></item>
+<item><p>area_start is the inclusive start address of the region being managed by this code.</p></item>
+<item><p>area_end is the exclusive end address of the region being managed by this code.</p></item>
+<item><p>dprintf is a printf-like function used for debugging.</p></item>
+</list></p><p><extended-example type="c">
+<userinput>/***************************************************************************</userinput><br/>
+<userinput> * Function:     Mod_Service</userinput><br/>
+<userinput> * Description:  Service call handler routine. All services which are being</userinput><br/>
+<userinput> *               received by the module will be passed to this routine.</userinput><br/>
+<userinput> * Parameters:   service = service call number</userinput><br/>
+<userinput> *               r       = pointer to register block on entry</userinput><br/>
+<userinput> *               pw      = private word for module</userinput><br/>
+<userinput> * On exit:      Update register values on return by updating r.</userinput><br/>
+<userinput> **************************************************************************/</userinput><br/>
+<userinput>void Mod_Service(int service, _kernel_swi_regs *r, void *pw)</userinput><br/>
+<userinput>{</userinput><br/>
+<userinput>  switch (service)</userinput><br/>
+<userinput>  {</userinput><br/>
+<userinput>    case Service_ValidateAddress: /* PRM1-362 */</userinput><br/>
+<userinput>      {</userinput><br/>
+<userinput>        unsigned long a = (unsigned long)r-&gt;r[2];</userinput><br/>
+<userinput>        unsigned long b = (unsigned long)r-&gt;r[3];</userinput><br/>
+<userinput>        dprintf("ValidateAddress: %08lx - %08lx\n", a, b);</userinput><br/>
+<userinput>        /*</userinput><br/>
+<userinput>                 area_start          area_end</userinput><br/>
+<userinput>             _____________|__________|_________________</userinput><br/>
+<userinput>            |             |   OURS   |                 |</userinput><br/>
+<userinput>            +------------------------------------------+</userinput><br/>
+<userinput>                 |    |_____|     |______|   |</userinput><br/>
+<userinput>                 |   a   1   b   a    2   b  |</userinput><br/>
+<userinput>                 |___________________________|</userinput><br/>
+<userinput>                a             3               b</userinput><br/>
+<userinput>           ALL:   a &lt; area_end</userinput><br/>
+<userinput>                  b &gt; area_start</userinput><br/>
+<userinput>           1:   1a &lt; area_start, 1b &gt; area_start</userinput><br/>
+<userinput>                Extra region: 1a to area_start</userinput><br/>
+<userinput>           2:   2a &lt; area_end,   2b &gt; area_end</userinput><br/>
+<userinput>                Extra region: area_end to 2b</userinput><br/>
+<userinput>           3:   3a &lt; area_start, 3b &gt; area_end</userinput><br/>
+<userinput>                Extra region: 3a to area_start</userinput><br/>
+<userinput>                              area_end to 3b</userinput><br/>
+<userinput>           We split this into a check for enclosing the region (ALL),</userinput><br/>
+<userinput>           then checking whether 1 (or 3) applies and validating that</userinput><br/>
+<userinput>           region,</userinput><br/>
+<userinput>           then checking whether 2 (or 3) applies and validating that</userinput><br/>
+<userinput>           region.</userinput><br/>
+<userinput>           If the tests all pass, the memory's valid.</userinput><br/>
+<userinput>         */</userinput><br/>
+<userinput>        if (a &lt; area_end &amp;&amp;</userinput><br/>
+<userinput>            b &gt; area_start)</userinput><br/>
+<userinput>        {</userinput><br/>
+<userinput>          /* 'ALL' applies - ie the region requested encloses (possibly</userinput><br/>
+<userinput>             partially) our area.</userinput><br/>
+<userinput>           */</userinput><br/>
+<userinput>          _kernel_oserror *err;</userinput><br/>
+<userinput>          int flags;</userinput><br/>
+<userinput>          dprintf("  encloses our area\n");</userinput><br/>
+<userinput>          /* Check extra region 1 (applies to 3 as well) */</userinput><br/>
+<userinput>          if (a &lt; area_start)</userinput><br/>
+<userinput>          {</userinput><br/>
+<userinput>            dprintf("  need to validate %08lx - %08lx (LEFT)\n", a, area_start);</userinput><br/>
+<userinput>            err = _swix(OS_ValidateAddress, _INR(0,1) | _OUT(_FLAGS),</userinput><br/>
+<userinput>                                            a, area_start, &amp;flags);</userinput><br/>
+<userinput>            if (err || (flags &amp; _C))</userinput><br/>
+<userinput>            {</userinput><br/>
+<userinput>              /* It didn't pass this before region test, so the region</userinput><br/>
+<userinput>                 is not valid.</userinput><br/>
+<userinput>               */</userinput><br/>
+<userinput>              dprintf("*Failed LEFT*\n");</userinput><br/>
+<userinput>              return;</userinput><br/>
+<userinput>            }</userinput><br/>
+<userinput>          }</userinput><br/>
+<userinput>          /* Check extra region 2 (applies to 3 as well) */</userinput><br/>
+<userinput>          if (b &gt; area_end)</userinput><br/>
+<userinput>          {</userinput><br/>
+<userinput>            dprintf("  need to validate %08lx - %08lx (RIGHT)\n", area_end, b);</userinput><br/>
+<userinput>            err = _swix(OS_ValidateAddress, _INR(0,1) | _OUT(_FLAGS),</userinput><br/>
+<userinput>                                            area_end, b, &amp;flags);</userinput><br/>
+<userinput>            if (err || (flags &amp; _C))</userinput><br/>
+<userinput>            {</userinput><br/>
+<userinput>              /* It didn't pass this after region test, so the region</userinput><br/>
+<userinput>                 is not valid.</userinput><br/>
+<userinput>               */</userinput><br/>
+<userinput>              dprintf("*Failed RIGHT*\n");</userinput><br/>
+<userinput>              return;</userinput><br/>
+<userinput>            }</userinput><br/>
+<userinput>          }</userinput><br/>
+<userinput>          /* The region covers our area AND the left and right region</userinput><br/>
+<userinput>             checks have come up as valid so the whole region is</userinput><br/>
+<userinput>             valid. Phew! */</userinput><br/>
+<userinput>          r-&gt;r[1] = 0; /* Region is valid */</userinput><br/>
+<userinput>          dprintf("*Region is valid*\n");</userinput><br/>
+<userinput>          return;</userinput><br/>
+<userinput>        }</userinput><br/>
+<userinput>      }</userinput><br/>
+<userinput>      break;</userinput><br/>
+<userinput>  }</userinput><br/>
+<userinput>}</userinput>
+</extended-example></p><p>
+The AbortTrap handler code should perform the copy operations necessary to satisfy the transfer request. This can be performed using a single 'memcpy' instruction for each direction. As above, the dprintf function is used to provide debugging on the abort. In addition, the 'page_in' function is expected to perform the paging operation and either return NULL or an error pointer. Because the error pointer will be discarded on return by the Kernel the error block is not relevant. The CMHG veneer ensures that V is set if a non-NULL value is returned.
+</p>
+<p><extended-example type="c">
+<userinput>/***************************************************************************</userinput><br/>
+<userinput> * Function:     Abort_Handler</userinput><br/>
+<userinput> * Description:  Generic handler function</userinput><br/>
+<userinput> * Parameters:   r  = pointer to register block on entry</userinput><br/>
+<userinput> *               pw = private word for module</userinput><br/>
+<userinput> * On exit:      Update r to alter return values</userinput><br/>
+<userinput> *               Return NULL to return with V clear</userinput><br/>
+<userinput> *               Return an error pointer to set V and r0</userinput><br/>
+<userinput> **************************************************************************/</userinput><br/>
+<userinput>_kernel_oserror *Abort_Handler(_kernel_swi_regs *r, void *pw)</userinput><br/>
+<userinput>{</userinput><br/>
+<userinput>  _kernel_oserror *err;</userinput><br/>
+<userinput>#define ABORT_TYPE_MASK   (15&lt;&lt;0)</userinput><br/>
+<userinput>#define ABORT_TYPE_STORE  (0&lt;&lt;0)</userinput><br/>
+<userinput>#define ABORT_TYPE_LOAD   (1&lt;&lt;0)</userinput><br/>
+<userinput>#define ABORT_SVC    (1&lt;&lt;4)</userinput><br/>
+<userinput>  unsigned long flags = (unsigned long)r-&gt;r[0];</userinput><br/>
+<userinput>  unsigned long start = (unsigned long)r-&gt;r[2];</userinput><br/>
+<userinput>  unsigned long size = (unsigned long)r-&gt;r[3];</userinput><br/>
+<userinput>  unsigned long block = (unsigned long)r-&gt;r[1];</userinput><br/>
+<userinput>  dprintf("\n\nABORT: flags = %08lx\n", flags);</userinput><br/>
+<userinput>  dprintf(    "       start = %08lx\n", start);</userinput><br/>
+<userinput>  dprintf(    "       size  = %08lx\n", size);</userinput><br/>
+<userinput>  dprintf(    "       block = %08lx\n", block);</userinput><br/>
+<userinput>  err = page_in(start, size);</userinput><br/>
+<userinput>  if (err)</userinput><br/>
+<userinput>  {</userinput><br/>
+<userinput>    dprintf("Abort page in failed: %s\n", err-&gt;errmess);</userinput><br/>
+<userinput>    return err;</userinput><br/>
+<userinput>  }</userinput><br/>
+<userinput>  switch (flags &amp; ABORT_TYPE_MASK)</userinput><br/>
+<userinput>  {</userinput><br/>
+<userinput>    case ABORT_TYPE_LOAD:</userinput><br/>
+<userinput>      memcpy((void *)block, (void *)start, size);</userinput><br/>
+<userinput>      break;</userinput><br/>
+<userinput>    case ABORT_TYPE_STORE:</userinput><br/>
+<userinput>      memcpy((void *)start, (void *)block, size);</userinput><br/>
+<userinput>      break;</userinput><br/>
+<userinput>    default:</userinput><br/>
+<userinput>      dprintf("Unsupported operation type %i\n", flags &amp; ABORT_TYPE_MASK);</userinput><br/>
+<userinput>      return err_Unsupported;</userinput><br/>
+<userinput>  }</userinput><br/>
+<userinput>  dprintf("AbortTrap satisfied\n");</userinput><br/>
+<userinput>  return NULL;</userinput><br/>
+<userinput>}</userinput>
+</extended-example></p></subsection>
+
+<subsection title="Caveats">
+<p>
+The following caveats should be noted when using the Abort trapping interfaces:
+</p>
+<p><list>
+<item><p>Hardware FPU operations not supported. Software FPE will function correctly because all the transfers degrade to standard LDR/STR or LDM/STM operations, with the exception of the LDRT/STRT operations.</p></item>
+<item><p>Half-word operations (LDR[S]H/STR[S]H) are not supported</p></item>
+</list></p></subsection>
+
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_AbortTrap"
+                number="67"
+                description="Register or deregister an AbortTrap handler"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Operation:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Register handler</value>
+ <value number="1">Deregister handler</value>
+ <value number="2+">Reserved</value>
+</value-table></register-use>
+ <register-use number="1">Low address (inclusive)</register-use>
+ <register-use number="2">High address (exclusive)</register-use>
+ <register-use number="3">Pointer to address to call to handle aborts</register-use>
+ <register-use number="4">Value to pass in R12 when calling handler address</register-use>
+</entry>
+<exit>
+ <register-use number="0-4">Preserved</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to register or deregister an AbortTrap handler. The SWI will return an error if the operation requested is invalid. This SWI is not implemented prior to Kernel version 6.61.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+<section title="Entry Points">
+<entry-definition name="AbortTrapHandler"
+                  description="AbortTrap handler called for an access to unmapped memory"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="SVC"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+ <bit number="0-3">Operation type:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">The operation was a 'store' (transfer from block at R1 to memory)</value>
+ <value number="1">The operation was a 'load' (transfer from memory to block at R1)</value>
+ <value number="2-15">Reserved for future expansion</value>
+</value-table></bit>
+ <bit number="4">Operation mode:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">The operation was performed in user mode</value>
+ <value number="1">The operation was performed in a privileged mode</value>
+</value-table></bit>
+ <bit number="5-31">Reserved</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Address into which the transfer should be performed</register-use>
+ <register-use number="2">Address of memory required by the abort</register-use>
+ <register-use number="3">Size of memory required by the abort (this may be 1, 2, 4, or any multiple of 4 up to 64)</register-use>
+</entry>
+<exit>
+ <register-use number="0-3" state="preserved" />
+</exit>
+<use>
+<p>
+All registers are preserved if the operation completed successfully. V is set if it failed, with R0 pointing to an error block.
+</p>
+<p>
+The AbortTrap Handler will be called when an operation is performed on memory which does not exist. The handler should map in the memory, perform the transfer and return, or set the V flag and return. The handler may cause other areas of memory to be mapped out.
+</p>
+<p>
+Once mapped in, the handler performs a transfer itself by copying from the address pointed to by R2 to the address pointed to by R1, for R3 bytes.
+</p>
+<p>
+Handlers may choose to omit the mapping in of a real page of memory. In such cases, the region will remain unmapped and subsequent operations on it will result in further calls to the AbortTrap handler.
+</p>
+<p>
+If the error block contains an error number for a hardware error (ie bit 31), it will be returned through the error generation mechanism rather than through the abort handler. In other words, it is similar to the instruction which faulted having been an error returning SWI. The exception registers and abort stack copies will still take place in this case. However, if the error is not claimed by ErrorV or the environment handler, an explicit OS_Exit will be issued.
+</p>
+<p>
+A SWP instruction will be processed as a load followed by a store operation.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_AbortTrap" />
+</related>
+</entry-definition>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected 'priveledge' to 'privilege', 'to the example before' to 'below', 'OS_Validate address' to 'OS_ValidateAddress', and 'non-NULL valid' to 'non-NULL value'. The code examples, which the captured HTML had flattened, were restored from the original documentation text.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
