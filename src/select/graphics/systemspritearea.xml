@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+
+<chapter title="System sprite pool">
+
+<section title="Overview">
+<p>The system sprite pool is no longer controlled by the kernel. The area is now under the control of the SpriteUtils module.</p>
+<p>The system sprite area should not be used by modern applications, and the changes described here should not affect recent software. Applications which need the size of the area should use <reference type="swi" name="OS_DynamicArea" reason="2" />, which reads the information for a dynamic area.</p>
+</section>
+
+<section title="OS_Byte 163, 242, 65">
+<p>This call no longer returns the size of the system sprite area.</p>
+<p><extended-example type="format">
+On entry:<br/>
+<userinput>R0 = 163</userinput><br/>
+<userinput>R1 = 242</userinput><br/>
+<userinput>R2 = 65</userinput><br/>
+On exit:<br/>
+<userinput>R1 = packed information (see PRM 1-655)</userinput><br/>
+<userinput>R2 = 0</userinput>
+</extended-example></p>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
