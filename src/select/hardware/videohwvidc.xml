@@ -1,0 +1,121 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Acceleration and support provided by VideoHWVIDC">
+<section title="Introduction and Overview">
+<p>
+The VideoHWVIDC module 0.48 provides hardware access for the native VIDC20 hardware used in RiscPC, A7000 and RiscStation hardware. The acceleration provided is described below. It covers the vast majority of common operations which are used by applications. The operations are broken down into the core components for the abstracted video system.
+</p>
+<p>
+All features which are not supported by the hardware driver will be deferred to the software driver which will use direct screen access to provide the required operation, or update its internal state.
+</p>
+<p>
+Glossary :
+</p>
+<p><value-table head-number="Term" head-value="Meaning">
+<value number="'Not supported'">The hardware driver does not provide any facilities for this feature; it will be passed to the software driver.</value>
+<value number="'Supported'">The hardware driver provides this facility but it does not gain from specialised hardware features for faster operation.</value>
+<value number="'Accelerated'">The hardware driver provides this facility and uses specialised hardware features to avoid direct screen access.</value>
+</value-table></p></section>
+
+<section title="Technical Details">
+<subsection title="Text (VDU4-style text output)">
+<p><value-table head-number="Operation" head-value="Support">
+<value number="VideoV_Text_ChangeDestination">Not supported</value>
+<value number="VideoV_Text_DefineChar">Not supported</value>
+<value number="VideoV_Text_SetTextColour">Not supported</value>
+<value number="VideoV_Text_WriteTextChar">Not supported</value>
+<value number="VideoV_Text_TextCursor">Not supported</value>
+<value number="VideoV_Text_ClearBox">Not supported</value>
+</value-table></p></subsection>
+
+<subsection title="VDU graphics operations">
+<p><value-table head-number="Operation" head-value="Support">
+<value number="VideoV_Graf_SetColour1">Not supported</value>
+<value number="VideoV_Graf_SetColour2">Not supported</value>
+<value number="VideoV_Graf_ChangeDestination">Not supported</value>
+<value number="VideoV_Graf_ChangeBase">Not supported</value>
+<value number="VideoV_Graf_ReadPrimitives">Not supported</value>
+<value number="VideoV_Graf_Rectangle">Not supported</value>
+<value number="VideoV_Graf_Triangle">Not supported</value>
+<value number="VideoV_Graf_Parallelogram">Not supported</value>
+<value number="VideoV_Graf_BlockCopy">Not supported</value>
+<value number="VideoV_Graf_CircleOutline">Not supported</value>
+<value number="VideoV_Graf_CircleFill">Not supported</value>
+<value number="VideoV_Graf_CircleArc">Not supported</value>
+<value number="VideoV_Graf_CircleSegment">Not supported</value>
+<value number="VideoV_Graf_CircleSector">Not supported</value>
+<value number="VideoV_Graf_EllipseOutline">Not supported</value>
+<value number="VideoV_Graf_EllipseFill">Not supported</value>
+<value number="VideoV_Graf_FillRight">Not supported</value>
+<value number="VideoV_Graf_FillLeftAndRight">Not supported</value>
+<value number="VideoV_Graf_FillFlood">Not supported</value>
+<value number="VideoV_Graf_PolyHLine">Not supported</value>
+</value-table></p></subsection>
+
+<subsection title="Graphics primitives">
+<p><value-table head-number="Operation" head-value="Support">
+<value number="HLine">Not supported</value>
+<value number="VLine">Not supported</value>
+<value number="Point">Not supported</value>
+</value-table></p></subsection>
+
+<subsection title="Mouse pointer operations">
+<p><value-table head-number="Operation" head-value="Support">
+<value number="VideoV_Pointer_Define">Supported</value>
+<value number="VideoV_Pointer_Select">Supported</value>
+<value number="VideoV_Pointer_Update">Supported</value>
+<value number="VideoV_Pointer_Remove">Supported</value>
+<value number="VideoV_Pointer_SetPalette">Supported</value>
+</value-table></p></subsection>
+
+<subsection title="Mode / screen operations">
+<p><value-table head-number="Operation" head-value="Support">
+<value number="VideoV_Mode_VetMode">Supported</value>
+<value number="VideoV_Mode_SetMode">Supported</value>
+<value number="VideoV_Mode_Scroll">Accelerated through frame base scroll</value>
+<value number="VideoV_Mode_SetPalette">Supported</value>
+<value number="VideoV_Mode_Enable">Supported</value>
+<value number="VideoV_Mode_Disable">Supported</value>
+<value number="VideoV_Mode_PowerSave">Supported</value>
+<value number="VideoV_Mode_SetRGBTable">Supported</value>
+<value number="VideoV_Mode_AccelConfigure">Supported</value>
+<value number="VideoV_Mode_AccelControl">Supported</value>
+<value number="VideoV_Mode_DisplaySelect">Supported</value>
+<value number="VideoV_Mode_BankCount">Supported</value>
+<value number="VideoV_Mode_BankDisplay">Supported</value>
+<value number="VideoV_Mode_BankDriver">Supported</value>
+<value number="VideoV_Mode_BankCopy">Not supported</value>
+<value number="VSync IRQ provision">Supported</value>
+<value number="Monitor EDID acquisition">Not supported</value>
+</value-table></p></subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
