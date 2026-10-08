@@ -6,7 +6,7 @@
 <chapter title="ZapRedraw">
 <section title="Introduction and Overview">
 
-<p>This document describes ZapRedraw 0.41 (13th November 2001).</p>
+<p>This document describes ZapRedraw 0.48 (2005).</p>
 
 <p>This document is in Request-For-Comments release 7; it is <strong>not a
 definitive release</strong>.</p>
@@ -64,7 +64,6 @@ changing, font sub-styles, and reduces DSA/VDU mode differences.</item>
     <item><fixme>The extensions for ZapRedraw_RedrawArea are essentially entrypoints with
         reason codes, so could be restructured to use the entry-definition format.</fixme></item>
     <item><fixme> Related APIs aren't linked at all</fixme></item>
-    <item><fixme> Update the documentation with the modern details.</fixme></item>
 </list>
 </p>
 </section>
@@ -198,9 +197,10 @@ address.</item>
   <offset number="92" name="r_xsize">Width of screen in pixels.</offset>
   <offset number="96" name="r_ysize">Height of screen in pixels.</offset>
   <offset number="100" name="r_mode">Current screen mode.</offset>
-  <offset number="104" name="r_length">OPTIONAL (see <sysvar>r_flags</sysvar> bit 6). Last used offset in the block (eg. set it to <sysvar>r_tmargin</sysvar>)</offset>
-  <offset number="108" name="r_lmargin">OPTIONAL (see <sysvar>r_flags</sysvar> bit 6). Number of pixels to leave blank at the left.</offset>
-  <offset number="112" name="r_tmargin">OPTIONAL (see <sysvar>r_flags</sysvar> bit 6). Number of pixels to leave blank at the top.</offset>
+  <offset number="104" name="r_length">OPTIONAL (see <sysvar>r_flags</sysvar> bit 6). The offset of the last field in the block which you have supplied (eg. set it to <sysvar>r_tmargin</sysvar> if you supply the margins but not <sysvar>r_encoding</sysvar>). Fields beyond this offset are not read.</offset>
+  <offset number="108" name="r_lmargin">OPTIONAL (see <sysvar>r_flags</sysvar> bit 6). Number of pixels to leave blank at the left. The margin is drawn in the colours in force for the first character of the line, and <reference type="swi" name="ZapRedraw_GetRectangle" /> subtracts it from <sysvar>r_scrollx</sysvar>.</offset>
+  <offset number="112" name="r_tmargin">OPTIONAL (see <sysvar>r_flags</sysvar> bit 6). Number of pixels to leave blank at the top. The margin is drawn in the background colour <sysvar>r_bac</sysvar>, and <reference type="swi" name="ZapRedraw_GetRectangle" /> subtracts it from <sysvar>r_scrolly</sysvar>.</offset>
+  <offset number="116" name="r_encoding">OPTIONAL (see <sysvar>r_flags</sysvar> bit 6). Encoding handle, as returned by <reference type="swi" name="ZapRedraw_Encoding" />, which <reference type="swi" name="ZapRedraw_PrepareDataLine" /> uses to translate the text it is given. 0 means that no translation is done. Only read if <sysvar>r_length</sysvar> is at least this offset.</offset>
 </offset-table></p>
 </subsection>
 
@@ -256,15 +256,17 @@ address.</item>
 <subsection title="Format of text to display (r_data)">
 <p>This block contains the text to be printed on the screen. There should be sufficient text here to redraw the specified area of the screen (given its size, the scroll offset, character sizes etc). Terminating each line with the bytes 0,2 will ensure the redraw doesn't run out of text horizontally and terminating the line list with a zero will ensure the same vertically. The value in <sysvar>r_data</sysvar> points to a list of words. The n'th word in the list is the offset (from the block data start) of the n'th line of text to be printed in the window. This list can be terminated by a 0 offset in which case all further lines will be cleared to background colour (<sysvar>r_bac</sysvar>).</p>
 
-<p>The data for each line consists of a string of bytes giving the characters to print. By character number 'n' will I mean the n'th (n starting from 0) bitmap in your character cache in DSA mode or the character with ASCII code 'n' in VDU redraw mode. The Redraw module does not limit n to the range 0-255 but also allows higher values. Currently you can access 0-65535. Of course, ASCII characters for the codes 0-31 and 256-65535 are not defined. Zap treats these specially - see below.</p>
+<p>The data for each line consists of a string of bytes giving the characters to print. By character number 'n' is meant the n'th (n starting from 0) bitmap in your character cache in DSA mode, or the character with code 'n' in VDU redraw mode.</p>
 
-<p>The byte 0 in the data for a line introduces a control code. Bytes 1-255 just print characters n = 1-255 as normal so you will need to use control codes to access characters &ge; 256. The currently defined control sequences are:</p>
+<p>The byte 0 in the data for a line introduces a control code. Bytes 1-255 just print characters n = 1-255 as normal, within the current <strong>chunk</strong> of 256 characters. The chunk is chunk 0 (characters 0-255) at the start of each line, and is changed by the control codes 0,11 and 0,12, so that characters above 255 may be reached. When the chunk is C then the byte b prints character C + b (C is always a multiple of 256, so characters from 0 to &hex;FFFFFF may be reached). For a character cache which you supply, there is only chunk 0 and the control code 0,3 may be used to reach the characters above 255. Characters which are not defined are drawn using the null glyph. The characters 0-31 and the character &hex;7F are not normally letters; Zap treats these specially - see below.</p>
+
+<p>The currently defined control sequences are:</p>
 
 <p><value-table>
   <value number="0,0">Prints character n = 0</value>
   <value number="0,1,f,b">Switch colour to foreground f and background b. (f/b are palette offsets - see <sysvar>r_for</sysvar>/<sysvar>r_bac</sysvar>).</value>
-  <value number="0,2">End of line - the rest of the line is cleared to the current background colour.</value>
-  <value number="0,3,l,h">Print character n = l + h &times; 256.</value>
+  <value number="0,2">End of line - the rest of the line is cleared to the current background colour. Every line must be terminated with this.</value>
+  <value number="0,3,l,h">Print character n = l + h &times; 256. This counts from the start of the character cache, not from the current chunk, and so can only be used when <sysvar>r_caddr</sysvar> is a character cache (in DSA mode) or in VDU mode; with a font handle, use the chunk control codes.</value>
   <value number="0,4,f,b,x,y">Merges the characters x,y. If a pixel is clear in the bitmap for y then the pixel is drawn according to the bitmap for x and the current for/background colours. If the pixel is set for y then the colours f/b are used instead for the x pixel. Useful for laying a cursor on top of the character. This effect is simulated in VDU mode by using sprites and masks. This leaves the current foreground and background colours unaltered. NB x and y may contain control codes as well. Eg you could have x = 0,0 and y = 0,3,0,1. If you nest, 0,4 codes (ie either x or y contain 0,4) then only the most deeply nested one will have effect.</value>
   <value number="0,5">For internal use only. Restores the stacked values after a 0,4 call. Putting this in your input string will probably cause a crash.</value>
   <value number="0,6,f">Change foreground colour to f.</value>
@@ -272,16 +274,20 @@ address.</item>
   <value number="0,8,f,b,x,y">Cursor merge of characters x,y. This is similar to 0,4 but only works for characters &hex;7F,&hex;100-&hex;105. For &hex;7F, it masks in the block simply by changing the for/bac cols of the current character being printed. For &hex;100+, the square or line is plotted over the top of the character in the background colour b.</value>
   <value number="0,9,S">Substyle change to style S.</value>
   <value number="0,10,f,b,S">Switch colour to foreground f and background b, and font to substyle S.</value>
+  <value number="0,11,c">Change to chunk c, so that following bytes b print character c &times; 256 + b. Only valid if <sysvar>r_caddr</sysvar> is a font handle (in DSA mode) or in VDU mode; otherwise it is ignored. The chunk returns to 0 at the end of the line.</value>
+  <value number="0,12,l,h">Change to chunk l + h &times; 256, so that following bytes b print character (l + h &times; 256) &times; 256 + b. Used for chunks above 255; otherwise as 0,11.</value>
 </value-table></p>
 
-<p>Note that sequences with codes 0,3,4 evaluate to one 'screen printable
-character', code 1 to none, and code 2 to as many as is required. Thus it is
+<p>Where a control code takes a sub-style S, it is a <reference type="subsection" name="Sub-styles">sub-style</reference>. In DSA mode with a font handle, ZapRedraw changes the sub-style for you; the change is also reported to the extension routine, if there is one. With a character cache you supply, sub-style changes can only be performed by an extension routine.</p>
+
+<p>Note that sequences with codes 0, 3, 4 and 8 evaluate to one 'screen printable
+character', codes 1, 6, 7, 9, 10, 11 and 12 to none, and code 2 to as many as is required. Thus it is
 not a simple matter to calculate the start of the n'th actual printable
 character given a string containing control codes as above. The SWI
 <reference type="swi" name="ZapRedraw_FindCharacter" /> does this for you.</p>
-<p>In DSA mode character 'n' just looks up the cached character at address
-<sysvar>r_caddr</sysvar> + n &times; <sysvar>r_cbpc</sysvar>. Usually the bitmaps will correspond to the VDU list below so that character &hex;20 will be the bitmap for a space etc.</p>
-<p>In VDU mode character 'n' is interpreted as below:</p>
+<p>In DSA mode with a character cache you supply, character 'n' just looks up the cached character at address
+<sysvar>r_caddr</sysvar> + n &times; <sysvar>r_cbpc</sysvar>. Usually the bitmaps will correspond to the VDU list below so that character &hex;20 will be the bitmap for a space etc. If <sysvar>r_caddr</sysvar> is a font handle then ZapRedraw looks up the character in the font, and uses the font's null glyph for characters which the font does not define. The cursor characters &hex;100-&hex;105 (used by the 0,8 control code) are always available in a font handle, and ZapRedraw generates the control characters 0-&hex;1F and the null glyph if the font does not contain them.</p>
+<p>In VDU mode character 'n' is the character code (a Unicode character if the Font Manager supports UTF-8, as it does for Font Manager 3.40 and later, and for the system font in modes where the characters can be defined) and is interpreted as below:</p>
 
 <p><value-table>
   <value number="&hex;00">Prints a '0' (ASCII &hex;30)</value>
@@ -345,20 +351,156 @@ SWI <reference type="swi" name="ZapRedraw_CreatePalette" /> is provided to set t
 </category>
 </subsection>
 
-<category title="Font Handles">
-<p>Font handles are a new concept in ZapRedraw 0.40. They make the process of loading / caching fonts much easier, and they also allow transparent access to font substyles in DSA mode in the same manner as in VDU mode. To initialise your font, pass the font name (eg <userinput>08x16.System</userinput>) to <reference type="swi" name="ZapRedraw_FindFont" />, and place the returned font handle in <sysvar>r_caddr</sysvar>. To find the size of the font, the call <reference type="swi" name="ZapRedraw_ReadCharSize" /> is provided. When you have finished with the font, you should call <reference type="swi" name="ZapRedraw_LoseFont" />.</p>
+<subsection title="Font handles">
+<p>Font handles are a concept introduced in ZapRedraw 0.40. They make the process of loading and caching fonts much easier, and they also allow transparent access to font sub-styles in DSA mode in the same manner as in VDU mode. To initialise your font, pass the font name (eg <userinput>08x16.System</userinput>) to <reference type="swi" name="ZapRedraw_FindFont" />, and place the returned font handle in <sysvar>r_caddr</sysvar>. To find the size of the font, the call <reference type="swi" name="ZapRedraw_ReadCharSize" /> is provided. When you have finished with the font, you should call <reference type="swi" name="ZapRedraw_LoseFont" />.</p>
 
 <p>Font handles take the form &hex;HHHHHHSS</p>
 
-<p>HH is the font handle proper, and SS is the substyle. Thus the lower 8 bits of <sysvar>r_caddr</sysvar> are the initial font substyle to use at the start of the line. They have the same effect as <sysvar>r_for</sysvar> and <sysvar>r_bac</sysvar>. 0,9 and 0,10 control codes may be used to change substyle during the line.</p>
+<p>HHHHHH is the font handle proper (a number from 1 to 32), and SS is the sub-style. Thus the lower 8 bits of <sysvar>r_caddr</sysvar> are the initial font sub-style to use at the start of the line. They have the same effect as <sysvar>r_for</sysvar> and <sysvar>r_bac</sysvar>. 0,9 and 0,10 control codes may be used to change sub-style during the line. Any value of <sysvar>r_caddr</sysvar> below &hex;8000 is taken to be a font handle; larger values are the addresses of a character cache or font name which you provide.</p>
 
-<p>A font handle allocated for VDU mode may be passed directly to <reference type="swi" name="ZapRedraw_RedrawArea" /> in DSA mode. This converts it to anti-aliased bitmaps on demand, exactly
-as Zap's aa-DSA mode does. The algorithm used is simple, but gives good results. Substyles are
-ignored, but may be added at a later date.</p>
+<p>When <sysvar>r_caddr</sysvar> is a font handle, ZapRedraw does the following for you:</p>
+<p><list>
+<item><p>It loads the font on demand, converts the bitmaps to the number of bits per pixel in <sysvar>r_bpp</sysvar>, and converts them again when <sysvar>r_bpp</sysvar> changes, so you do not need to cache the characters yourself. In modes with 32 bits per pixel the 1 bit per pixel bitmaps are plotted directly.</p></item>
+<item><p>It sets <sysvar>r_charw</sysvar>, <sysvar>r_charh</sysvar>, <sysvar>r_cbpl</sysvar> and <sysvar>r_cbpc</sysvar> in the redraw block to match the font each time the block is used for DSA redraw. (In VDU mode the character size is that of the cell in which the font is plotted, and it is not stored in the block.)</p></item>
+<item><p>It provides its own workspace, if <sysvar>r_workarea</sysvar> is 0.</p></item>
+<item><p>It changes the sub-style for the control codes 0,9 and 0,10, and selects the chunk for the control codes 0,11 and 0,12. The characters above 255 which the font contains can therefore be drawn, and those it does not contain are drawn as the null glyph.</p></item>
+<item><p>If <sysvar>r_flags</sysvar> bit 5 is set, it chooses double height mode.</p></item>
+</list></p>
 
-</category>
+<p>A font handle is counted: each call to <reference type="swi" name="ZapRedraw_FindFont" /> which finds an already loaded font adds a user to the handle, and each call to <reference type="swi" name="ZapRedraw_LoseFont" /> removes one. There are 32 handles available to all the applications which use ZapRedraw. The font data remains cached after it has no users, so that a font which is closed and then reopened is not reloaded, until the memory is needed for another font or until <reference type="command" name="ZapFontTidy" /> is used.</p>
+
+<p>A font handle allocated for VDU mode may be passed directly to <reference type="swi" name="ZapRedraw_RedrawArea" /> in DSA mode. This converts it to anti-aliased bitmaps on demand, exactly as Zap's aa-DSA mode does. The algorithm used is simple, but gives good results; it chooses an anti-aliased bitmap unless the colours of the text and its background are too similar for it to matter, when it uses a 1 bit per pixel bitmap instead, and it never uses anti-aliasing if <sysvar>r_flags</sysvar> bit 9 is set. Sub-styles are ignored.</p>
+
+<p>The application should lose its handles when it has finished, before the module can be killed. ZapRedraw cannot be killed while any handle has users (see <reference type="service" name="ZapRedrawDying" />).</p>
+</subsection>
+
+<subsection title="Fonts and the font path">
+<p>The bitmap fonts which DSA redraw uses are found along the path variable <sysvar>ZapFontsSource$Path</sysvar>. This is a comma separated list of directories, which the application <filename>!ZapFonts</filename> sets to the directories <filename>Fonts</filename> and <filename>Encodings</filename> inside it. An application which uses ZapRedraw should use <filename>!ZapFonts</filename> rather than carry its own fonts, so that the fonts are shared; <filename>!ZapFonts</filename> also sets <sysvar>Zap$Redraw</sysvar> to the location of the ZapRedraw module, which an application's <filename>!Run</filename> file can use to load the module.</p>
+
+<p>A <strong>font</strong> is a file within one of the directories (or within a subdirectory of them; the names use dots to separate the levels, and are not case sensitive), such as <userinput>08x16.System</userinput> for the font in the file <filename>08x16.System</filename>. A <strong>font directory</strong> is a directory whose name is used as the font name. The file named <userinput>0</userinput> within it is the base font, and the others are its sub-styles (see <reference type="subsection" name="Font files">Font files</reference>). If the name of a font is the name of a directory and not of a file, then the base font in it is used, and its sub-styles. A <strong>link</strong> is a small text file which refers to another font; the names of fonts are the names of the links and the fonts. The names of fonts follow the convention <userinput>&lt;width&gt;x&lt;height&gt;.&lt;name&gt;</userinput>, such as <userinput>08x16.System</userinput>, though this is not enforced by the module.</p>
+
+<p>The names which ZapRedraw lists in menus (see <reference type="swi" name="ZapRedraw_ListFonts" />) come from <filename>Messages</filename> files. In each directory on the path, ZapRedraw looks for the file <filename>Messages</filename><userreplace>n</userreplace>, where <userreplace>n</userreplace> is the number of the current territory (in decimal); if it is not there, the file <filename>Messages1</filename> is used. This is a normal MessageTrans file in which each line</p>
+<p><userinput>Font_</userinput><userreplace>identifier</userreplace><userinput>:</userinput><userreplace>name</userreplace></p>
+<p>describes one font, and each line</p>
+<p><userinput>Encoding_</userinput><userreplace>identifier</userreplace><userinput>:</userinput><userreplace>name</userreplace></p>
+<p>describes one encoding. The <userreplace>identifier</userreplace> is the name by which the font or encoding is found on the path. As brackets cannot be used in the tokens, <userinput>&lt;</userinput> and <userinput>&gt;</userinput> are used in the identifier in their place and are converted to brackets when the identifier is read. The <userreplace>name</userreplace> is the text to show to the user in the territory; if it is empty, the identifier is used instead, and if it ends in <userinput>*</userinput> then that font is the default one for an ambiguous name (and the <userinput>*</userinput> is not part of the name). The lists are scanned when the module starts, and can be scanned again by <reference type="command" name="ZapFontInstall" /> after the path has changed. They are sorted using the territory's collation.</p>
+</subsection>
+
+<subsection title="Font files">
+<p>Font files must be of type Data (&hex;FFD) and link files of type Text (&hex;FFF). There are two formats of font file: the original format, used for fonts of up to 256 glyphs, and the format which divides fonts of up to 4 billion glyphs into chunks.</p>
+
+<p>The bitmaps of the glyphs are held at one bit per pixel in the format used for the <reference type="subsection" name="Character cache format (r_caddr)">character cache</reference> of a 2 colour mode: each row of a glyph is a whole number of bytes (1 byte if the glyph is up to 8 pixels wide, 2 if up to 16 pixels wide, and otherwise the next multiple of 4 bytes), the leftmost pixel is in the least significant bit, and the rows start at the top of the glyph. Pixels which are set are in the foreground colour.</p>
+
+<p>The original format is:</p>
+<p><offset-table>
+  <offset number="0" name="Magic">The bytes "ZapFont" followed by 13</offset>
+  <offset number="8" name="Width">Width of each font character in pixels</offset>
+  <offset number="12" name="Height">Height of each font character in pixels</offset>
+  <offset number="16" name="First">First character code given (eg 0 or &hex;20)</offset>
+  <offset number="20" name="Last">Last character code given + 1 (eg &hex;100)</offset>
+  <offset number="24" name="Reserved">Reserved (0)</offset>
+  <offset number="28" name="Reserved">Reserved (0)</offset>
+  <offset number="32" name="Glyphs">Bitmaps, starting at the character given in the First field</offset>
+</offset-table></p>
+<p>Any glyphs above 255 in the file are ignored. If the font does not start at character 0 then the glyphs for the control characters 0-&hex;1F are made from the letters (0 is the digit 0, and 1-&hex;1F are copies of &hex;41-&hex;5F). The cursor glyphs for characters &hex;7F and &hex;100-&hex;105 are always made by ZapRedraw, as is the null glyph, which is used for the characters the font does not define.</p>
+
+<p>The chunked format is:</p>
+<p><offset-table>
+  <offset number="0" name="Magic">The bytes "ZRUF" (ZapRedraw UCS Font)</offset>
+  <offset number="4" name="Reserved">Reserved (0)</offset>
+  <offset number="8" name="Width">Width of each glyph in pixels</offset>
+  <offset number="12" name="Height">Height of each glyph in pixels</offset>
+  <offset number="16" name="Directory size">Size of the chunk directory in bytes</offset>
+  <offset number="20" name="Null glyph">Offset of the null glyph from the start of the file, or 0 if there is none</offset>
+  <offset number="24" name="Reserved">Reserved (0)</offset>
+  <offset number="28" name="Reserved">Reserved (0)</offset>
+</offset-table></p>
+<p>The chunk directory follows immediately. The glyphs are divided into chunks of up to 256 glyphs, and the directory has an entry of four words for each chunk:</p>
+<p><offset-table>
+  <offset number="0" name="Chunk number">The number of the first glyph of the chunk: a chunk containing the glyph &hex;2A3F has &hex;2A00 here</offset>
+  <offset number="4" name="Glyph count">The number of glyphs in this chunk</offset>
+  <offset number="8" name="File offset">Offset in the file of the glyph data of this chunk</offset>
+  <offset number="12" name="Reserved">Reserved - must be 0</offset>
+</offset-table></p>
+<p>The glyph data for a chunk consists of the bitmaps of the glyphs in order. If the chunk has fewer than 256 glyphs then the data starts with a translation table of 256 bytes: for each of the 256 characters of the chunk, the table gives the number of its glyph in the data plus 1, or 0 if it is not defined. The table is not present for a chunk with all 256 glyphs. Chunk 0 must be present and have all 256 glyphs, including the glyphs for the control characters; it should use the Acorn Extended Latin 1 encoding where possible. The null glyph is a bitmap of the same size as the others; if there is none then ZapRedraw uses a dotted box. ZapRedraw loads chunk 0 when it loads the font and the other chunks the first time that they are needed.</p>
+
+<p>Where a font has sub-styles, it is a directory. The file <filename>0</filename> is the base font, and the files for the sub-styles have names made of the letters of the styles they are for, in the order U, S, I, B: <filename>B</filename> (bold), <filename>I</filename> (italic), <filename>S</filename> (strikethrough), <filename>U</filename> (underlined), or any combination such as <filename>IB</filename> or <filename>USIB</filename>. When ZapRedraw needs a sub-style it tries the file for exactly that combination of styles. If there is none, it takes away the styles in turn and tries again: first underline, then italic, then bold, then strikethrough; then pairs of styles; then it uses the single style files if they exist; and finally the base font. Fonts directly in the font directory are not given sub-styles.</p>
+
+<p>A link file contains the bytes "ZFLK" followed by 10, and then the path of the font linked to, ending in a zero byte. A link cannot refer to another link. A link may be the file <filename>0</filename> of a font directory, which is the base font when the directory is chosen.</p>
+</subsection>
+
+<subsection title="Encodings">
+<p>An encoding translates the character codes of text into Unicode, so that text in any of the 8 bit character sets can be displayed using a font which holds Unicode characters. Encodings are found by name along <sysvar>ZapFontsSource$Path</sysvar>, and are handled with <reference type="swi" name="ZapRedraw_Encoding" />. An encoding file is of type Data (&hex;FFD) and has the format:</p>
+<p><offset-table>
+  <offset number="0" name="Magic">The bytes "ZENC"</offset>
+  <offset number="4" name="Version">File format version - must be 2</offset>
+  <offset number="8" name="Reserved">Reserved (0)</offset>
+  <offset number="12" name="Reserved">Reserved (0)</offset>
+  <offset number="16" name="Table">256 words, one for each character code from 0 to 255, giving the Unicode character for the code, or -1 if the code is not defined</offset>
+</offset-table></p>
+<p>Two encodings are built in: <userinput>UTF8</userinput> and <userinput>UTF16</userinput>, which are not tables and have no file. The supplied encodings are the ISO Latin character sets (Latin1 to Latin10), Arabic, Hebrew, Greek, Cyrillic, KOI8-R, Thai and Welsh.</p>
+</subsection>
+
+<subsection title="Memory use, caching and mode changes">
+<p>The font data and the converted bitmaps are held in a dynamic area named "Zap font cache" (the name is a message token, FontCache), which is created when the module starts, and which can be at most 2 megabytes. If the dynamic area cannot be created because the system does not support them (which is the case before RISC OS 3.5) then font handles cannot be used in DSA mode. The memory is returned when fonts with no users are tidied and the cache is compacted, either when a new font is needed or with <reference type="command" name="ZapFontTidy" />.</p>
+<p>ZapRedraw watches for the mode change service call (<reference type="service" name="ModeChange" href="?" />, &hex;46). On a mode change the sizes of the VDU fonts are read again for the new mode. The DSA fonts are converted again to the new number of bits per pixel the next time that they are used. Applications must read the screen details into the redraw block again with <reference type="swi" name="ZapRedraw_ReadVduVars" />, and the number of bits per pixel for the cache with <reference type="swi" name="ZapRedraw_ReadModeBPP" />, after a mode change.</p>
+</subsection>
+
+<subsection title="VDU redraw mode">
+<p>In VDU redraw mode ZapRedraw draws with the operating system rather than writing the screen memory. Each line is drawn in three passes: first the backgrounds, as rectangles of each background colour (using the fast rectangle plot of <reference type="swi" name="ZapRedraw_PlotRectangle" /> if <sysvar>r_flags</sysvar> bit 4 is set, and OS_Plot otherwise); then the characters, with Font_Paint for a font and OS_WriteC for the system font; and then any merged characters and cursors. The colours of the palette entries are translated to the nearest available colours with ColourTrans.</p>
+<p>The system font is used when the font name is 0. The characters 0-&hex;1F, &hex;7F and &hex;100-&hex;105 are drawn as described in <reference type="subsection" name="Format of text to display (r_data)">Format of text to display</reference> by ZapRedraw, since the operating system's meaning of these characters is not the one wanted. Characters above 255 are drawn with UTF-8 text if the Font Manager supports it (Font Manager 3.40 or later); the system font characters are defined temporarily with VDU 23 in the Unicode range of the operating system, via the international service call (&hex;43), and restored afterwards.</p>
+</subsection>
+
+<subsection title="ViewFinder">
+<p>If the ViewFinder module (version 1.29 or later) is present and is in use (the system variable <sysvar>ViewFinder$Enable</sysvar> being set to a non-zero number, or ViewFinder 1.41 or later which is assumed to be active), ZapRedraw has ViewFinder draw the text and the rectangles, since ViewFinder modes cannot be written directly. This is automatic and needs nothing from the application, except that <reference type="swi" name="ZapRedraw_RedrawRaster" /> cannot be used, and <reference type="swi" name="ZapRedraw_ReadModeBPP" /> returns 0 so that 1 bit per pixel caches are used.</p>
+</subsection>
+
+<subsection title="Using ZapRedraw">
+<p>An application which draws text with ZapRedraw does this:</p>
+<p><list>
+<item><p>When starting, check that the module is present (with <userinput>RMEnsure</userinput>) and issue the first call to <reference type="swi" name="ZapRedraw_Version" /> if the version matters. Find the font with <reference type="swi" name="ZapRedraw_FindFont" /> and keep the handle. Fill in the redraw block: <sysvar>r_flags</sysvar>, <sysvar>r_caddr</sysvar> (the handle), <sysvar>r_palette</sysvar> (made with <reference type="swi" name="ZapRedraw_CreatePalette" />), <sysvar>r_for</sysvar>, <sysvar>r_bac</sysvar> and <sysvar>r_linesp</sysvar>, and read the character size with <reference type="swi" name="ZapRedraw_ReadCharSize" /> to size the windows.</p></item>
+<item><p>Call <reference type="swi" name="ZapRedraw_ReadVduVars" /> to fill in the screen details, and again after each mode change.</p></item>
+<item><p>Build the <sysvar>r_data</sysvar> for the visible lines, using <reference type="swi" name="ZapRedraw_PrepareDataLine" /> and <reference type="swi" name="ZapRedraw_AddCursorSmart" />.</p></item>
+<item><p>On a redraw event, set <sysvar>r_scrollx</sysvar> and <sysvar>r_scrolly</sysvar> with <reference type="swi" name="ZapRedraw_GetRectangle" /> and call <reference type="swi" name="ZapRedraw_RedrawArea" /> for each rectangle, or use <reference type="swi" name="ZapRedraw_RedrawWindow" /> or <reference type="swi" name="ZapRedraw_UpdateWindow" /> to do the loop.</p></item>
+<item><p>When finishing, call <reference type="swi" name="ZapRedraw_LoseFont" /> for each font found.</p></item>
+<item><p>Be ready for <reference type="service" name="ZapRedrawStarted" />, after which any addresses obtained from <reference type="swi" name="ZapRedraw_Version" /> are no longer valid.</p></item>
+</list></p>
+</subsection>
 </section>
 
+
+<section title="System Variables">
+<sysvar-definition name="ZapFontsSource$Path"
+                   description="Path along which fonts and encodings are found">
+<use>
+<p>A comma separated list of directories, which ZapRedraw searches for fonts, font links, encodings and their <filename>Messages</filename> files. It is read each time that a font or encoding is looked for, and when the font lists are scanned. <filename>!ZapFonts</filename> sets it to its <filename>Fonts</filename> and <filename>Encodings</filename> directories. <reference type="command" name="ZapFontInstall" /> adds a directory to it.</p>
+</use>
+<related>
+<reference type="command" name="ZapFontInstall" />
+</related>
+</sysvar-definition>
+
+<sysvar-definition name="ZapFontsMessages$Path"
+                   description="Path along which the module's Messages file is found">
+<use>
+<p>ZapRedraw opens the file <filename>ZapFontsMessages:Messages</filename> for its error messages, command help and the titles of menus. <filename>!ZapFonts</filename> sets the variable to the directory for the current country, and then to the UK one.</p>
+</use>
+</sysvar-definition>
+
+<sysvar-definition name="Zap$Redraw"
+                   description="Location of the ZapRedraw module">
+<use>
+<p>Set by <filename>!ZapFonts</filename> to the ZapRedraw module it contains, so that an application can load it with <userinput>RMLoad &lt;Zap$Redraw&gt;</userinput>. The module itself does not read it.</p>
+</use>
+</sysvar-definition>
+
+<sysvar-definition name="ViewFinder$Enable"
+                   description="Whether ZapRedraw should use ViewFinder">
+<use>
+<p>Read when the module starts, if ViewFinder 1.29 or later is present. If it is set to a non-zero number, ZapRedraw uses ViewFinder to draw. ViewFinder 1.41 or later is assumed to be in use if the variable is not set to a number below 2 (a value of 0 turns it off).</p>
+</use>
+</sysvar-definition>
+</section>
 
 <section title="Service Calls">
   <service-definition name="ZapRedrawStarted"
@@ -370,7 +512,7 @@ ignored, but may be added at a later date.</p>
   </exit>
   <use>
     <p>This informs any potential application which has pointers into the module (via
-<reference type="swi" name="ZapRedraw_Version" /> that ZapRedraw has either started or been reinitialised, and hence the pointers may have moved. It should not be claimed.</p>
+<reference type="swi" name="ZapRedraw_Version" /> that ZapRedraw has either started or been reinitialised, and hence the pointers may have moved. It should not be claimed. It is issued from a callback shortly after the module has initialised, and not during initialisation.</p>
   </use>
   <related>
     <reference type="service" name="ZapRedrawDying"/>
@@ -384,12 +526,14 @@ ignored, but may be added at a later date.</p>
   </entry>
   <exit>
   </exit>
-  <use><p>This informs applications that ZapRedraw is about to quit. It will not be issued if quitting is impossible (eg. if it has open font handles.) If it is claimed, ZapRedraw will refuse to die with the error "ZapRedraw is in use" (error number &hex;48484) - this is to prevent version numbers becoming invalid.</p></use>
+  <use><p>This informs applications that ZapRedraw is about to quit. It will not be issued if quitting is impossible (eg. if it has open font handles or encodings in use, in which case the same error is returned.) If it is claimed, ZapRedraw will refuse to die with the error "ZapRedraw is in use" (error number &hex;48484) - this is to prevent version numbers becoming invalid.</p></use>
   <related>
     <reference type="service" name="ZapRedrawStarted"/>
   </related>
   </service-definition>
 
+
+  <p>ZapRedraw also listens for the mode change service call (&hex;46), and uses the international service call (&hex;43) to define Unicode characters of the system font in VDU mode.</p>
 </section>
 
 
@@ -574,26 +718,36 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
                   processor-mode="undefined"
                   re-entrant="no">
   <entry>
-    <register-use number="0">Foreground colour to use for control characters (0 - &hex;1F) or set to -1 if you do not wish ctrl chars to be specially treated.</register-use>
-    <register-use number="1">Pointer to redraw block giving start foreground background colours in <sysvar>r_for</sysvar>, <sysvar>r_bac</sysvar> - nothing else used.</register-use>
+    <register-use number="0">Foreground colour to use for control characters (0 - &hex;1F, and &hex;7F) or set to -1 if you do not wish ctrl chars to be specially treated.</register-use>
+    <register-use number="1">Pointer to redraw block giving start foreground background colours in <sysvar>r_for</sysvar>, <sysvar>r_bac</sysvar>, and <sysvar>r_flags</sysvar> (and <sysvar>r_caddr</sysvar>, for the initial sub-style, and <sysvar>r_length</sysvar> and <sysvar>r_encoding</sysvar>, if present) - nothing else used.</register-use>
     <register-use number="2">Pointer to text input string (length in R5)</register-use>
-    <register-use number="3">Pointer to foreground mask (length in R5)</register-use>
-    <register-use number="4">Pointer to background mask (length in R5)</register-use>
-    <register-use number="5">Length of inputs in bytes</register-use>
-    <register-use number="6">Destination buffer (length must be at least 6 &times; R5 + 16 to ensure it is big enough - colour change + 0 -&gt; 0, 0 + terminator).</register-use>
-  <register-use number="7">Font mask... (not supplied if b3 of r_flags is zero)</register-use>
+    <register-use number="3">Pointer to foreground list, or 0 to use <sysvar>r_for</sysvar> throughout (length in R5)</register-use>
+    <register-use number="4">Pointer to background list, or 0 to use <sysvar>r_bac</sysvar> throughout (length in R5)</register-use>
+    <register-use number="5">Length of input text in <strong>bytes</strong>. The foreground, background and sub-style lists must be this long, unless <sysvar>r_flags</sysvar> bit 12 is set, when they have one byte for each character.</register-use>
+    <register-use number="6">Destination buffer (see below for the size required).</register-use>
+    <register-use number="7">Sub-style list (not supplied if b3 of <sysvar>r_flags</sysvar> is zero)</register-use>
   </entry>
   <exit>
-    <register-use number="0">Highest used character code used (ie &hex;20 - &hex;FF). You may not want to cache all font characters as usually those &ge; 128 are not needed. This tells you the range you MUST cache.</register-use>
+    <register-use number="0">Highest character code used (&hex;20 or above). You may not want to cache all font characters as usually those &ge; 128 are not needed. This tells you the range you MUST cache. If the text contains characters from other chunks, this may be above &hex;FF.</register-use>
     <processor-flag name="N" state="corrupted" />
     <processor-flag name="C" state="corrupted" />
     <processor-flag name="Z" state="corrupted" />
-    <register-use number="5">Length of output string (including 0, 2 terminator) Only a subset of the redraw codes available are used.</register-use>
+    <register-use number="5">Length of output string (including 0, 2 terminator) Only a subset of the redraw codes available are used (0,0; 0,1; 0,2; 0,6; 0,7; 0,10; 0,11 and 0,12).</register-use>
   </exit>
   <use>
-    <p>This SWI is to help prepare the <sysvar>r_data</sysvar> field of the redraw block. It takes as input the pointer to a line of text character (0 - 255) to be treated as ordinary characters (0 is not a control code). It also takes as input a pointer to a background mask and a foreground mask list, giving the background and foreground colours of each character separately. The output is a line of the format required by <sysvar>r_data</sysvar> with control codes changing the colours and specifying the line end. Control codes in the input string can have their colour set automatically by setting R0 to the colour.</p>
+    <p>This SWI is to help prepare the <sysvar>r_data</sysvar> field of the redraw block. It takes as input the pointer to a line of text characters, which are treated as ordinary characters (0 is not a control code). It also takes as input a pointer to a background list and a foreground list, giving the background and foreground colours of each character separately. The output is a line of the format required by <sysvar>r_data</sysvar> with control codes changing the colours, sub-style and chunk, and specifying the line end. Control codes in the input string can have their colour set automatically by setting R0 to the colour.</p>
 
-<p>Note: Bit 3 of any font data supplied is used to control the 'Inverse video' effect. While this bit is set, foreground and background colours are swapped over in all operations.</p>
+    <p>The width of the input characters is 8 bits unless <sysvar>r_flags</sysvar> bit 10 (16 bits) or bit 11 (32 bits) is set. The characters are then translated according to the encoding in <sysvar>r_encoding</sysvar>, if there is one:</p>
+    <p><list>
+      <item>If the encoding is a table (as found by <reference type="swi" name="ZapRedraw_Encoding" /> for an encoding such as Latin1) then 8 bit input characters are looked up in the table to give Unicode characters. Table entries of -1 give the character &hex;FFFF.</item>
+      <item>If the encoding is UTF-8 then the text is decoded as UTF-8. Invalid sequences (including overlong forms, surrogates and the characters &hex;FFFE and &hex;FFFF) give the character &hex;FFFD.</item>
+      <item>UTF-16 is not yet properly supported; the text is treated as 16 bit characters.</item>
+    </list></p>
+    <p>Whenever the character is not within the current chunk, a 0,11 or 0,12 control code is generated to change chunk. The output is that of a single line, so the chunk is 0 at the end. Space characters at the end of the output are removed if the line is in chunk 0, as the end of line code clears the remainder of the line to the background colour. The character 0 is output as 0,0.</p>
+
+    <p>Bit 3 of any sub-style data supplied is used to control the 'Inverse video' effect. While this bit is set, foreground and background colours are swapped over in all operations. The initial sub-style is the bottom byte of <sysvar>r_caddr</sysvar> if it is a font handle, and otherwise 0.</p>
+
+    <p>The buffer must be large enough for the output. For text of 8 bit characters with no encoding, 6 &times; R5 + 16 bytes are sufficient (a colour change, a 0 changed to 0,0, and the terminator). Where chunk changes and sub-styles can be generated, each character may need up to 11 bytes (0,10,f,b,S then 0,12,l,h then the character as 0,0), so allow 11 bytes for every character plus 16.</p>
   </use>
   <example>
     <p>Input:</p>
@@ -608,6 +762,8 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
     <p><systemoutput>"HELLO ",0,1,2,0,"WORLD",0,2 (highest letter used = "W").</systemoutput></p>
   </example>
   <related>
+    <reference type="swi" name="ZapRedraw_Encoding" />
+    <reference type="swi" name="ZapRedraw_FindCharacter" />
   </related>
   </swi-definition>
 
@@ -660,6 +816,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
       <register-use number="2">Current foreground colour</register-use>
       <register-use number="3">Current background colour</register-use>
       <register-use number="4">Current font substyle</register-use>
+      <register-use number="5">Current chunk (&hex;100 &times; the chunk number set by a 0,11 or 0,12 control code; 0 at the start of a line)</register-use>
     </entry>
     <exit>
       <register-use number="0">If the n'th character is in the string then this points to the end of the n'th character (start in R1).
@@ -669,9 +826,10 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
       <register-use number="2">Updated by any colour change control codes.</register-use>
       <register-use number="3">Updated by any colour change control codes. Flags are corrupted.</register-use>
       <register-use number="4">Updated by any font change control codes.</register-use>
+      <register-use number="5">Updated by any chunk change control codes.</register-use>
     </exit>
     <use>
-    <p>This SWI takes as input a line of the format required by <sysvar>r_data</sysvar> (ie containing ctrl sequences starting with 0) and a number 'n' and returns the start of the (n+1)'th printable character within this line (ie it skips over n printable characters), ignoring colour change control codes etc. Thus on exit it points to a byte 1 - 255 or one of the control sequences 0, 0 or 0, 2 or 0, 3, l, h or 0, 4, f, b, c1, c2 each of which define one printable character. If the offset n is off the end of the line then it will point to the 0, 2 terminator. It also keeps track of the colour changes that take place. NB If n = 0 then it may still be useful - as it will jump over any colour changes before the first character. If R0 &gt; R1 on exit then the character was found, otherwise there were R1 - R0 characters left to skip.</p>
+    <p>This SWI takes as input a line of the format required by <sysvar>r_data</sysvar> (ie containing ctrl sequences starting with 0) and a number 'n' and returns the start of the (n+1)'th printable character within this line (ie it skips over n printable characters), ignoring colour change control codes etc. Thus on exit it points to a byte 1 - 255 or one of the control sequences 0, 0 or 0, 2 or 0, 3, l, h or 0, 4, f, b, c1, c2 or 0, 8, f, b, c1, c2 each of which define one printable character. If the offset n is off the end of the line then it will point to the 0, 2 terminator. It also keeps track of the colour, sub-style and chunk changes that take place. NB If n = 0 then it may still be useful - as it will jump over any colour changes before the first character. If R0 &gt; R1 on exit then the character was found, otherwise there were R1 - R0 characters left to skip.</p>
     </use>
     <example>
     <p>Input: <userinput>"hello ",0,1,2,3,"goodbye",0,2</userinput></p>
@@ -892,7 +1050,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
                   re-entrant="no">
     <entry>
       <register-use number="0">Block as returned by <reference type="swi" name="Wimp_RedrawWindow" href="?" /> / <reference type="swi" name="Wimp_GetRectangle" href="?" /> ie: window handle, minx, miny, maxx, maxy, scrollx, scrolly etc.</register-use>
-      <register-use number="1">Zap redraw block with <sysvar>r_magx</sysvar>, <sysvar>r_magy</sysvar>, <sysvar>r_xsize</sysvar>, <sysvar>r_ysize</sysvar> and <sysvar>r_flags</sysvar> filled in.</register-use>
+      <register-use number="1">Zap redraw block with <sysvar>r_magx</sysvar>, <sysvar>r_magy</sysvar>, <sysvar>r_xsize</sysvar>, <sysvar>r_ysize</sysvar> and <sysvar>r_flags</sysvar> filled in (and the optional fields <sysvar>r_length</sysvar>, <sysvar>r_lmargin</sysvar> and <sysvar>r_tmargin</sysvar>, if <sysvar>r_flags</sysvar> bit 6 is set).</register-use>
     </entry>
     <exit>
       <register-use number="0 (and flags)">Corrupted.</register-use>
@@ -900,6 +1058,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
     </exit>
     <use>
       <p>This SWI should be used after calls to <reference type="swi" name="Wimp_GetRectangle" href="?" />. It takes the redraw rectangle block as returned by <reference type="swi" name="Wimp_RedrawWindow" href="?" /> or <reference type="swi" name="Wimp_GetRectangle" href="?" /> and uses it to fill in the ZapRedraw block. The scroll offsets of the update rectangle are in pixels. The y scroll offset is the amount 'down' from the work area origin (inclusive), so negating will get the 'upward' scroll offset in pixels (exclusive), and the shifting by <sysvar>r_magy</sysvar> will give the normal OS work area scroll offset (which is exclusive).</p>
+      <p>If the redraw block has margins (<sysvar>r_flags</sysvar> bit 6 set and <sysvar>r_length</sysvar> large enough), the left and top margins are subtracted from the scroll offsets, so that they are negative in the margin. If the right-to-left flag (<sysvar>r_flags</sysvar> bit 7) is set, <sysvar>r_scrollx</sysvar> is the distance in pixels from the right hand edge of the work area (as found with <reference type="swi" name="Wimp_GetWindowInfo" href="?" />) to the right hand edge of the rectangle, rather than from the left.</p>
     </use>
   <related>
   </related>
@@ -1223,29 +1382,35 @@ of these numbers. These bitmaps are also useful as cursors.</p>
         <bitfield-table>
         <bit number="0">Set if VDU mode; clear for DSA mode.</bit>
         <bit number="1">Set if R4 points to a reduction block. This applies to VDU mode only; it is ignored in DSA mode.</bit>
+        <bit number="2-31">Reserved - set to 0</bit>
         </bitfield-table></register-use>
       <register-use number="2">X size (in points &times; 16). Only applicable in VDU mode.</register-use>
-      <register-use number="3">Aspect ratio (Y / X &times; 100). Only applicable in VDU mode.</register-use>
+      <register-use number="3">Aspect ratio (Y / X &times; 100), or 0 for the same as the X size. Only applicable in VDU mode.</register-use>
       <register-use number="4">Pointer to reduction block. Only applicable in VDU mode.</register-use>
     </entry>
     <exit>
       <register-use number="0">Font handle</register-use>
     </exit>
     <use>
-      <p>This finds a font and returns a font handle which should be placed in <sysvar>r_caddr</sysvar>. All of the font's substyles are opened as well, if available. In VDU mode, R4 may optionally point to a reduction block which allows the font size to be fine-tuned. The block has the following form:
-
-<value-table>
+      <p>This finds a font and returns a font handle which should be placed in <sysvar>r_caddr</sysvar>. All of the font's substyles are opened as well, if available. The font handle has the form &hex;HHHHHH00 where HHHHHH is a number from 1 to 32; the bottom byte is the sub-style, and you may set it to the initial sub-style for the line before using the handle in <sysvar>r_caddr</sysvar>. Any value below &hex;8000 in <sysvar>r_caddr</sysvar> is a font handle; larger values are the addresses of character caches or font names.</p>
+      <p>If the font has already been found with the same name (and, in VDU mode, the same size, aspect ratio and reduction block) then the same handle is returned, and the number of users of the handle is increased. Each call to FindFont must therefore be balanced by one call to <reference type="swi" name="ZapRedraw_LoseFont" />. Creating a new handle also discards the data for any fonts which have no users, to free memory.</p>
+      <p><strong>DSA mode:</strong> the font name is either a font as it appears in the ZapFonts directory, eg <userinput>08x16.System</userinput>, or a complete path name of a font file or an application-specific font directory (in which case it need not be on <sysvar>ZapFontsSource$Path</sysvar>). It may also be a font identifier of the form returned by <reference type="swi" name="ZapRedraw_DecodeMenu" />. If the name is the name of a directory then the file <userinput>0</userinput> in it is the base font, and the other files are its sub-styles. If the name is a link file, the font linked to is used. See the description of font files for details of the files. The font is loaded on demand, in the format required by the screen mode in <sysvar>r_bpp</sysvar> at the time it is used; the call itself only needs to find the font. An unusable font gives the errors "Font '%0' not found", "Font file corrupt" or "Invalid font link file". RISC OS 3.5 or later is required, because the data is held in a dynamic area; before that the call returns the error "Font handles require RISC OS 3.50 or later".</p>
+      <p><strong>VDU mode:</strong> the font name is the Font Manager identifier of a font. If R0 is 0 then the system font is used, and the sizes are ignored. Otherwise R2 and R3 give the size at which to plot the font, as for Font_FindFont. The size of a character cell is taken from the bounding box of the characters 0-9, A-Z and a-z of the font, converted into pixels. In VDU mode, R4 may optionally point to a reduction block which allows the cell size to be fine-tuned. The block has the following form:</p>
+<p><value-table head-number="Offset" head-value="Meaning">
   <value number="0">Left reduction</value>
   <value number="4">Top reduction</value>
   <value number="8">Right reduction</value>
   <value number="12">Bottom reduction</value>
 </value-table></p>
-
-<p>All values are in pixels, and are signed integers. In general, the values in this block will all be 0, so you may omit it.</p>
-
-<p>The font name may either be a font as it appears in the ZapFonts directory, or it may be a complete path name of a application-specific font directory.</p>
+<p>All values are in pixels, and are signed integers. In general, the values in this block will all be 0, so you may omit it. The system font is treated as being 8 pixels wide and 16 pixels high (8 pixels high if there are 4 or more OS units to a pixel vertically).</p>
+      <p>The handle is shared between VDU mode and DSA mode redraws as far as the font data is concerned: a handle found in VDU mode may also be used in DSA mode, when ZapRedraw converts the font to anti-aliased bitmaps on demand (unless the <sysvar>r_flags</sysvar> bit 9 asks it not to). A handle found in DSA mode cannot be used in VDU mode (this gives the error "Attempt to use a DSA font in VDU mode").</p>
+      <p>There are 32 font handles. If they are all in use the error "No more font handles" is returned.</p>
     </use>
     <related>
+      <reference type="swi" name="ZapRedraw_LoseFont" />
+      <reference type="swi" name="ZapRedraw_ReadCharSize" />
+      <reference type="swi" name="ZapRedraw_ListFonts" />
+      <reference type="swi" name="ZapRedraw_DecodeMenu" />
     </related>
     </swi-definition>
 
@@ -1257,15 +1422,16 @@ of these numbers. These bitmaps are also useful as cursors.</p>
                   processor-mode="undefined"
                   re-entrant="no">
     <entry>
-      <register-use number="0">Font handle</register-use>
+      <register-use number="0">Font handle (the sub-style byte is ignored)</register-use>
     </entry>
     <exit>
       <register-use number="0">Corrupted</register-use>
     </exit>
     <use>
-      <p>This tells ZapRedraw that you no longer need a font. The data may be discarded from memory, and the font cache compacted.</p>
+      <p>This tells ZapRedraw that you no longer need a font, by reducing the number of users of the handle by one. When the handle has no more users the font data may be discarded from memory, and the font cache compacted; this happens when the next new font is found or when the <reference type="command" name="ZapFontTidy" /> command is used. Losing a handle with no users gives the error "Invalid font handle".</p>
     </use>
     <related>
+      <reference type="swi" name="ZapRedraw_FindFont" />
     </related>
     </swi-definition>
 
@@ -1282,8 +1448,9 @@ of these numbers. These bitmaps are also useful as cursors.</p>
       <register-use number="2">Flags:<p>
         <bitfield-table>
           <bit number="0">Return values in OS units if set, pixels if clear</bit>
-          <bit number="1">Add value of <sysvar>r_linesp</sysvar></bit>
+          <bit number="1">Add the line spacing (bits 0-15 of <sysvar>r_linesp</sysvar>) to the height, and the character spacing (bits 16-31) to the width</bit>
           <bit number="2">Use <sysvar>r_flags</sysvar> bits 1 and 5 (double-height flags)</bit>
+          <bit number="3-31">Reserved - set to 0</bit>
         </bitfield-table></p></register-use>
     </entry>
     <exit>
@@ -1293,9 +1460,10 @@ of these numbers. These bitmaps are also useful as cursors.</p>
       <register-use number="3">Y size</register-use>
     </exit>
     <use>
-      <p>This call is used to read the size of a font.</p>
+      <p>This call is used to read the size of a font. The size is that of a character cell. If bit 2 is set and <sysvar>r_flags</sysvar> bit 1 is set (double height mode) then the Y size is doubled. If bit 2 is set and <sysvar>r_flags</sysvar> bit 5 is set, and the redraw is in DSA mode, then double height mode is chosen as it is for <reference type="swi" name="ZapRedraw_RedrawArea" />: if the character height is 8 or less and <sysvar>r_magy</sysvar> is 0 or 1 then the Y size is doubled. The conversion to OS units is made last, so that spacing is included in it.</p>
     </use>
     <related>
+      <reference type="swi" name="ZapRedraw_FindFont" />
     </related>
     </swi-definition>
 
@@ -1355,7 +1523,7 @@ of these numbers. These bitmaps are also useful as cursors.</p>
       <register-use number="5">Number of bytes written to (or, if R4 was 0, required for) the buffer in R4</register-use>
     </exit>
     <use>
-      <p>This call enumerates the fonts (or encodings) known to ZapRedraw, and its entry and exit conditions follow those of the Font Manager's Font_ListFonts SWI. The fonts known are those listed in the <filename>Messages</filename> files in the directories of <sysvar>ZapFontsSource$Path</sysvar>, and are scanned when the module starts. The lists are sorted using the territory's collation. Fonts whose names contain dots are grouped into submenus by their components: the font <userinput>08x16.Computer</userinput> appears as the entry <userinput>Computer</userinput> in the submenu <userinput>08x16</userinput>. If a font has a name which is also the prefix of other fonts, its own entry is labelled <userinput>(Regular)</userinput> within its submenu.</p>
+      <p>This call enumerates the fonts (or encodings) known to ZapRedraw, and its entry and exit conditions follow those of the Font Manager's Font_ListFonts SWI. The fonts known are those listed in the <filename>Messages</filename> files in the directories of <sysvar>ZapFontsSource$Path</sysvar>, and are scanned when the module starts, and again by <reference type="command" name="ZapFontInstall" />. The lists are sorted using the territory's collation. Fonts whose names contain dots are grouped into submenus by their components: the font <userinput>08x16.Computer</userinput> appears as the entry <userinput>Computer</userinput> in the submenu <userinput>08x16</userinput>. If a font has a name which is also the prefix of other fonts, its own entry is labelled <userinput>(Regular)</userinput> within its submenu.</p>
       <p>In list mode the call returns one font each time, so that it should be called repeatedly, starting with an index of 0 and using the index returned in R2 each time, until R2 is -1. The font identifier is the string used to open the font; the font name is a localised string which is suitable for displaying to the user. If the name is not given in the messages file then the identifier is used for it.</p>
       <p>In menu mode the call builds a standard Wimp menu, with indirected title and entry text, and with the submenus following the main menu in the buffer. The menu title is the localised text for the token <userinput>FontList</userinput> (or <userinput>Encodings</userinput>). It may be passed to <reference type="swi" name="Wimp_CreateMenu" href="?" />,. As with Font_ListFonts, the size required for the buffers may be found by calling the SWI with R1 and R4 as 0.</p>
       <p>The call gives an error if bits which are reserved are set ("Bad parameters"), or if a buffer is too small ("Buffer overflow").</p>
@@ -1407,6 +1575,148 @@ of these numbers. These bitmaps are also useful as cursors.</p>
     </related>
     </swi-definition>
 
+  <swi-definition name="ZapRedraw_ReadModeBPP"
+                  number="4849E"
+                  description="Reads the number of bits per pixel at which to cache bitmaps for the current mode."
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="no">
+    <entry>
+    </entry>
+    <exit>
+      <register-use number="0">Log base 2 of the number of bits per pixel to use for the character cache (the value for <sysvar>r_bpp</sysvar> when creating it)</register-use>
+    </exit>
+    <use>
+      <p>This call returns the log base 2 of the bits per pixel of the current screen mode, adjusted for the ways in which ZapRedraw can draw from one bit per pixel bitmaps. The value returned is 0 if the mode has 32 bits per pixel (as ZapRedraw can plot from 1 bpp bitmaps in these modes) or if ViewFinder is rendering the text (as ViewFinder uses 1 bpp bitmaps). Otherwise it is the log base 2 of the number of bits per pixel of the mode. It should be used where you would otherwise read the number of bits per pixel of the mode, when you choose the size of the character cache for the mode. When the call returns 0 for a 32 bpp mode, <sysvar>r_bpp</sysvar> in the redraw block remains 5, but the sizes <sysvar>r_cbpl</sysvar> and <sysvar>r_cbpc</sysvar> are those for a character cache of 1 bpp.</p>
+    </use>
+    <related>
+      <reference type="swi" name="ZapRedraw_CachedCharSize" />
+      <reference type="swi" name="ZapRedraw_ReadVduVars" />
+    </related>
+    </swi-definition>
+
+  <swi-definition name="ZapRedraw_DecodeMenu"
+                  number="4849F"
+                  description="Converts a selection from a font menu into a font identifier."
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="no">
+    <entry>
+      <register-use number="0">Flags:
+        <bitfield-table>
+          <bit number="0">Set if the menu is a menu of encodings rather than of fonts</bit>
+          <bit number="1">Terminate the identifier with CR instead of 0</bit>
+          <bit number="2-31">Reserved - set to 0</bit>
+        </bitfield-table></register-use>
+      <register-use number="1">Pointer to the menu definition, as returned by <reference type="swi" name="ZapRedraw_ListFonts" /></register-use>
+      <register-use number="2">Pointer to the menu selection array, as returned by <reference type="swi" name="Wimp_Poll" href="?" /> for a menu selection</register-use>
+      <register-use number="3">Pointer to buffer for the identifier, or 0 to only read the length</register-use>
+      <register-use number="4">Length of the buffer</register-use>
+    </entry>
+    <exit>
+      <register-use number="4">Length of the identifier, including its terminator, or 0 if the system font was selected</register-use>
+    </exit>
+    <use>
+      <p>This call converts the selection made in a menu built by <reference type="swi" name="ZapRedraw_ListFonts" /> into the identifier of the font (or of the encoding). It uses <reference type="swi" name="Wimp_DecodeMenu" href="?" /> to find the text of the entries chosen, and joins them with dots to give the font name; a final <userinput>(Regular)</userinput> entry stands for the font whose name is the prefix of the submenu. The identifier is a string of the form</p>
+      <p><userinput>\F</userinput><userreplace>identifier</userreplace><userinput>\f</userinput><userreplace>territory</userreplace><userinput> </userinput><userreplace>name</userreplace></p>
+      <p>where <userreplace>identifier</userreplace> is the name by which the font is opened, <userreplace>territory</userreplace> is the number of the territory of the localised <userreplace>name</userreplace> (a decimal number) and the <userinput>\f</userinput> part is omitted if the name is the same as the identifier. For encodings, the letters are <userinput>\E</userinput> and <userinput>\e</userinput>. The identifier may be passed directly to <reference type="swi" name="ZapRedraw_FindFont" /> (or <reference type="swi" name="ZapRedraw_Encoding" />) and may be saved in a configuration file, as it does not depend on the territory of the machine reading it. If the font in the menu cannot be found the error "Unrecognised font in menu in ZapRedraw_DecodeMenu" is returned.</p>
+    </use>
+    <related>
+      <reference type="swi" name="ZapRedraw_ListFonts" />
+      <reference type="swi" name="ZapRedraw_FindFont" />
+    </related>
+    </swi-definition>
+
+  <swi-definition name="ZapRedraw_Encoding"
+                  number="484A0"
+                  description="Finds, releases and reads encodings for use with ZapRedraw_PrepareDataLine."
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="no">
+    <entry>
+      <register-use number="0">Reason code:
+        <p><value-table head-number="Reason" head-value="Meaning">
+          <value number="0">Find an encoding. R1 = pointer to the encoding identifier. Returns R0 = encoding handle.</value>
+          <value number="1">Lose an encoding. R1 = encoding handle.</value>
+          <value number="2">Read the translation table. R1 = encoding handle. Returns R0 = pointer to the table.</value>
+        </value-table></p></register-use>
+      <register-use number="1">Depends on the reason code - see above</register-use>
+    </entry>
+    <exit>
+      <register-use number="0">Depends on the reason code - see above</register-use>
+    </exit>
+    <use>
+      <p>An encoding translates the character codes of a piece of text into Unicode characters. <reference type="swi" name="ZapRedraw_PrepareDataLine" /> can use an encoding to translate text, and thereby display text in other character sets in fonts which contain the Unicode characters.</p>
+      <p>Reason code 0 finds an encoding by its identifier, as returned by <reference type="swi" name="ZapRedraw_DecodeMenu" />, or by its name, such as <userinput>Latin2</userinput>. The encoding is loaded from the file of that name found along <sysvar>ZapFontsSource$Path</sysvar> if it is not already loaded, and the number of users of the handle is increased. The names <userinput>UTF8</userinput> and <userinput>UTF16</userinput> give special handles which require no file. Up to 16 encodings can be loaded at once.</p>
+      <p>Reason code 1 reduces the number of users of an encoding by one. Encodings without users are freed when space is needed and when the module is finished.</p>
+      <p>Reason code 2 returns a pointer to the translation table of an encoding. It is a table of 256 words, one for each 8 bit character code, giving the Unicode character or -1 if the character is not defined. For the special UTF-8 and UTF-16 encodings, which are not tables, it returns 1 for UTF-8 and 2 for UTF-16. The table is valid until the encoding is lost.</p>
+      <p>Handles for tables are numbers from 1 to 16. The special handles for UTF-8 and UTF-16 are &hex;40000001 and &hex;40000002. An unknown reason code gives the error "Unknown ZapRedraw_Encoding reason code" (error number 0); an invalid handle gives "Invalid encoding handle".</p>
+    </use>
+    <related>
+      <reference type="swi" name="ZapRedraw_PrepareDataLine" />
+      <reference type="swi" name="ZapRedraw_DecodeMenu" />
+      <reference type="swi" name="ZapRedraw_ListFonts" />
+    </related>
+    </swi-definition>
+
+</section>
+
+<section title="Star Commands">
+<command-definition name="ZapFontTidy" description="Compacts the Zap font cache">
+  <syntax>
+  </syntax>
+  <use>
+    <p>Discards the data of all fonts which have no users, and compacts the font cache so that the memory can be returned to the system.</p>
+  </use>
+  <related>
+    <reference type="command" name="ZapFontList" />
+    <reference type="swi" name="ZapRedraw_LoseFont" />
+  </related>
+</command-definition>
+
+<command-definition name="ZapFontList" description="Lists the fonts in the Zap font cache">
+  <syntax>
+  </syntax>
+  <use>
+    <p>Lists the font handles in use with, for each, the name of the font (or System font), the size of a character cell, the number of users, and the memory used by the font. It ends with the total size of the font cache and the amount of it which is free.</p>
+  </use>
+  <related>
+    <reference type="command" name="ZapFontTidy" />
+  </related>
+</command-definition>
+
+<command-definition name="ZapFontCat" description="Lists the fonts available to ZapRedraw">
+  <syntax>
+    <optional><userreplace>encodings</userreplace></optional>
+  </syntax>
+  <parameter name="encodings">If any parameter is given, the encodings are listed instead of the fonts.</parameter>
+  <use>
+    <p>Writes the localised name of each font known to ZapRedraw, one per line, in the order of the font menu.</p>
+  </use>
+  <related>
+    <reference type="swi" name="ZapRedraw_ListFonts" />
+  </related>
+</command-definition>
+
+<command-definition name="ZapFontInstall" description="Adds a directory of fonts and rescans the font lists">
+  <syntax>
+    <optional><userreplace>directory</userreplace></optional>
+  </syntax>
+  <parameter name="directory">The directory to add to <sysvar>ZapFontsSource$Path</sysvar>.</parameter>
+  <use>
+    <p>Appends the directory to <sysvar>ZapFontsSource$Path</sysvar>, and scans the directories on the path again for fonts and encodings. With no parameter, only the scan is made.</p>
+  </use>
+  <related>
+    <reference type="swi" name="ZapRedraw_ListFonts" />
+  </related>
+</command-definition>
+
+<subsection title="Debugging commands">
+<p>Builds of ZapRedraw made for debugging also have the commands <userinput>ZapFontDescribe</userinput> (describes the font blocks, encodings and free memory of the cache), <userinput>ZapFontDie</userinput> (forgets all font handles without freeing their memory, so that the module can be killed) and <userinput>ZapFontDebug</userinput> (prints an internal variable), and profiling builds also have <userinput>ZapFontProfile</userinput>. These are only present in debugging builds of ZapRedraw, are subject to change, and should not be relied on.</p>
+</subsection>
 </section>
 
 <section title="Extension routines to ZapRedraw_RedrawArea">
@@ -1421,7 +1731,7 @@ of these numbers. These bitmaps are also useful as cursors.</p>
   <p><value-table head-number="Register" head-value="Contents">
     <value number="R1">Pointer to redraw block</value>
     <value number="R3">Pointer to first character</value>
-    <value number="R4"><sysvar>r_caddr</sysvar> + <sysvar>r_cbpl</sysvar> &times; row where row (0 ... <sysvar>r_charh</sysvar> - 1) is the current character row being drawn. Or, R4 = 0 if in line spacing.</value>
+    <value number="R4">Address of the bitmap data for the current character row being drawn: <sysvar>r_caddr</sysvar> + <sysvar>r_cbpl</sysvar> &times; row where row (0 ... <sysvar>r_charh</sysvar> - 1), or the equivalent address within the font if <sysvar>r_caddr</sysvar> is a font handle. Or, R4 = 0 if in line spacing. R4 = 1 means the current chunk of the font does not exist.</value>
     <value number="R5">Pointer to address in screen memory of current word being written</value>
     <value number="R6">Bit offset in current word being written</value>
     <value number="R7">Current word being written (bits &ge; R6 are clear)</value>
@@ -1490,15 +1800,80 @@ of these numbers. These bitmaps are also useful as cursors.</p>
 
 <subsection title="R0=10 : Foreground colour, background colour and font change">
   <p>Registers as for <reference type="subsection" name="R0=1 : Foreground and background colours changing">R0 = 1</reference></p>
-  <p>Note that if changing font during redraw, then this must be done in an extension routine for DSA redraws.</p>
+  <p>Note that if you are not using a font handle then changing font during redraw must be done in an extension routine for DSA redraws. With a font handle, ZapRedraw has already changed to the new sub-style before the extension routine is called.</p>
 </subsection>
 
-<subsection title="R0>10 : Reserved">
+<subsection title="R0=11 : Chunk change">
+  <p>Registers as for <reference type="subsection" name="R0=1 : Foreground and background colours changing">R0 = 1</reference>, with R3 the address of the next character after the control code and R4 the address of the glyph data for the new chunk (0 if in line spacing, 1 if the chunk does not exist). Called after control code 0,11.</p>
+</subsection>
+
+<subsection title="R0=12 : Large chunk change">
+  <p>As for R0 = 11. Called after control code 0,12.</p>
+</subsection>
+
+<subsection title="R0>12 : Reserved">
 </subsection>
 </section>
 
+<section title="Error Messages">
+<error-definition name="ZapRedraw_NoHandles" number="48480" description="No more font handles">
+<use><p>All 32 font handles are in use (or, for the message "No more encoding handles", all 16 encoding handles).</p></use>
+<related><reference type="swi" name="ZapRedraw_FindFont" /><reference type="swi" name="ZapRedraw_Encoding" /></related>
+</error-definition>
+
+<error-definition name="ZapRedraw_BadLink" number="48481" description="Invalid font link file">
+<use><p>A file which is a link does not begin with "ZFLK" or cannot be read.</p></use>
+</error-definition>
+
+<error-definition name="ZapRedraw_NotFound" number="48482" description="Font '%0' not found">
+<use><p>The font (or, for "Encoding '%0' not found", the encoding) could not be found along <sysvar>ZapFontsSource$Path</sysvar>.</p></use>
+<related><reference type="swi" name="ZapRedraw_FindFont" /><reference type="swi" name="ZapRedraw_Encoding" /></related>
+</error-definition>
+
+<error-definition name="ZapRedraw_NotFont" number="48483" description="Font file corrupt">
+<use><p>The file is not a font file, or (for "Encoding file corrupt") not an encoding file of the supported version, or is truncated.</p></use>
+</error-definition>
+
+<error-definition name="ZapRedraw_CantDie" number="48484" description="ZapRedraw is in use">
+<use><p>The module cannot be killed because font handles or encodings are in use, or because a client claimed <reference type="service" name="ZapRedrawDying" />.</p></use>
+</error-definition>
+
+<error-definition name="ZapRedraw_BadHandle" number="48485" description="Invalid font handle">
+<use><p>The font handle is not in use. For encodings, the message is "Invalid encoding handle".</p></use>
+</error-definition>
+
+<error-definition name="ZapRedraw_NoCache" number="48486" description="Font handles require RISC OS 3.50 or later">
+<use><p>The dynamic area for the font cache could not be created because the system does not support dynamic areas.</p></use>
+</error-definition>
+
+<error-definition name="ZapRedraw_NotImpl" number="48487" description="ZapRedraw_RedrawRaster is no longer implemented">
+<use><p><reference type="swi" name="ZapRedraw_RedrawRaster" /> was called when ViewFinder is drawing the text.</p></use>
+</error-definition>
+
+<error-definition name="ZapRedraw_NotVDU" number="48488" description="Attempt to use a DSA font in VDU mode">
+<use><p>A font handle found in DSA mode was used for a VDU redraw.</p></use>
+</error-definition>
+
+<error-definition name="ZapRedraw_BadFontInfo" number="48489" description="Unknown ReadFontInfo index">
+<use><p>The index passed to <reference type="swi" name="ZapRedraw_ReadFontInfo" /> is not 0. The supplied messages file has no text for this error.</p></use>
+</error-definition>
+
+<error-definition name="ZapRedraw_BadMenu" number="4848A" description="Unrecognised font in menu in ZapRedraw_DecodeMenu">
+<use><p>The selection does not correspond to a font known to ZapRedraw.</p></use>
+<related><reference type="swi" name="ZapRedraw_DecodeMenu" /></related>
+</error-definition>
+
+<error-definition name="ZapRedraw_BadReason" number="0" description="Unknown ZapRedraw_Encoding reason code">
+<use><p>The reason code passed to <reference type="swi" name="ZapRedraw_Encoding" /> is not 0, 1 or 2.</p></use>
+</error-definition>
+
+<error-definition name="ZapRedraw_UnknownSWI" number="1E6" description="Unknown ZapRedraw SWI">
+<use><p>The SWI number is above the last SWI of ZapRedraw.</p></use>
+</error-definition>
+</section>
+
 <section title="Copyright / Contact details">
-<p>The ZapRedraw module is copyright Dominic Symes 1994-1997. Please contact him if you wish to use it in a program other than Zap. See the Zap Copyright file for his address. ZapRedraw and Zap can be obtained from <reference type="link" href="http://www.zap.uk.eu.org/">www.zap.uk.eu.org</reference></p>
+<p>The ZapRedraw module is copyright Dominic Symes 1994-1997, and later versions copyright the Zap Developers. Please contact him if you wish to use it in a program other than Zap. See the Zap Copyright file for his address. ZapRedraw and Zap can be obtained from <reference type="link" href="http://www.zap.uk.eu.org/">www.zap.uk.eu.org</reference></p>
 <p>This manual has been converted from text format to XML by <email name="Andrew Hill" address="drew.hill@tesco.net" />. It is currently in RFC release, and should therefore neither be considered authoritative nor for official release. Many thanks for the RISC OS Documentation Project Group for proof-reading and comments.</p>
 <p>All maintenance to this document should be performed on the XML document, not to its output formats.</p>
 <p>Comments or queries regarding this documentation should be addressed to <email name="Andrew Hill" address="drew.hill@tesco.net" />; comments about ZapRedraw should go to the <email name="Zap DevTeam" address="christian@zap.tartarus.org" />.</p>
@@ -1511,7 +1886,7 @@ of these numbers. These bitmaps are also useful as cursors.</p>
   <email name="Charles Ferguson" address="gerph@gerph.org" />
  </maintainer>
  <disclaimer>
-<p>The ZapRedraw module is copyright Dominic Symes 1994-1997. Please contact him if you wish to use it in a program other than Zap. See the Zap Copyright file for his address. ZapRedraw and Zap can be obtained from <reference type="link" href="http://www.zap.uk.eu.org/">www.zap.uk.eu.org</reference></p>
+<p>The ZapRedraw module is copyright Dominic Symes 1994-1997, and later versions copyright the Zap Developers. Please contact him if you wish to use it in a program other than Zap. See the Zap Copyright file for his address. ZapRedraw and Zap can be obtained from <reference type="link" href="http://www.zap.uk.eu.org/">www.zap.uk.eu.org</reference></p>
 <p>This manual has been converted from text format to XML by <email name="Andrew Hill" address="drew.hill@tesco.net" />. It is currently in RFC release, and should therefore neither be considered authoritative nor for official release. Many thanks for the RISC OS Documentation Project Group for proof-reading and comments.</p>
 <p>All maintenance to this document should be performed on the XML document, not to its output formats.</p>
 <p>Comments or queries regarding this documentation should be addressed to <email name="Andrew Hill" address="drew.hill@tesco.net" />; comments about ZapRedraw should go to the <email name="Zap DevTeam" address="christian@zap.tartarus.org" />.</p>
@@ -1534,6 +1909,12 @@ of these numbers. These bitmaps are also useful as cursors.</p>
    <change>Corrected the offset name of r_maxy, the 4 bits per pixel cache example, the CacheFontChars reason codes, the description of the work area offset 16, and the R0=6 to R0=10 extension routine references.</change>
    <change>Corrected the ConvertBitmap description to say that the cache is written rather than preserved, and that the source bitmap starts at character 0.</change>
    <change>Corrected descriptions copied from other SWIs, spelling, and cross-references.</change>
+  </revision>
+
+  <revision number="RFCs 8" author="Gerph" date="08 Oct 2026" title="Updated for ZapRedraw 0.48">
+   <change>Checked against the ZapRedraw 0.48 sources and corrected the redraw block, flags, sub-styles, RedrawRaster, FindCharacter, PrepareDataLine, GetRectangle, ReadCharSize and ReadFontInfo.</change>
+   <change>Documented chunks (control codes 0,11 and 0,12), encodings and the r_encoding field, ListFonts, ReadModeBPP, DecodeMenu and Encoding.</change>
+   <change>Added descriptions of the font path, font, link and encoding files, caching, VDU mode, ViewFinder, system variables, star commands and errors.</change>
   </revision>
  </history>
 </meta>
