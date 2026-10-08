@@ -1,0 +1,79 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Sprite errors">
+<section title="Introduction and Overview">
+<p>
+JPEG handling within SpriteExtend has been improved to provide greater feedback on errors relating to JPEG which cannot be rendered. This should provide better programmer feedback as to why rendering cannot be performed, and allow the user to decide what course of action to take.
+</p>
+<p>
+Other errors have been added to provide feedback on other faults within SpriteExtend.
+</p>
+</section>
+
+<section title="Error Messages">
+<error-definition name="Error_Sprite_BadColourMap" number="720"
+                  description="The ColourMap flag was set for an unsuitable sprite depth">
+<use>
+<p>
+This error is generated when the 'ColourMap' flag is set for a depth for which it is unsuitable, for example a 256 colour sprite. Colour mapping for shallow sprites should be performed through translation tables which are more efficient.
+</p>
+</use>
+</error-definition>
+
+<error-definition name="Error_Sprite_BadJPEGUnsupported" number="721"
+                  description="The JPEG format is not supported">
+<use>
+<p>
+This error is generated for JPEGs whose format is not supported. Examples of such JPEGs are those with sample factors which are not supported, for example JPEGs with U or V sampling factors other than 1x1.
+</p>
+</use>
+</error-definition>
+
+<error-definition name="Error_Sprite_BadJPEGProgressive" number="722"
+                  description="The progressive JPEG cannot be rendered">
+<use>
+<p>
+This error is generated when a progressive JPEG cannot be rendered by SpriteExtend.
+</p>
+</use>
+</error-definition>
+
+<error-definition name="Error_Sprite_BadType" number="723"
+                  description="The sprite type is not understood">
+<use>
+<p>
+This error is generated when a call is made to SpriteExtend to render a sprite of a type which is not understood.
+</p>
+</use>
+</error-definition>
+
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected 'sample factors which are not supporting' to 'not supported'.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
