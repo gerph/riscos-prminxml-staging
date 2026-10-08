@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="DisplayManager">
+<section title="Introduction">
+<p>
+The DisplayManager tool has been updated with Select 4 to use the new interfaces for mode string processing and to allow control of the display drivers.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Display devices">
+<p>
+The iconbar menu includes a submenu for selecting the desktop display device. On selecting the entry from the menu, the current display device will be shut down and the selected device enabled. The mode which was used last for that device will be selected as the current desktop mode. If no mode had been used for that device, the configured mode will be selected.
+</p>
+</subsection>
+
+<subsection title="Mode strings">
+<p>
+The mode strings used by the display manager are now processed by the OS_ScreenMode routines (see the <reference type="document" href="../graphics/osscreenmode" name="OS_ScreenMode changes" /> document for more details). This ensures that future extensions to mode selection will be available through the DisplayManager interface. Note that teletext mode selectors will not be usable within the desktop.
+</p>
+</subsection>
+
+<subsection title="256 colour modes">
+<p>
+In earlier versions of the Display Manager, the selection of a 256 colour mode from the menus would actually select a 64 colour mode (64 colours, with 4 different brightness levels). This is no longer the case. The selection of a 256 colour mode from the menu will now select a true 256 colour mode.
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
