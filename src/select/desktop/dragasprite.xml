@@ -1,0 +1,99 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="DragASprite">
+<section title="Introduction and Overview">
+<p>
+The DragASprite module was updated in RISC OS 4 to add a number to ease the use of the module. The rendering of the dragged object was updated in Select 2 to take advantage of the transparent rendering of sprites, making it easier to see where the object dragged was being placed.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Flags">
+<p>
+The full bit flag set as used by R0 on entry to <reference type="swi" name="DragASprite_Start" /> is as follows :
+</p>
+<p><bitfield-table>
+ <bit number="0-1">Horizontal location of sprite in box (see PRM 3-301):
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Left</value>
+ <value number="1">Centre</value>
+ <value number="2">Right</value>
+ <value number="3">Undefined</value>
+</value-table></bit>
+ <bit number="2-3">Vertical location of sprite in box (see PRM 3-301):
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Bottom</value>
+ <value number="1">Centre</value>
+ <value number="2">Top</value>
+ <value number="3">Undefined</value>
+</value-table></bit>
+ <bit number="4-5">Drag bounding box is (see PRM 3-301):
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Whole screen</value>
+ <value number="1">Display area of window that the pointer's over</value>
+ <value number="2">User specified</value>
+ <value number="3">Undefined</value>
+</value-table></bit>
+ <bit number="6">Bounding box applies to (see PRM 3-301):
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">The box</value>
+ <value number="1">The pointer</value>
+</value-table></bit>
+ <bit number="7">Control of drop-shadow (see PRM 3-301):
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Don't do a drop-shadow</value>
+ <value number="1">Make a drop shadow when copying the sprite</value>
+</value-table></bit>
+ <bit number="8">Sprite transparency (see PRM 5a-493):
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Sprite should be see-through</value>
+ <value number="1">Sprite should be solid</value>
+</value-table></bit>
+ <bit number="9">Sprite positioning (new to RISC OS 4):
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Sprite's position is determined by bits 0-3</value>
+ <value number="1">Sprite is centred on pointer position</value>
+</value-table></bit>
+ <bit number="10-31">Reserved for future use, should be set to 0</bit>
+</bitfield-table></p>
+</subsection>
+
+<subsection title="Rendering of the dragged sprite">
+<p>
+The meaning of bit 8 changed slightly in Select 2. Under RISC OS 3.5 this bit was added to force the dragged image to be dithered with alternate masked pixels in a chequer-board pattern. Whilst this allowed the background to be dragged, it lost detail from the dragged sprite. This caused visual problems with sprites which used a dither pattern to make up their colours, such as the standard RISC OS sprite set.
+</p>
+<p>
+Under Select 2 this behaviour was modified to use a true translucent sprite. However this effect is less effective as the number of colours in the display mode is reduced. At its extreme (2 colour modes) the sprite becomes solid. However, it is not expected that such low depths be used by many clients and so this is not a serious problem.
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
