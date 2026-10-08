@@ -1,0 +1,80 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="System speed">
+<section title="Introduction and Overview">
+<p>
+The speed of the operating system as a whole will always be an area which is focused on during developments of RISC OS. Whilst it is always desirable to improve the speed with each iteration of the system this is not always possible because of hardware, algorithmic and practical reasons. RISC OS 4, in particular, introduced many efficiency improvements which had a noticeably beneficial effect on the system as a whole. The Kernel itself is the primary candidate for changes in internal use which can have a significant impact on speed. In particular, RISC OS 4 kernel featured :
+</p>
+<p><list>
+<item><p>A streamlined SWI dispatch</p></item>
+<item><p>Memory pools for regularly allocated blocks</p></item>
+<item><p>Cached screen memory</p></item>
+<item><p>'Lazy' task swapping</p></item>
+<item><p>Improved *-command dispatch</p></item>
+<item><p>Hash-filtered service and SWI dispatch</p></item>
+<item><p>Faster dynamic area translation</p></item>
+<item><p>Faster logical memory reservation</p></item>
+</list></p><p>
+Versions of the operating system after this have added other speed optimisations in places, and eroded some of the gain in others.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Kernel changes in Select 4">
+<p>
+Of the features of the Select 4 which have impacted speed the following Kernel changes are of note :
+</p>
+<p><list>
+<item><p>SWI dispatch is no longer placed in RAM but lives within the ROM itself. As the ROM is softloaded into RAM, this presents no speed penalty but has allowed other optimisations to be used.</p></item>
+<item><p>Screen memory is now cached at the discretion of the video driver. The current video drivers (VIDC, SM501, ViewFinder) use this feature to improve performance. Because it is no longer as tightly bound to the Kernel the performance is slightly lower.</p></item>
+<item><p>Video abstraction interfaces mean that additional layers exist between the client's invocation of an operation and it reaching the video memory. On dumb frame buffers, such as VIDC, this means that the speed is reduced slightly. On accelerated hardware, such as ViewFinder and the SM501, hardware features may be used to improve the speed.</p></item>
+<item><p>Some of the software rendering functions (now provided by VideoSW) have been improved. Despite the additional overheads of the video abstraction, some of the operations are now faster than they were previously.</p></item>
+<item><p>System stability has been a significant area of focus for Select 4 and where trade-offs have needed to be made between speed and stability the stability of the system has been the priority. In particular, the diagnostic and stability benefits provided by the 'Privileged Back Trace Structures' has meant that many of the operating system interfaces have been made slightly slower by their inclusion.</p></item>
+<item><p>Although *-command dispatch is now handled entirely externally to the Kernel many of the speed improvements have been retained. The increase in speed previously provided by the hashed command lookups has been improved through a slightly different algorithm.</p></item>
+<item><p>The speed of dynamic area memory allocation has been significantly improved, which has benefits for clients which regularly change the size of their memory areas. A side effect of this, however, is that interrupts during dynamic area memory allocation operations may be delayed in order to ensure that the change happens safely.</p></item>
+<item><p>Heap dynamic areas (a feature introduced with Select 1) are far more efficient for large and regular allocations.</p></item>
+<item><p>SWI name to number translation is significantly faster using a hashing algorithm to reject non-matching cases. This should primarily benefit BASIC applications.</p></item>
+<item><p>Internal buffers (mouse, keyboard, serial) are no longer handled by the Kernel but are now managed by BufferManager. This should not have any significant impact on the speed, although if very large numbers of buffers are registered with BufferManager there may be speed issues.</p></item>
+</list></p></subsection>
+
+<subsection title="Other changes">
+<p>
+Other changes not directly related to the Kernel will have affected system speed. This list is not complete and developers should consult the relevant documentation for issues with specific components.
+</p>
+<p><list>
+<item><p>Within the desktop rendering of special icons is now provided through FilterManager and thus may be slightly slower. In particular, the use of fancy icons (such as the rounded buttons) may be noticeably slower as the images are generated. Because button images are cached this change should only be noticeable for the first rendering of that size and style of icon. The icon cache is discarded on a mode change.</p></item>
+<item><p>The display manager now selects true-colour 256 colour modes when a 256 colour mode is selected from its menus. Previously only the VIDC1-compatible modes would be selected. Clients which check for the 'Fully specified palette' flag within the mode flags in order to provide optimised rendering may find that they must now use slower routines. This can usually be corrected by checking the palette in use. This change has been applied to ColourTrans, and results in an equivalent speed for processing palettes to that of the old style modes, whilst at the same time benefiting true-colour paletted sprites.</p></item>
+<item><p>ColourTrans now provides optimised support for a monotonic 256 grey scale palette (as used by the desktop 'Grey' mode selector). This allows grey scale colour translations to be performed faster than even the optimised old-palette 256 colour palettes.</p></item>
+</list></p></subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected 'handled entirely external by the Kernel' to 'externally to'.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
