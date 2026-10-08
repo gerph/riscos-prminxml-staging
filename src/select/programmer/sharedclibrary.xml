@@ -1,0 +1,448 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="SharedCLibrary">
+<section title="Introduction and Overview">
+<p>
+The Run Time System (RTS) under the SharedCLibrary (and under ANSILib, where
+applicable) has changed to take into account of 32bit operating system
+updates, and the removal of legacy features. Whilst this work is ongoing and
+there will be changes to the various parts of the environment developers
+should note the changes which have occurred thus far.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Event handlers">
+<p>
+With the exception of the escape event the RTS event handlers will no longer
+be called with notification of events from the program environment handler.
+None of the 3 handlers (EventProc, UnhandledEventProc and FastEventProc) will
+be dispatched to the language for non-Escape events for versions of the SCL
+Kernel after 0.19 (consult <sysvar>SharedCLibrary$Version$Kernel</sysvar> for
+this version). Applications wishing to handle events should claim vectors as
+necessary. Consult PRM 4-238 for details of the previous behaviour of these
+entry points.
+</p>
+
+<p>
+This change rationalises the application interface, removing the legacy
+single-tasking event handler which is not used by any known applications under
+modern systems. The expectation of applications running under the Desktop
+means that these handlers are not reliable under the vast majority of
+circumstances.
+</p>
+
+<p>
+Although not explicitly documented within the PRM, the event handler would,
+and continues to be, entered with the event code set to -1 to indicate an
+escape event.
+</p>
+
+<p>There is also a system performance improvement if these handlers are not present.</p>
+</subsection>
+
+<subsection title="Error reporting">
+<p>
+The default signal handler which reports errors within the SCL has been
+updated with 5.57 (specifically Core 0.21). Where possible, the user will now
+be notified through a Wimp error report box. This should be more friendly. It
+should no longer be possible for applications to exit silently when such a
+fault occurs.
+</p>
+
+<p>
+Prior to the error box being displayed (whether it is or not, depending on the
+state of the system) all printing is aborted through PDriver_AbortJob, sprite
+output is redirected back to the screen, and the printing output is disabled
+by a VDU 3.
+</p>
+
+<p>An error box will be presented under the following circumstances:</p>
+
+<p><list>
+<item><p>The application is an initialised Wimp task, not running under
+TaskWindow (TaskWindow is explicitly checked for; suppliers of other similar
+environments should contact us for more details on how support for such
+environments can be provided).</p></item>
+<item><p>The application is not a Wimp task, but is running in a state where it
+is not apparent to the user that the system is in a 'non-desktop' state. This
+means that the Wimp reports that it is in the 'desktop', rather than 'command
+line'. The implication is that a Command window would be pending, although a
+command window may have been explicitly disabled by the task.</p></item>
+</list></p>
+
+<p>
+The error box may, depending on the severity of the fault, report through the
+'&lt;application&gt; may have gone wrong' interface, in which case the
+'Describe' button will display the error report. Where a backtrace report is
+possible (usually under circumstances where the heap and stack frame is known
+to be in a good state) a 'Postmortem' button will be offered to the user. The
+button will be omitted if standard error output is diverted, and the default
+'Quit' button will trigger the postmortem report (which will be sent to the
+diverted file).
+</p>
+
+<p>
+Under circumstances other than those listed above for the error box report,
+the action of the SCL is as if the user had requested a postmortem from the
+error box (if there was one).
+</p>
+
+<p>
+If the 'Postmortem' button is selected (whether explicitly, implicitly because
+output has been diverted, or implicitly because the error box was not
+displayed), the system will begin its display of a postmortem. Otherwise the
+application will exit with an 'EXIT_FAILURE' state.
+</p>
+
+<p>
+When a 'Postmortem' request is made, a command window will be opened if the
+system is within a 'desktop' state. Paged mode will be enabled, requiring
+shift to be pressed to scroll, where necessary. The error report will be
+repeated at the top of the output, followed by a backtrace from the last known
+position. The backtrace should be more reliable under certain obscure stack
+corruption circumstances. Decimal values within the backtrace will now be
+displayed left-padded, and hexadecimal value of 0 will no longer omit the
+leading '0x'. This change ensures that the output lines up vertically and
+makes reading simpler.
+</p>
+
+<p>
+The backtrace itself can be extended through a service call interface. This
+allows other components to replace or augment the backtrace function or to
+provide much more advanced functionality such as full core-dumps, debugging or
+full-circle reporting. The interface for this is documented in the
+<reference type="subsection" name="Postmortem and diagnostic services">Postmortem and diagnostic services</reference>
+and the <reference type="service" name="APCSBacktrace" reason="0" />
+service calls.
+</p>
+
+<p>
+In addition, two previously 'fatal' error reports have been made capable of
+providing a postmortem report.
+</p>
+
+<p><list>
+<item><p>The duplicate free() request would previously report a fatal error
+and terminate. This fault will now offer a postmortem report. Note, however,
+that the more serious free() of an invalid block will still terminate without
+backtrace.</p></item>
+<item><p>Stack exhaustion may now be handled by clients with care. This has two
+facets to it. Firstly, it is now possible for more complex SIGSTAK signal
+handlers to be written. Secondly, the default handler for the stack exhaustion
+signal will now offer a postmortem. Note that the reports from a stack
+exhaustion signal will usually be very long.</p></item>
+</list></p>
+</subsection>
+
+<subsection title="Stack exhaustion recovery">
+<p>
+When a stack exhaustion signal is raised, the system will switch to using a
+separate stack for its operation. This allows clients to recover from the
+stack exhaustion with around 4K of stack in hand. Continued operation from a
+stack exhaustion signal should only be performed through a longjmp()
+operation. Attempting to execute code which requires more than the small
+signal handling stack, without freeing memory for further stack space, will
+result in a fatal error which cannot be trapped.
+</p>
+
+<p>
+Developers have been aware of the limitations on memory imposed by certain
+applications. In particular, the use of the weak __root_stack_size symbol to
+determine the initial system size may have been required to fit certain memory
+limitations. In order to cater for these cases, the allocation for the stack to
+be used during stack exhaustion handling is deferred until the first stack
+extension. Developers will have been aware that the stack extension meant that
+an indeterminate amount of space would be required for their application
+(clients have never been able to rely on the 4K allocation that is usually
+used, PRM 4-239), and thus the action of requiring further stack space
+indicates that both the initial stack size and any requested stack size
+through __root_stack_size are insufficient and thus that the original
+developer did not have memory limitation issues in mind.
+</p>
+
+<p>
+The size of the stack allocated for handling stack exhaustion is guaranteed to
+be 3K or more. The actual maximum size within the current implementation will
+be 4K minus stack chunk overhead and Kernel and Run-Time-System interface
+overhead. However, as the Kernel and Run-Time-System interface overheads are
+not known by the developer in advance, it should be assumed that only 3K is
+available.
+</p>
+</subsection>
+
+<subsection title="Sub-task invocation">
+<p>
+Faulty versions of the squeeze tool (all extant versions) fail to check for
+sufficient memory prior to code expansion. This is partially dealt with by the
+UnsqueezeAIF module to ensure that enough space remains. However, all versions
+of the UnsqueezeAIF module prior to 0.14 contain a similar fault which can also
+fail to check for sufficient memory for the expansion. Version 0.30 of the SCL
+Kernel and later is aware of this problem and leaves sufficient space for this
+extraction process. The visible effect of this is that application failures,
+aborts, or other miscellaneous problems on return from sub-task invocation
+will instead result in a failed sub-task invocation with a 'Not enough memory'
+report.
+</p>
+
+<p>
+Execution of sub-tasks should now be more reliable within a TaskWindow and in
+the face of background exceptions, exits or raised errors. The implementation
+of sub-task invocation is significantly different under version 0.34 and later
+of the SCL Kernel. These changes should remove the likelihood that the parent
+task can be exited erroneously without finalising (atexit handlers, closed
+files, etc). The reimplementation requires slightly more memory and therefore
+a smaller memory area will be available to the invoked task. Whilst the size is
+not defined, under present implementations the overhead required is slightly
+over 2K. This is in addition to the changes that were made to ensure that
+compressed code can be decompressed safely.
+</p>
+</subsection>
+
+<subsection title="Postmortem and diagnostic services">
+<p>
+During a post-mortem request by the SharedCLibrary (Core 0.31 and later), a
+number of service calls will be issued. These service calls allow clients to
+trap the operation of the backtrace and replace it with their own behaviour as
+necessary. It is expected that debugging tools, fault reporting tools, and
+other diagnostic components can take advantage of these to provide more
+information about the failures.
+</p>
+
+<p>
+The service number &hex;DC (<reference type="service" name="APCSBacktrace" reason="0" />)
+is issued to perform a number of different operations, passing a reason code in
+R0. This allows modules to perform alternate operations. The reason codes
+allocated are currently in the following groups:
+</p>
+
+<p><value-table head-number="Reason codes" head-value="Meaning">
+<value number="&hex;00-&hex;0F">Backtrace, application specific operations</value>
+<value number="&hex;10-&hex;1F">Non-application specific</value>
+<value number="&hex;20 onwards">Additional operations</value>
+</value-table></p>
+
+<p>
+The application specific operations will pass an 'application definition'
+structure to the routine. This is a structure intended to provide additional
+information about the application to the handler which it can use at its
+discretion. Any entry within the 'application definition' structure may have
+the value 0 to indicate that the relevant information is not available. The
+structure is as follows:
+</p>
+
+<p><offset-table>
+<offset number="0" name="Structure format">1. Unrecognised formats should be ignored</offset>
+<offset number="4" name="Application name">Pointer to a space, or control-terminated name of the application, usually referred to as argv[0].</offset>
+<offset number="8" name="Command line">Pointer to the entire command line, where available.</offset>
+<offset number="12" name="Heap chunks">Number of heap chunks present</offset>
+<offset number="16" name="Heap chunk descriptors">Pointer to heap chunk descriptors array (of which the number of chunks present is provided at +12). Each heap chunk descriptor describes a region of the heap which has been used, with the format given below. Note that it is expected that these be low level heap chunks, and not the chunks returned by (for example) malloc. The format of the heap is not defined.</offset>
+<offset number="20" name="First RTS block">Pointer to first RTS block</offset>
+<offset number="24" name="After last RTS block">Pointer to after last RTS block</offset>
+</offset-table></p>
+
+<p>Each heap chunk descriptor has the format:</p>
+
+<p><offset-table>
+<offset number="0" name="Base">Base of chunk</offset>
+<offset number="4" name="Size">Size of chunk</offset>
+</offset-table></p>
+</subsection>
+
+<subsection title="Locale operations">
+<p>
+The setlocale function has been updated to correct problems with non-existent
+territory names used as locales. Under versions of the Core prior to 0.34
+valid territory names would be accepted regardless of whether they were
+loaded. This would result in character type issues (eg functions referenced
+from &lt;ctype.h&gt; and other functions which rely on the tables used by those
+functions). The Core will now check for the existence of the territory named in
+the setlocale call before attempting to use it.
+</p>
+</subsection>
+</section>
+
+<section title="Service Calls">
+<service-definition name="APCSBacktrace" number="DC" reason="0" reasonname="BacktraceRequest"
+                    description="An APCS Backtrace has been requested">
+<entry>
+ <register-use number="0">&hex;00 (reason code, Service_APCSBacktrace_BacktraceRequest)</register-use>
+ <register-use number="1">&hex;DC (Service_APCSBacktrace)</register-use>
+ <register-use number="2">File handle to write to, or 0 to print to screen</register-use>
+ <register-use number="3">Pointer to initial register set (if client needs it), or NULL if the register set is not relevant (eg raise()'d signal)</register-use>
+ <register-use number="4">Pointer to initialised _kernel_unwindblock structure</register-use>
+ <register-use number="5">Pointer to name of language for pc value</register-use>
+ <register-use number="6">Error number for reason:
+  <value-table>
+   <value number="&hex;80800EA0">Illegal read, R7 valid</value>
+   <value number="&hex;80800EA1">Illegal write, R7 valid</value>
+  </value-table>
+ </register-use>
+ <register-use number="7">Address of faulting operation</register-use>
+ <register-use number="8">Pointer to application definition</register-use>
+</entry>
+<exit>
+ <register-use number="1">0 if claimed (all backtrace completed)</register-use>
+</exit>
+<use>
+<p>
+This service call is issued by the SharedCLibrary (or other library
+implementations) to notify components that a backtrace has been requested and
+to allow them to replace the entire backtrace generation process. A client
+which is replacing the entire backtrace should claim this call; no further
+output will be written by the library. See the
+<reference type="service" name="APCSBacktrace" reason="1" use-description="yes" />
+service, below, for details of the register block format.
+</p>
+</use>
+<related>
+<reference type="service" name="APCSBacktrace" reason="1" />
+<reference type="service" name="APCSBacktrace" reason="2" />
+</related>
+</service-definition>
+
+<service-definition name="APCSBacktrace" number="DC" reason="1" reasonname="RegisterDump"
+                    description="An APCS Backtrace is in progress and a register dump needs to be written">
+<entry>
+ <register-use number="0">&hex;01 (reason code, Service_APCSBacktrace_RegisterDump)</register-use>
+ <register-use number="1">&hex;DC (Service_APCSBacktrace)</register-use>
+ <register-use number="2">File handle to write to, or 0 to print to screen</register-use>
+ <register-use number="3">Pointer to initial register set (16 or 17 words)</register-use>
+ <register-use number="8">Pointer to application definition</register-use>
+</entry>
+<exit>
+ <register-use number="1">0 if claimed (register dump displayed)</register-use>
+</exit>
+<use>
+<p>
+This service call is issued by the SharedCLibrary (or other library
+implementations) to request the display of a register dump. The register block
+supplied will contain either 16 or 17 words, depending on the processor mode.
+In 26bit mode the block will contain the normal 16 registers with the PC and
+PSR combined. In 32bit mode, the PC will be bare and the 17th word will
+contain the PSR at the time of the fault. The register block will have been
+modified to force the important APCS registers to be their USR mode
+equivalents. That is, R10 (sl), R11 (fp), R13 (sp), and R14 (lr) will contain
+the values they last took when executing USR mode code. All other registers
+should contain their values at the time of the abort. Clients which wish to
+replace the regular register set display should claim the service.
+</p>
+</use>
+<related>
+<reference type="service" name="APCSBacktrace" reason="0" />
+<reference type="service" name="APCSBacktrace" reason="2" />
+</related>
+</service-definition>
+
+<service-definition name="APCSBacktrace" number="DC" reason="2" reasonname="BacktraceDump"
+                    description="An APCS Backtrace is in progress and the backtrace needs to be written">
+<entry>
+ <register-use number="0">&hex;02 (reason code, Service_APCSBacktrace_BacktraceDump)</register-use>
+ <register-use number="1">&hex;DC (Service_APCSBacktrace)</register-use>
+ <register-use number="2">File handle to write to, or 0 to print to screen</register-use>
+ <register-use number="3">Pointer to initial register set (if client needs it), or NULL if the register set is not relevant (eg raise()'d signal)</register-use>
+ <register-use number="4">Pointer to initialised _kernel_unwindblock structure</register-use>
+ <register-use number="5">Pointer to name of language for pc value</register-use>
+ <register-use number="8">Pointer to application definition</register-use>
+</entry>
+<exit>
+ <register-use number="1">0 if claimed (backtrace printed)</register-use>
+</exit>
+<use>
+<p>
+This service call is issued by the SharedCLibrary (or other library
+implementations) to request the display of a backtrace. Clients should display
+the relevant backtrace in whatever form they require, and then claim the
+service.
+</p>
+</use>
+<related>
+<reference type="service" name="APCSBacktrace" reason="0" />
+<reference type="service" name="APCSBacktrace" reason="1" />
+</related>
+</service-definition>
+
+<service-definition name="APCSBacktrace" number="DC" reason="10" reasonname="DecodeName"
+                    description="Request to decode a function name into a displayable format">
+<entry>
+ <register-use number="0">&hex;10 (reason code, Service_APCSBacktrace_DecodeName)</register-use>
+ <register-use number="1">&hex;DC (Service_APCSBacktrace)</register-use>
+ <register-use number="2">Pointer to string to decode</register-use>
+ <register-use number="3">Pointer to language name, or NULL if not known</register-use>
+</entry>
+<exit>
+ <register-use number="1">0 if claimed (name was translated)</register-use>
+ <register-use number="2">Pointer to decoded string (may be static until next call), if claimed</register-use>
+</exit>
+<use>
+<p>
+This service may be issued by any client during a backtrace operation, a debug
+operation, or similar, to decode a function name into a printable format. This
+is intended for use with 'mangled' function names where the function name used
+for linking or embedded within the executable is not representative of the
+user-specified function name. This can be used for languages such as C++ with
+CFront, where the name supplied can be decoded into a fully specified C++
+name. Clients providing replacement names should write a decoded string into a
+private buffer and return this buffer to the client. The buffer should be
+readable in USR mode.
+</p>
+</use>
+<related>
+<reference type="service" name="APCSBacktrace" reason="2" />
+</related>
+</service-definition>
+
+<service-definition name="APCSBacktrace" number="DC" reason="20" reasonname="MiniDumpCreated"
+                    description="Notification to clients that a MiniDump has been created">
+<entry>
+ <register-use number="0">&hex;20 (reason code, Service_APCSBacktrace_MiniDumpCreated)</register-use>
+ <register-use number="1">&hex;DC (Service_APCSBacktrace)</register-use>
+ <register-use number="2">Pointer to filename of MiniDump file</register-use>
+ <register-use number="3">Pointer to executable name</register-use>
+</entry>
+<exit>
+ <register-use number="1">0 if MiniDump has been dealt with</register-use>
+</exit>
+<use>
+<p>
+This service is generated by the MiniDump module after it has dealt with a
+Backtrace request and generated a Diagnostic Data file from it. Clients may
+use this service to perform automated operations on the diagnostic data, such
+as full circle reporting. It is strongly recommended that such clients pay
+attention to any security issues which might be raised by such reports. If
+unclaimed, the MiniDump module will perform the default action. At the present
+time, this means that the dump directory will be opened.
+</p>
+</use>
+<related>
+<reference type="service" name="APCSBacktrace" reason="0" />
+</related>
+</service-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>

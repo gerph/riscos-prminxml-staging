@@ -106,6 +106,7 @@
         <page href="extendedc">Extended C functions</page>
         <page href="modularity">Modularity within RISC OS</page>
         <page href="c99lowlevel">C99 low level support functions</page>
+        <page href="sharedclibrary">SharedCLibrary</page>
         <page href="pathutils">PathUtils</page>
         <page href="zipper">Zipper module</page>
     </section>
