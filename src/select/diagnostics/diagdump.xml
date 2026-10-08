@@ -45,6 +45,23 @@ In addition to this information, the user may choose to expand the regions of me
 </p>
 </subsection>
 
+<subsection title="Dump files">
+<p>
+A dump recorded because of a failure is given a name made from the date and time
+of the failure (in UTC) and the name of the application which failed, in the form
+<userinput>YYYYMMDD-HHMM-</userinput><userreplace>application</userreplace>, within the
+dump directory. The application name is taken from the command which started the
+program; where the program is called <userinput>!RunImage</userinput> the name of
+the directory containing it is used instead, and where no useful name can be found
+the name <userinput>Dump</userinput> is used. Dumps requested with
+<reference type="swi" name="DiagnosticDump_Write" /> are named in the same way, with
+a unique number appended (<userinput>-1</userinput>, <userinput>-2</userinput>, and
+so on, counting from the start of the session). On a filing system which cannot hold
+names of this length a shorter name is used, which identifies only the date and the
+time.
+</p>
+</subsection>
+
 <subsection title="Reading Diagnostic Dump files">
 <p>
 The dump files are stored in a simple chunk format. This format can be obtained
@@ -84,12 +101,13 @@ enabled it will record the necessary details to a dump file.
 
 <p><value-table head-number="Option" head-value="Meaning">
 <value number="Y[&lt;level&gt;]">Enable the module. Without a 'Y' option, dumps will not be generated. If not specified, the &lt;level&gt; defaults to 0. The &lt;level&gt; values determine the amount of information recorded from the application space, in increasing order of dump size: 0 = record backtrace details (usually ~30K); 1 = record backtrace details and application heap; 2 = record backtrace details, application heap and application statics; 3 = record entire application space.</value>
-<value number="O">Automatically open the dump directory if no other handler shows an interest in the dump.</value>
+<value number="O">Automatically open the dump directory if no other handler shows an interest in the dump. After a dump has been recorded, the module issues <reference type="service" name="APCSBacktrace" reason="20" /> with the name of the dump; if that service is not claimed, the directory is opened.</value>
 </value-table></p>
 
 <p>
-By default the module is configured to use 'Y0O'. To disable the module's
-automatic recording of diagnostic data entirely, unset the variable.
+When the module starts, if the variable is not set then it is set to 'Y0O'. To
+disable the module's automatic recording of diagnostic data entirely, unset the
+variable. Option characters which are not recognised are ignored.
 </p>
 </use>
 <related>
@@ -102,7 +120,8 @@ automatic recording of diagnostic data entirely, unset the variable.
 <use>
 <p>
 The dump files are held in the directory specified by this variable or, if it is
-unset, in <filename>&lt;Wimp$ScrapDir&gt;.DiagDump</filename>.
+unset, in <filename>&lt;Wimp$ScrapDir&gt;.DiagDump</filename>. The directory is
+created if it does not exist.
 </p>
 </use>
 <related>
@@ -132,11 +151,11 @@ unset, in <filename>&lt;Wimp$ScrapDir&gt;.DiagDump</filename>.
    </bit>
    <bit number="2">Name in R1 is an explicit filename to use</bit>
    <bit number="3">Buffer file for writing on callback</bit>
-   <bit number="4">Open directory after writing dump</bit>
+   <bit number="4">Open directory after writing dump. This flag is defined, but versions of the module up to and including 0.17 do not accept it and return the error <reference type="error" name="DiagnosticDump_BadFlags" /></bit>
    <bit number="5-31">Reserved, must be 0</bit>
   </bitfield-table>
  </register-use>
- <register-use number="1">0 to generate filename automatically; if R0 bit 3 is set, pointer to filename to write to; if R0 bit 3 is clear, pointer to a leaf name in the standard directory</register-use>
+ <register-use number="1">If R0 bit 2 is set and R1 is not 0, the name of the file to write to. Otherwise the name is generated in the standard directory: if R1 is 0 or points to an empty string the name of the current program is used, and otherwise R1 points to the name to use in place of the program name</register-use>
  <register-use number="2">Pointer to a block of 16 (17 in 32bit mode) registers to record with the dump</register-use>
 </entry>
 <exit>
@@ -178,16 +197,20 @@ immediately.
 
 <p>Other bits are reserved for future expansion.</p>
 
-<p>
-<fixme>The description of R1 depends on R0 bit 3 (buffer the file), while R0 bit 2 is the flag which states that R1 is an explicit filename. It is not recorded which of the two flags was intended to select the interpretation of R1.</fixme>
-</p>
 
 <p>The register dump, if supplied, will be included within the file.</p>
 
 <p>
 In order to ensure uniqueness for automatically generated files, even when many
 files are recorded within the space of a minute, a unique number is appended to
-the filename.
+the filename (see <reference type="subsection" name="Dump files">Dump files</reference>).
+</p>
+
+<p>
+If the dump cannot be recorded (for example because the file cannot be created),
+no error is returned. The call returns an error if reserved flags are set, if it
+is called whilst buffered dumps are being written to disc, or if there is not
+enough memory to hold the data.
 </p>
 </use>
 <related>
@@ -195,6 +218,45 @@ the filename.
 <reference type="sysvar" name="DiagnosticDump$Dir" />
 </related>
 </swi-definition>
+</section>
+
+<section title="Error Messages">
+<error-definition name="DiagnosticDump_NoMemory" number="81E300"
+                  description="Not enough memory to buffer diagnostic data">
+<use>
+<p>There was not enough memory to hold the data which was to be recorded.</p>
+</use>
+<related>
+<reference type="swi" name="DiagnosticDump_Write" />
+</related>
+</error-definition>
+
+<error-definition name="DiagnosticDump_Locked" number="81E301"
+                  description="Entries cannot be written whilst DiagnosticDump is locked">
+<use>
+<p>
+<reference type="swi" name="DiagnosticDump_Write" /> was called whilst the module was
+writing buffered dumps to disc.
+</p>
+</use>
+<related>
+<reference type="swi" name="DiagnosticDump_Write" />
+</related>
+</error-definition>
+
+<error-definition name="DiagnosticDump_BadFlags" number="81E302"
+                  description="Bad flags for DiagnosticDump">
+<use>
+<p>
+<reference type="swi" name="DiagnosticDump_Write" /> was called with a flag set which
+the module does not accept: a reserved bit, or (in versions up to and including 0.17)
+bit 4.
+</p>
+</use>
+<related>
+<reference type="swi" name="DiagnosticDump_Write" />
+</related>
+</error-definition>
 </section>
 
 <section title="Security Issues">
@@ -246,6 +308,7 @@ typically credit card details).
   </revision>
   <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
     <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Added the errors, the naming of dump files, the default value of the options variable, the notification of a new dump and the behaviour of R1 in DiagnosticDump_Write, and noted that bit 4 of the flags is not accepted by version 0.17.</change>
  </revision>
  </history>
 
