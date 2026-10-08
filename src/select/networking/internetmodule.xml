@@ -1,0 +1,330 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Internet module">
+<section title="Introduction and Overview">
+<p>
+The Internet module has been updated in line with the previous extensions to
+the module. Whilst the changes have not been as wide ranging as in earlier
+versions of the operating system they extend the functionality to support
+certain specialist tools. This document supplements the original documentation
+of the module.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="System recovery">
+<p>
+The Internet module and the other networking components within the Operating
+System are able to recover in the face of the Internet module being restarted.
+Network components within the operating system have been updated to shut down
+gracefully when the Internet module dies and to attempt to reestablish
+themselves if it is restarted. This behaviour should be expected of all network
+components, but there is a long history of components which do not cope well
+with the stack being restarted. In particular, there is no mechanism for
+applications to be made aware of this.
+</p>
+
+<p>
+Clients should pay attention to the
+<reference type="service" name="DCIProtocolStatus" href="?" /> and
+<reference type="service" name="DCIDriverStatus" href="?" /> service calls in
+order to cope with such situations.
+</p>
+</subsection>
+
+<subsection title="Address collision">
+<p>
+When an address collision is detected by the Internet module (two hosts using
+the same IP address within the same network) a new service,
+<reference type="service" name="InternetStatus" href="addresscollisions" /> 8
+will be issued. This allows clients to recover by configuring an alternative
+address. If no measures are taken the Internet module will 'panic' and must be
+restarted to recover.
+</p>
+</subsection>
+
+<subsection title="Socket pollwords">
+<p>
+A new ioctl operation on sockets, FIOPOLLWORD, has been added to provide
+applications with the ability to set a pollword within shared workspace (for
+example the module area). This operation allows multitasking clients such as
+those using the Wimp to be polled when events occur on such sockets.
+</p>
+
+<p>
+FIOPOLLWORD is defined as <code type="c">_IOW('f', 120, int[2])</code> which
+has a value of &hex;80086678.
+</p>
+
+<p>
+The data passed to FIOPOLLWORD consists of two 32bit values. The first of these
+is the pointer to the word aligned pollword to enable pollword usage, or 0 to
+disable pollword usage. The pollword should be in shared workspace such as the
+module area. The second value is a bit number to set within the word pointed to
+and should be a value between 0 and 31 inclusive.
+</p>
+
+<p>Usually this would be used in the form:</p>
+<p><extended-example type="c">
+<userinput>struct {long *pollword;</userinput><br/>
+<userinput>       int bit_number;</userinput><br/>
+<userinput>      } pwstruct;</userinput><br/>
+<userinput></userinput><br/>
+<userinput>pwstruct.pollword = pollword_in_rma;</userinput><br/>
+<userinput>pwstruct.bit_number = 0;</userinput><br/>
+<userinput></userinput><br/>
+<userinput>if (ioctl(socket, FIOPOLLWORD, &amp;pwstruct))</userinput><br/>
+<userinput>{</userinput><br/>
+<userinput>    /* fault pollword operation, or fallback to simpler methods */</userinput><br/>
+<userinput>}</userinput>
+</extended-example></p>
+</subsection>
+
+<subsection title="Aliased interfaces">
+<p>
+From Internet 5.37, support for interface aliasing has been enhanced to allow
+for named aliased interfaces. The new interface naming scheme is compatible
+with that of earlier versions of the Internet module and it is unlikely that
+applications will fail to function with aliased names. Interface names are now
+given in the form:
+</p>
+
+<p><extended-example type="format">
+<userinput>&lt;interface&gt;&lt;unit&gt;[:&lt;alias&gt;]</userinput>
+</extended-example></p>
+
+<p>
+Where &lt;interface&gt; is given by the device driver (such as 'ea'), &lt;unit&gt;
+is numbered from 0, describing the units provided by the device driver (most
+devices only supply a single unit). &lt;alias&gt; is a number from 0, describing
+the alias for an interface.
+</p>
+
+<p>
+The primary address of an interface is described without an alias identifier.
+Reading non-Internet based information (such as hardware addresses) will
+ignore the alias number.
+</p>
+
+<p>
+Internet module versions 5.37 to 5.43 allocate alias numbers dynamically,
+resulting in non-deterministic behaviour for clients wishing to create aliases
+for interfaces. That is, deleting the address associated with 'eh0:0' would
+cause 'eh0:1' to be renumbered to 'eh0:0'. From Internet 5.44 onward alias
+numbers are fixed at their creation and can be referred to directly - 'eh0:1'
+would remain as 'eh0:1' in the above example.
+</p>
+
+<p>
+Aliased interfaces cannot be used for DHCP or BootP (only the primary address
+may be obtained through DHCP or BootP). The ioctl call to obtain interface
+details, SIOCGIFCONF, will return aliased interfaces as named above.
+</p>
+
+<p>
+Aliased interfaces will not be matched within firewalling rules. Only the
+primary interface ('&lt;interface&gt;&lt;unit&gt;') will be matched for these
+rules.
+</p>
+
+<p>
+Clients should treat aliased interfaces as separated interfaces where this is
+appropriate. For example, where clients wish to broadcast to all connected
+networks, all interfaces including those which are aliased should be
+considered.
+</p>
+</subsection>
+
+<subsection title="Datagram control information">
+<p>
+Control information may be returned on packets using the 'IP_RECV' prefixed
+socket options with the recvmsg() system call. In versions of the Internet
+module prior to 5.54, the control information was not returned for broadcast or
+multicast datagrams. This information is now correctly returned for broadcast,
+multicast or unicast use.
+</p>
+</subsection>
+
+<subsection title="Reception interface">
+<p>
+In order to support certain multi-homed clients, it is now possible to read the
+interface on which a datagram was received. This option is known as 'IP_RECVIF'
+and takes the socket option 20 (see TCPIPLibs:sys.h.netinet). This is similar
+to the other 'IP_RECV' prefixed options in that it provides an additional field
+in the options for the packet based on the packet's reception.
+</p>
+
+<p>Typical usage to enable the use of the data with a socket is:</p>
+<p><extended-example type="c">
+<userinput>int paramint = 1;</userinput><br/>
+<userinput>err = setsockopt(sock, IPPROTO_IP, IP_RECVIF, &amp;paramint, sizeof(paramint));</userinput>
+</extended-example></p>
+<p>
+The details of the packet can be received through the message control data
+received with recvmsg. Typically this might be read thus:
+</p>
+<p><extended-example type="c">
+<userinput>struct msghdr   msg;</userinput><br/>
+<userinput>struct iovec    iov[1];</userinput><br/>
+<userinput>int readlen;</userinput><br/>
+<userinput>struct cmsghdr  *cmptr;</userinput><br/>
+<userinput>static union {</userinput><br/>
+<userinput>  cmsghdr cm;</userinput><br/>
+<userinput>  char    control[1024];</userinput><br/>
+<userinput>} control_un;</userinput><br/>
+<userinput></userinput><br/>
+<userinput>msg.msg_control = control_un.control;</userinput><br/>
+<userinput>msg.msg_controllen = sizeof(control_un.control);</userinput><br/>
+<userinput>msg.msg_flags = 0;</userinput><br/>
+<userinput></userinput><br/>
+<userinput>msg.msg_name = (caddr_t)&amp;saddr;</userinput><br/>
+<userinput>msg.msg_namelen = sizeof(saddr);</userinput><br/>
+<userinput>iov[0].iov_base = packetdata;</userinput><br/>
+<userinput>iov[0].iov_len = sizeof(packetdata);</userinput><br/>
+<userinput>msg.msg_iov = iov;</userinput><br/>
+<userinput>msg.msg_iovlen = 1;</userinput><br/>
+<userinput></userinput><br/>
+<userinput>readlen = recvmsg(sock, &amp;msg, 0);</userinput><br/>
+<userinput>if (readlen &lt; 0)</userinput><br/>
+<userinput>  return FAILURE;</userinput><br/>
+<userinput></userinput><br/>
+<userinput>if (msg.msg_controllen &gt; 0 &amp;&amp;</userinput><br/>
+<userinput>    (msg.msg_controllen &lt; sizeof(struct cmsghdr) ||</userinput><br/>
+<userinput>     (msg.msg_flags &amp; MSG_CTRUNC)))</userinput><br/>
+<userinput>{</userinput><br/>
+<userinput>  /* the control data was corrupted so ignore */</userinput><br/>
+<userinput>}</userinput><br/>
+<userinput>else</userinput><br/>
+<userinput>{</userinput><br/>
+<userinput>  if (msg.msg_controllen &gt; 0)</userinput><br/>
+<userinput>  {</userinput><br/>
+<userinput>    for (cmptr = CMSG_FIRSTHDR(&amp;msg);</userinput><br/>
+<userinput>         cmptr != NULL;</userinput><br/>
+<userinput>         cmptr = CMSG_NXTHDR(&amp;msg, cmptr))</userinput><br/>
+<userinput>    {</userinput><br/>
+<userinput>      if (cmptr-&gt;cmsg_level == IPPROTO_IP)</userinput><br/>
+<userinput>      {</userinput><br/>
+<userinput>        switch (cmptr-&gt;cmsg_type) {</userinput><br/>
+<userinput>          case IP_RECVIF:</userinput><br/>
+<userinput>            {</userinput><br/>
+<userinput>              sockaddr_dl *sdl = (struct sockaddr_dl *) CMSG_DATA(cmptr);</userinput><br/>
+<userinput>              ifindex = sdl-&gt;sdl_index;</userinput><br/>
+<userinput>              /* Deal with interface appropriately */</userinput><br/>
+<userinput>            }</userinput><br/>
+<userinput>            break;</userinput><br/>
+<userinput>        }</userinput><br/>
+<userinput>      }</userinput><br/>
+<userinput>    }</userinput><br/>
+<userinput>  }</userinput><br/>
+<userinput>}</userinput>
+</extended-example></p>
+</subsection>
+
+<subsection title="Multicast filtering">
+<p>
+Network drivers supporting the multicast filtering specified in DCI 4.04 are
+now supported by the Internet module. This should ensure that, where hardware
+filtering is supported, the system load is reduced by ignoring packets which are
+destined for groups which we are not members of. As with all multicast
+filtering implementations the system is based on a hash of the destination
+address and thus cannot filter all traffic. Consult the DCI functional
+specification for more details (restricted availability).
+</p>
+</subsection>
+
+<subsection title="Multicast use">
+<p>
+Under versions of the Internet module prior to 5.55 it was necessary to
+configure a default route in order to use multicast, either for reception or
+transmission. Where an interface is specified, the packets will now be sent
+directly regardless of the configuration of routing.
+</p>
+</subsection>
+
+<subsection title="Improved standard compliance">
+<p>
+Various improvements have been made to the Internet module to better comply to
+the standards for internet hosts. In particular the following changes have been
+made:
+</p>
+
+<p><list>
+<item><p>Addresses within 127/8 will no longer be sent on external interfaces, and will be ignored on reception.</p></item>
+<item><p>ICMP 'unreachable port' and ICMP 'unreachable protocol' are now reported as hard errors which will abort TCP connections, rather than soft errors which would merely cause a retry.</p></item>
+<item><p>ICMP 'time exceeded' is now reported as a soft error, similar to the 'unreachable host', rather than being ignored.</p></item>
+<item><p>Configuration of interfaces with addresses 0.0.0.x or 255.255.255.x is no longer accepted.</p></item>
+</list></p>
+</subsection>
+
+<subsection title="Internet module packet filtering">
+<p>
+The Internet module provides an interface for packet filtering, allowing
+clients to capture packets on entry and before output. This can be used for a
+number of purposes, ranging from auditing through diagnostic logging, to
+address translation. See the InternetFiltering document for more details.
+</p>
+</subsection>
+
+<subsection title="UpCall behaviour (FIOSLEEPTW)">
+<p>
+Under versions of the Internet module prior to 5.63 the ioctl control
+FIOSLEEPTW would only be effective within a TaskWindow environment. This placed
+an undue reliance on the TaskWindow module. The restriction has been removed
+from the module. Where FIOSLEEPTW is enabled, OS_UpCall 6 will be issued whether
+the component is running under a TaskWindow or not. This should allow alternate
+implementations and similar sleep operations to be performed.
+</p>
+</subsection>
+
+<subsection title="MBuf Scavenging">
+<p>
+In order to cope more gracefully with MBuf exhaustion the Internet module now
+responds appropriately to a 'scavenge' request from the MBufManager. When
+MBufManager discovers that not enough space remains to perform an allocation it
+will request that clients obtain more space through the
+<reference type="service" name="MBufManagerStatus" reason="2" /> 'scavenge'
+service. The Internet module responds to this by freeing buffered MBufs from
+the protocol-specific buffers. This means that IP fragment reconstruction
+buffers will be released back to the MBufManager such that it may continue its
+allocation.
+</p>
+
+<p>
+Single chains of IP fragments will be released for each scavenge request,
+starting from the oldest. This should ensure that during large network activity
+and prolonged periods with interrupts disabled it should be possible to receive
+packets and continue reconstruction of the most recent data. Scavenge requests
+should only be common when the network speed exceeds the system's ability to
+process data, or where packets are generated more rapidly than the network can
+transmit them.
+</p>
+</subsection>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>The code examples in the capture had lost some of their keywords and comment markers (the if, for and switch statements and the comment delimiters); these have been restored.</change>
+ </revision>
+ </history>
+
+</meta>
+</riscos-prm>
