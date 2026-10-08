@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Fixed page dynamic areas">
+<section title="Introduction and Overview">
+<p>
+Fixed page dynamic areas are an extension of the 'Needs specific pages' flag (bit 8) on OS_DynamicArea 0 (Create). For certain applications it is necessary to directly access hardware or certain given page numbers. Where this is the case and no system-provided mapping is available it is possible to create a dynamic area which can be used to access the pages by supplying a Dynamic Area Handler routine. However, for the vast majority of cases the routine will specify a fixed set of pages for the dynamic area to grow into. This is where the 'Needs Fixed Pages' flag (bit 19) is useful.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+Instead of providing a dynamic area handler routine the list of pages which are required for the dynamic area can be supplied as the workspace parameter on dynamic area creation, together with the 'Needs Fixed Pages' flag. The list of pages takes the same form as that used by the Dynamic Area Handler routines :
+</p>
+<p><offset-table>
+ <offset number="0">Page number (only when the 'Physical Mapping' flag is unset)</offset>
+ <offset number="4">Logical address (ignored)</offset>
+ <offset number="8">Physical address (only when the 'Physical Mapping' flag is set)</offset>
+</offset-table></p>
+<p>
+Fixed page dynamic areas will always occupy the maximum extent of the dynamic area and sufficient pages should be provided within the workspace parameter to create the dynamic area. The page block is not required after the dynamic area has been created. Fixed page dynamic areas may not be :
+</p>
+<p><list>
+<item><p>Abortable</p></item>
+<item><p>Heap</p></item>
+<item><p>Sparse</p></item>
+<item><p>Shrinkable</p></item>
+</list></p><p>
+It is recommended that they be locked and 'not user draggable' if clients do not wish the areas to be resized by user operations.
+</p>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the identification of the 'Needs specific pages' flag as bit 19; it is bit 8 (bit 19 is the 'Needs Fixed Pages' flag).</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
