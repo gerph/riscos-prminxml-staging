@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="PipeFS">
+<section title="Introduction and Overview">
+<p>
+Since RISC OS 4, PipeFS has been improved to provide better performance when larger transfers are used and to reduce the fragmentation of the RMA. Instead of using the RMA for storing files, a private dynamic area is used. This should reduce the fragmentation of the RMA and allow greater space to be used for executable code.
+</p>
+<p>
+Large transfers using the multi-byte transfer OS_GBPB calls are now much faster and are no longer implemented as a sequence of byte operations. This should improve performance significantly when transferring bulk data through PipeFS. In addition, 'file modified' upcalls are no longer issued for every byte which is transferred (regardless of whether it is a multi-byte or single byte transfer); these will be deferred by a short period to allow multiple transfers to be notified only after they have completed or transferred a larger amount of data. This has a significant effect on performance.
+</p>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
