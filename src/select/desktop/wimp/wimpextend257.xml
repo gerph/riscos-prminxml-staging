@@ -1,0 +1,75 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Wimp_Extend 257">
+<section title="Introduction and Overview">
+<p>
+This call appends a mode suffix to a filename within a buffer, so that mode-dependent resources can be located.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="Wimp_Extend"
+                number="400FB"
+                reason="101"
+                reasonname="Wimp_Extend_AppendModeSuffix"
+                description="Append a mode suffix to a filename"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">257 (reason code)</register-use>
+ <register-use number="1">Pointer to filename in a buffer to be updated</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to buffer passed in</register-use>
+ <register-use number="1">0 (if buffer updated, preserved if not supported by this Wimp)</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to append a mode suffix to a filename within a buffer. The buffer should have space for up to 8 characters in addition to the filename in order to allow for future expansion. The suffixes follow the standard pattern of describing the pixel sizes in terms of OS units (see <reference type="swi" name="Wimp_ReadSysInfo" reason="2" /> in PRM 3-218).
+</p>
+<p>
+Initially, the current mode suffix will be tried. If this does not exist, the name will be normalised to the lowest pixel size. If the suffix is 11 and this fails then 22 will be tried. If these fail, then the call will fall back to no suffix. For example, in a mode with pixels using the size 1 OS unit in the x direction and 4 OS units in the y direction (eigen factors EX0 EY2) the suffixes examined would be 14, 24, 44 and finally falling back to no suffix.
+</p>
+<p>
+Clients should check whether R1 has been set to 0 on return. If it has not, this call is not supported by the WindowManager.
+</p>
+<p>
+<strong>Note:</strong> Under Select 3i1 this call was Wimp_Extend 14 but this was found to clash with an undocumented call under RISC OS 5. It has been reallocated.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
