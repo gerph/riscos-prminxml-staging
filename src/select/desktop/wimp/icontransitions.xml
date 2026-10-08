@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Icon Transitions">
+<section title="Introduction">
+<p>
+The Window Manager has been updated to provide notifications of the pointer entering and leaving icons. These transition messages are similar to those provided by the 'pointer entering/leaving window' messages. Most clients will not need to receive such notifications.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Wimp_Poll reason codes and masks">
+<p>
+The new reasons codes have been allocated as event codes 14 (pointer leaving icon) and 15 (pointer entering icon). Because most applications will not have these bits masked in their Wimp_Poll mask it is necessary to set bit 25 in the mask to indicate that the events are required. Thus, the mask definition has been updated to add the following bits :
+</p>
+<p><bitfield-table>
+ <bit number="14">If set, ignore 'pointer leaving icon' events</bit>
+ <bit number="15">If set, ignore 'pointer entering icon' events</bit>
+ <bit number="25">If clear, ignore all 'pointer entering/leaving icon' events; if set, obey bits 14 and 15</bit>
+</bitfield-table></p>
+<p>
+Wimp_Poll event codes 14 and 15 are returned whenever the above conditions have been met, and the mouse has moved in or out of an icon's bounding box.
+</p>
+<p>
+Event codes 14 and 15 return the same structure in the user's event block :
+</p>
+<p><offset-table>
+ <offset number="0">Window handle</offset>
+ <offset number="4">Icon handle</offset>
+</offset-table></p>
+<p>
+Icon transition events will never be returned for the logical window background, which is usually indicated by icon handle -1. When windows are closed beneath the pointer the events will be delivered in the logical manner as if the pointer had left the window naturally. Thus, the usual sequence of events for a pointer moving into a window, to a 'Close' button, and clicking it would be :
+</p>
+<p><list type="ordered">
+<item><p>Pointer entering window</p></item>
+<item><p>Pointer entering close icon [mouse clicked, window closed]</p></item>
+<item><p>Pointer leaving close icon</p></item>
+<item><p>Pointer leaving window</p></item>
+</list></p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected 'backgound' to 'background'.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
