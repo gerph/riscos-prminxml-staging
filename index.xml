@@ -103,6 +103,7 @@
     </section>
     <section title="Programmer" dir="programmer">
         <page href="pathutils">PathUtils</page>
+        <page href="zipper">Zipper module</page>
     </section>
     <section title="Boot sequence" dir="boot">
         <page href="configure-plugins">Configure plugins</page>
