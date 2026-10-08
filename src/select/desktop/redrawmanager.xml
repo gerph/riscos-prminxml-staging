@@ -1,0 +1,236 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Rendering into Windows">
+<section title="Introduction">
+<p>
+The RedrawManager module, together with the FilterManager and recent versions of the Window Manager, provides a mechanism for drawing into a window as part of the Window Manager's redraw process. This allows clients to implement complex rendering transparently without requiring the application to be updated to explicitly call the rendering routines as part of their redraw loop. Complex gadget redraws are made much simpler through the use of the RedrawManager. With RedrawManager, gadgets may redraw their content without any application-specific support.
+</p>
+<p>
+The functions of the RedrawManager are used by the more recent Window toolbox objects to allow gadgets to redraw more complex gadgets. This document covers RedrawManager 0.11 and later.
+</p>
+</section>
+
+<section title="Technical Details">
+<p>
+In some instances it is necessary to have a complex graphic in a window which cannot be represented as text or a sprite and so requires an external source to redraw it. This is achieved via the Wimp's Post-Rectangle Filters. The Filter Manager (version 0.13 and above) makes these filters available to other modules so that they can draw directly into a Wimp window. Filter Manager 0.15, in conjunction with version 3.86 of the Wimp also provides Post-Icon Filters.
+</p>
+<p>
+Post-Rectangle filters are available in Window Manager modules 3.86 or later. On versions 3.16-3.85 of the Wimp, the Filter Manager will simulate the post-rectangle filter using the rectangle filter. (The original rectangle filter itself is not useful for this application because it is called for the window tools as well as window contents, and is also called before the Window Manager draws the window background).
+</p>
+<p>
+Post-Icon filters are only available in Window Manager modules 3.86 or later; they are not simulated on older Window Managers.
+</p>
+<p>
+Post-Rectangle and Post-Icon filters are quite low level and there are a number of complications when using them directly, so a new module, the Redraw Manager has been written. This enables a module to 'register interest' in a region of a wimp window and then be called back whenever this region has been invalidated. Note that Rectangle filters work even if the window is 'auto-redraw' and so the client does not need to know that the Gadget is being provided in this way.
+</p>
+<p>
+When the callback is made, the module is told which part of the window is being updated and how this intersects with the region that was registered. A data pointer is also passed back so that the module can access the required information for redrawing the region. As a result the call will be made separately for each region that is currently invalid that the module has registered an interest in.
+</p>
+<p>
+The callback is made during a redraw loop (so Wimp_PlotIcon takes work area coordinates). Do not call Wimp_GetRectangle or Wimp_UpdateWindow in your callback routine. The order of actions for each rectangle being redrawn is:
+</p>
+<p><list type="ordered">
+<item><p>The Filter Manager calls rectangle filters.</p></item>
+<item><p>The Window Manager draws the window tools and the window background.</p></item>
+<item><p>The Filter Manager calls post-rectangle filters, including the Redraw Manager.</p></item>
+<item><p>The Redraw Manager calls 'early' callback routines for the areas of interest intersecting the rectangle being drawn.</p></item>
+<item><p>The Window Manager sets the graphics foreground and background colours according to the window definition.</p></item>
+<item><p>The application owning the window draws any contents in its redraw loop.</p></item>
+<item><p>The Window Manager draws the icons.</p></item>
+<item><p>The Filter Manager calls post-icon filters, including the Redraw Manager.</p></item>
+<item><p>The Redraw Manager calls 'late' callback routines for the areas of interest intersecting the rectangle being drawn.</p></item>
+</list></p>
+<p>
+Thus anything your callback routine redraws will appear behind the rest of the window contents, unless you ask for a 'late' callback (bit 3 of R0 set in <reference type="swi" name="Redraw_AddCallBack" />), in which case what you draw will appear in front of the rest of the window contents. It is generally recommended that you do not use 'late' callbacks unless your application/gadget will only ever run on version 3.86 or later of the Wimp.
+</p>
+<p>
+<strong>Notes:</strong>
+</p>
+<p><list>
+<item><p>Wimps prior to 3.86 have a bug which means that rectangle filters (and hence the simulated post-rectangle filters) are erroneously called when the caret moves. This can result in strange effects if, for example, a writable icon is placed in front of a graphic drawn via the Redraw Manager. This shouldn't normally affect gadget authors, as gadgets shouldn't normally overlap. A fix for this may be implemented in future releases of the Filter Manager.</p></item>
+<item><p>When post-rectangle filters are being simulated on Wimps prior to 3.86, the Window Manager will set up graphics colours between stages 2 and 3 above as well as in step 5. This does not happen with Wimp 3.86 or later, so do not rely on this behaviour.</p></item>
+</list></p><subsection title="Toolbox window gadgets">
+<p>
+Whilst it is possible to implement Toolbox Window Gadgets directly using these interfaces, it is recommended that gadget authors use the interface provided by the Window module to provide gadget rendering callbacks. The Window module provides a redraw entry through the regular gadget entry point with similar parameters to those provided by the RedrawManager, thus simplifying the process of extending such gadgets.
+</p>
+</subsection>
+
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="Redraw_AddCallBack"
+                number="82C80"
+                description="Register an 'interest' in a region of a window"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+ <bit number="0">Reserved</bit>
+ <bit number="1">Set up graphics rectangle before making SWI</bit>
+ <bit number="2">Return co-ordinates to callback in screen co-ordinates</bit>
+ <bit number="3">Call after plotting icons, else before user contents</bit>
+ <bit number="4">R2 is the address of the routine to call</bit>
+ <bit number="5-31">Reserved</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Wimp window handle</register-use>
+ <register-use number="2">SWI number, or pointer to code address to call for redraw requests</register-use>
+ <register-use number="3">Pointer to bounding box of region (in work area coordinates)</register-use>
+ <register-use number="4">Data to associate with region, passed in R4</register-use>
+ <register-use number="5">Private word for direct call (bit 4 of flags set)</register-use>
+</entry>
+<exit>
+ <register-use number="0-5">Preserved</register-use>
+</exit>
+<use>
+<p>
+This SWI registers an 'interest' in a region of a window so that the module will be called whenever the region is updated. Setting bit 1 will ensure that a suitable graphics window will have been set up before the module is called (restricting output to within both the redraw rectangle and the area of interest). If bit 1 isn't set the graphics window will be the whole redraw rectangle.
+</p>
+<p>
+Setting bit 3 means that you will be called after the Wimp has plotted any icons in the window, so that what you draw will appear on top of anything else (a 'late' redraw). This behaviour is only available with version 3.86 or later of the Window Manager.
+</p>
+<p>
+Setting bit 4 means that the call will be made to a routine, rather than to a SWI as a direct call. This allows modules without SWIs to use the RedrawManager interface without having to obtain a SWI chunk for this single entry. The overheads for this form of call will typically be lower than those of a SWI.
+</p>
+</use>
+<related>
+<reference type="swi" name="Redraw_RemoveCallBack" />
+</related>
+</swi-definition>
+
+<swi-definition name="Redraw_RemoveCallBack"
+                number="82C81"
+                description="Deregister an 'interest' in a region of a window"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags (must match flags passed to <reference type="swi" name="Redraw_AddCallBack" />)</register-use>
+ <register-use number="1">Wimp window handle</register-use>
+ <register-use number="2">SWI number, or pointer to code address to call for redraw requests</register-use>
+ <register-use number="3">Pointer to bounding box of region (in work area coordinates)</register-use>
+ <register-use number="4">Data to associate with region, passed in R4</register-use>
+ <register-use number="5">Private word for direct call (bit 4 of flags set)</register-use>
+</entry>
+<exit>
+ <register-use number="0-5">Preserved</register-use>
+</exit>
+<use>
+<p>
+This SWI deregisters an 'interest' in a region of a window. In order to deregister successfully, all the parameters must match in the way that the region was registered.
+</p>
+</use>
+<related>
+<reference type="swi" name="Redraw_AddCallBack" />
+</related>
+</swi-definition>
+
+</section>
+
+<section title="Entry Points">
+<entry-definition name="Redraw_CallbackEntry"
+                  description="Callback entry point for a region requiring redraw"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="0">Flags:
+  <bitfield-table>
+ <bit number="0">Your region is entirely inside the area being updated</bit>
+ <bit number="1-31">Reserved</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Pointer to bounding box of region being updated (in work area coordinates or screen coordinates depending on bit 2 of flags in call to <reference type="swi" name="Redraw_AddCallBack" />)</register-use>
+ <register-use number="2">Pointer to 'state' for this window (block as returned from Wimp_GetWindowState)</register-use>
+ <register-use number="3">Pointer to bounding box of registered region (in work area coordinates)</register-use>
+ <register-use number="4">Data associated with region (as passed in R4 to <reference type="swi" name="Redraw_AddCallBack" />)</register-use>
+ <register-use number="12">Private word value (for direct called routines, as passed in R5 to <reference type="swi" name="Redraw_AddCallBack" />)</register-use>
+</entry>
+<exit>
+ <register-use number="0-12" state="preserved" />
+</exit>
+<use>
+<p>
+The Redraw Manager calls a module when a region requires redrawing with the above registers set up. Flags are ignored on exit.
+</p>
+</use>
+<related>
+<reference type="swi" name="Redraw_AddCallBack" />
+</related>
+</entry-definition>
+</section>
+
+<section title="Service Calls">
+<service-definition name="RedrawManagerInstalled"
+                    number="A5"
+                    description="The Redraw Manager has started">
+<entry>
+ <register-use number="0">Redraw Manager version x 100</register-use>
+ <register-use number="1">&hex;A5 (service number)</register-use>
+</entry>
+<exit>
+ <register-use number="0-1">Preserved</register-use>
+</exit>
+<use>
+<p>
+This service call is issued when the Redraw Manager starts up. You may then register areas of interest using <reference type="swi" name="Redraw_AddCallBack" />.
+</p>
+</use>
+<related>
+<reference type="service" name="RedrawManagerDying" />
+</related>
+</service-definition>
+
+<service-definition name="RedrawManagerDying"
+                    number="A6"
+                    description="The Redraw Manager is about to die">
+<entry>
+ <register-use number="1">&hex;A6 (service number)</register-use>
+</entry>
+<exit>
+ <register-use number="1">Preserved</register-use>
+</exit>
+<use>
+<p>
+This service call is issued as a broadcast to inform Redraw Manager clients that they have been deregistered and that the Redraw Manager is about to die.
+</p>
+</use>
+<related>
+<reference type="service" name="RedrawManagerInstalled" />
+</related>
+</service-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the slips 'Gadgets may redrawing' (redraw), 'only are only available', and the call named RedrawManager_AddCallBack (the SWI is Redraw_AddCallBack). The characters lost from the captured HTML in the range '3.16-3.85' and 'x 100' were restored from the original documentation text.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
