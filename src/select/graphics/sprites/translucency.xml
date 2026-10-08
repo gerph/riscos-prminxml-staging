@@ -1,0 +1,78 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Translucent sprite operation">
+<section title="Introduction and Overview">
+<p>
+Translucent - partially transparent - sprite rendering has been provided within the SpriteExtend module. This relies on certain other modules being present (suitable InverseTable and BlendTable modules) and requires application support before it will be visible to the user. All non-translucent graphic operations remain as before.
+</p>
+<p>
+Translucent operations apply to all sprite depths (except CMYK), rendered in all output depths (except CMYK).
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Translucency">
+<p>
+Translucency is measured as a value from 0 to 255. At 0 no translucency is applied and the image is rendered as previously. At 128 the sprite is blended half and half with the background. At 255 the image is almost totally transparent.
+</p>
+</subsection>
+
+<subsection title="API changes">
+<p>
+Sprite operations through the SpriteExtend entry points for PutSpriteScaled, and the JPEG operations JPEG_PlotScaled, JPEG_PlotFileScaled, JPEG_PlotTransformed and JPEG_PlotFileTransformed have updated APIs to handle the translucent operations.
+</p>
+<p>
+<strong>OS_SpriteOp 52 (PutSpriteScaled)</strong> and <strong>OS_SpriteOp 56 (PutSpriteTransformed)</strong>: the plot action has been extended :
+</p>
+<p><bitfield-table>
+ <bit number="8-15">Translucency to render the image at (0-255)</bit>
+</bitfield-table></p>
+<p>
+<reference type="swi" name="JPEG_PlotScaled" /> and <reference type="swi" name="JPEG_PlotFileScaled" />: the plot flag bits have been extended :
+</p>
+<p><bitfield-table>
+ <bit number="4-11">Translucency to render the image at (0-255)</bit>
+</bitfield-table></p>
+<p>
+<reference type="swi" name="JPEG_PlotTransformed" /> and <reference type="swi" name="JPEG_PlotFileTransformed" />: the transformation flag bits have been extended :
+</p>
+<p><bitfield-table>
+ <bit number="5-12">Translucency to render the image at (0-255)</bit>
+</bitfield-table></p>
+</subsection>
+
+<subsection title="Transformed sprite plotting">
+<p>
+Rendering translucent sprites transformed is not presently supported by SpriteExtend.
+</p>
+</subsection>
+
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
