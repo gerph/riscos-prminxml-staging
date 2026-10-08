@@ -1,0 +1,74 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="LegacyScreen">
+<section title="Introduction">
+<p>
+The LegacyScreen module provides a limited amount of compatibility for applications which are not aware of the changes introduced to graphics system. It cannot ensure complete compatibility with all applications, but should allow many to function unaffected. There are three functions that the module provides, each of which is intended to avert problems seen with earlier applications :
+</p>
+<p><list>
+<item><p>Dummy screen dynamic area</p></item>
+<item><p>Direct loading of files to screen memory</p></item>
+<item><p>Force use of double banking</p></item>
+</list></p></section>
+
+<section title="Technical Details">
+<subsection title="Dummy screen dynamic area">
+<p>
+With the introduction of multiple screen drivers it is no longer sensible to use a single dynamic area for the frame buffer. Dynamic area 2 (screen memory) has therefore been removed from the Kernel. Many applications will attempt to resize dynamic area 2 in order to ensure that there is sufficient memory available for a mode, or the banks within a mode. The LegacyScreen module allocates dynamic area 2, with a maximum size of 2MB, for this purpose. This ensures that the changes in size which the application applies will succeed. The content of the area is undefined.
+</p>
+<p>
+To check whether sufficient memory is available for a mode, <reference type="swi" name="OS_CheckModeValid" /> can be used.
+</p>
+<p>
+To check whether multiple screen banks can be used, one of two methods may be employed. The application may select the necessary number of banks and at each stage confirm that the bank requested has been selected (see <userinput>OS_Byte 112</userinput> in PRM 1). Alternatively, <reference type="swi" name="OS_ScreenMode" reason="7" /> may be used to count the number of available banks for the hardware. Note, however, that it is still necessary to select the banks before accessing them in order to read their base address and to inform the driver that multiple banks will be used.
+</p>
+</subsection>
+
+<subsection title="Direct loading of files to screen memory">
+<p>
+Many applications will, after locating the frame buffer with OS_ReadVduVariables, attempt to load files directly into the buffer with an OS_File operation. The frame buffer is, in general, a physically mapped dynamic area. Physically mapped dynamic areas are not validated as being accessible with OS_ValidateAddress (see the <reference type="document" href="../memory/osvalidateaddress" name="OS_ValidateAddress" /> document). This means that the OS_File operation would fail due to checking first whether the memory was valid. The LegacyScreen module will explicitly allow the loading of data to the screen in this way. It is not recommended that clients rely on this.
+</p>
+</subsection>
+
+<subsection title="Force use of double banking">
+<p>
+A number of applications will assume that the previous conditions regarding bank location and allocation remain in place. In particular, that resizing Dynamic Area 2 ensures that memory following the first bank will be free for use as a second bank, and that the second bank will start immediately after the first. Neither of these conditions are true any longer. Because of hardware limitations, it may not be possible to place the second bank immediately after the first, and the driver may wish to use the unused space for cached data such as sprites, internal workspace or pointer images.
+</p>
+<p>
+The LegacyScreen module attempts to avoid these problems in numbered modes by forcing a second bank to be allocated when the mode is selected. This should ensure that applications which assume they may write to the memory immediately following the first bank will not corrupt internal data, at the expense of an extra bank being allocated from the video memory. This only applies to numbered modes.
+</p>
+<p>
+The other problem - that of the second bank not being contiguous with the first - cannot be addressed by any means. The existing video drivers do not at present require any additional alignment, so the simple allocation of the second buffer is sufficient to allow many applications to function.
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
