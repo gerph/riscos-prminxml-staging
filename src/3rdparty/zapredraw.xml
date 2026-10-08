@@ -63,7 +63,6 @@ changing, font sub-styles, and reduces DSA/VDU mode differences.</item>
         that information.</fixme></item>
     <item><fixme>The extensions for ZapRedraw_RedrawArea are essentially entrypoints with
         reason codes, so could be restructured to use the entry-definition format.</fixme></item>
-    <item><fixme> Related APIs aren't linked at all</fixme></item>
 </list>
 </p>
 </section>
@@ -588,6 +587,8 @@ does this.</p>
     <reference type="swi" name="ZapRedraw_RedrawRaster" />
     <reference type="swi" name="ZapRedraw_RedrawWindow" />
     <reference type="swi" name="ZapRedraw_UpdateWindow" />
+      <reference type="swi" name="ZapRedraw_FindFont" />
+    <reference type="swi" name="ZapRedraw_PrepareDataLine" />
   </related>
   </swi-definition>
 
@@ -671,6 +672,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
   </use>
   <related>
     <reference type="swi" name="ZapRedraw_RedrawArea" />
+      <reference type="swi" name="ZapRedraw_PrepareDataLine" />
   </related>
   </swi-definition>
 
@@ -707,6 +709,8 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
   <related>
     <reference type="swi" name="ZapRedraw_RedrawArea" />
     <reference type="swi" name="ZapRedraw_ConvBitmapChar" />
+      <reference type="swi" name="ZapRedraw_CachedCharSize" />
+    <reference type="swi" name="ZapRedraw_ReadSystemChars" />
   </related>
   </swi-definition>
 
@@ -800,6 +804,9 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
 <p>Note that there is now a more sophisticated version of this call, <reference type="swi" name="ZapRedraw_AddCursorSmart" />, which can cope with selections containing characters that have a different foreground colour (but the same background colour) to the rest of the selection.</p>
     </use>
   <related>
+    <reference type="swi" name="ZapRedraw_AddCursorSmart" />
+    <reference type="swi" name="ZapRedraw_PrepareDataLine" />
+    <reference type="swi" name="ZapRedraw_FindCharacter" />
   </related>
   </swi-definition>
 
@@ -843,6 +850,9 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
     </p>
     </example>
   <related>
+    <reference type="swi" name="ZapRedraw_PrepareDataLine" />
+    <reference type="swi" name="ZapRedraw_InsertChar" />
+    <reference type="swi" name="ZapRedraw_AddCursorSmart" />
   </related>
   </swi-definition>
 
@@ -868,6 +878,8 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
     <p>This is a fast byte shifting SWI. It is highly optimised; bytes are shifted starting at the top or bottom depending on whether the destination address is higher or lower than the start (respectively). Thus the data is always preserved.</p>
     </use>
   <related>
+    <reference type="swi" name="ZapRedraw_Version" />
+    <reference type="swi" name="ZapRedraw_Divide" />
   </related>
     </swi-definition>
 
@@ -892,6 +904,9 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
     <p>This SWI works out the values of <sysvar>r_cbpl</sysvar>, <sysvar>r_cbpc</sysvar> from <sysvar>r_charw</sysvar>, <sysvar>r_charh</sysvar>, <sysvar>r_bpp</sysvar> in the manner defined under the help text on <sysvar>r_caddr</sysvar>. ie. <sysvar>r_cbpl</sysvar> is either 1, 2, or a multiple of 4 and <sysvar>r_cbpc</sysvar> = <sysvar>r_charh</sysvar> * <sysvar>r_cbpl</sysvar>.</p>
     </use>
   <related>
+    <reference type="swi" name="ZapRedraw_ConvertBitmap" />
+    <reference type="swi" name="ZapRedraw_ReadModeBPP" />
+    <reference type="swi" name="ZapRedraw_ReadCharSize" />
   </related>
   </swi-definition>
 
@@ -919,6 +934,8 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
     <p>This SWI is for the use of the <reference type="swi" name="ZapRedraw_ConvertBitmap" /> SWI and performs the bitmap conversion for one character. It takes a bit map of the one bit per pixel format and expands it to have n = 2^R7 bits per pixel by replacing each '0' with n '0's and each '1' with the mask in R6 (usually n '1's). Thus for standard conversion you should set R6 to be 2^n-1 (= 2^(2^R7) - 1). (NB if R7 ( = <sysvar>r_bpp</sysvar>) is zero then all you have to do is copy the bitmap. R7 = 0 is not supported by this call.</p>
     </use>
   <related>
+    <reference type="swi" name="ZapRedraw_ConvertBitmap" />
+    <reference type="swi" name="ZapRedraw_CachedCharSize" />
   </related>
   </swi-definition>
 
@@ -952,6 +969,8 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
     <p>This SWI is used to create the <sysvar>r_palette</sysvar> data block. If R0=1 on entry then it takes a palette consisting of a list of wimp colour numbers (one per word) and converts it to entries of the form &hex;BBGGRRxx, a 24 bit palette entry by using the call <reference type="swi" name="Wimp_ReadPalette" href="?" /> and duplicating the nibbles. If R0 = 2 on entry then it takes a list of entries of the form &hex;BBGGRRxx and converts them to colour masks required for DSA redraw (see <sysvar>r_palette</sysvar>) using <reference type="link" name="ColourTrans" href="?" /> calls and <reference type="swi" name="ZapRedraw_GetPaletteEntry" />. If R0 = 3 on entry then it does both, converting wimp colour numbers to DSA redraw masks.</p>
     </use>
   <related>
+    <reference type="swi" name="ZapRedraw_GetPaletteEntry" />
+    <reference type="swi" name="ZapRedraw_RedrawArea" />
   </related>
   </swi-definition>
 
@@ -974,6 +993,8 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
     <p>This inserts a single character into a string of <sysvar>r_data</sysvar> format. If R0 = 0 then it inserts 0, 0 and if R0 &ge; &hex;100 then it inserts 0, 3, x, y where R0 = &hex;yyxx. Otherwise it just inserts the byte as normal.</p>
     </use>
   <related>
+    <reference type="swi" name="ZapRedraw_PrepareDataLine" />
+    <reference type="swi" name="ZapRedraw_FindCharacter" />
   </related>
   </swi-definition>
 
@@ -996,6 +1017,9 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
 <reference type="swi" name="ZapRedraw_RedrawArea" />. To do this, it just bit-reverses the information read by <reference type="swi" name="OS_Word" reason="10" href="?" />. It only reads characters &hex;20 - &hex;FF, leaving 0 - &hex;1F untouched. The bit reversing is done efficiently so this call is fairly fast.</p>
   </use>
   <related>
+    <reference type="swi" name="ZapRedraw_ConvertBitmap" />
+    <reference type="swi" name="ZapRedraw_AddVduBitmaps" />
+    <reference type="swi" name="ZapRedraw_ReverseBitmaps" />
   </related>
   </swi-definition>
 
@@ -1018,6 +1042,7 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
     <p>This SWI takes a list of bytes and reverses the bits of each byte. This is useful for reversing the bitmaps (flipping about the y axis) of 8 &times; 8 pixel characters at one bit per pixel (ie <sysvar>r_cbpl</sysvar> = 1; <sysvar>r_cbpc</sysvar> = 8).</p>
     </use>
   <related>
+    <reference type="swi" name="ZapRedraw_ReadSystemChars" />
   </related>
   </swi-definition>
 
@@ -1038,6 +1063,9 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
       <p>This SWI is used to set up the Zap redraw block initially. It puts the value 0 in <sysvar>r_screen</sysvar> so the actual screen address is used when <reference type="swi" name="ZapRedraw_RedrawArea" /> is called (this can change quite often) and fills in <sysvar>r_bpl</sysvar>, <sysvar>r_bpp</sysvar>, <sysvar>r_magx</sysvar>, <sysvar>r_magy</sysvar>, <sysvar>r_xsize</sysvar>, <sysvar>r_ysize</sysvar> by using the call <reference type="swi" name="OS_ReadVduVariables" href="?" />. It also fills in <sysvar>r_mode</sysvar> by using <reference type="swi" name="OS_Byte" reason="135" href="?" />. This call should be made after any mode change. Compensation is made for double pixel modes by decreasing <sysvar>r_magx</sysvar>. A pixel in Zap means a hardware pixel rather than an emulated double pixel.</p>
     </use>
   <related>
+    <reference type="swi" name="ZapRedraw_ReadModeBPP" />
+    <reference type="swi" name="ZapRedraw_GetRectangle" />
+    <reference type="swi" name="ZapRedraw_RedrawArea" />
   </related>
   </swi-definition>
 
@@ -1061,6 +1089,10 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
       <p>If the redraw block has margins (<sysvar>r_flags</sysvar> bit 6 set and <sysvar>r_length</sysvar> large enough), the left and top margins are subtracted from the scroll offsets, so that they are negative in the margin. If the right-to-left flag (<sysvar>r_flags</sysvar> bit 7) is set, <sysvar>r_scrollx</sysvar> is the distance in pixels from the right hand edge of the work area (as found with <reference type="swi" name="Wimp_GetWindowInfo" href="?" />) to the right hand edge of the rectangle, rather than from the left.</p>
     </use>
   <related>
+    <reference type="swi" name="ZapRedraw_RedrawArea" />
+    <reference type="swi" name="ZapRedraw_RedrawWindow" />
+    <reference type="swi" name="ZapRedraw_UpdateWindow" />
+    <reference type="swi" name="ZapRedraw_ReadVduVars" />
   </related>
   </swi-definition>
 
@@ -1097,6 +1129,9 @@ creating a mask as needed for <sysvar>r_palette</sysvar> in DSA mode. Eg if R0
 of these numbers. These bitmaps are also useful as cursors.</p>
     </use>
   <related>
+    <reference type="swi" name="ZapRedraw_ReadSystemChars" />
+    <reference type="swi" name="ZapRedraw_ConvertBitmap" />
+    <reference type="swi" name="ZapRedraw_SpriteSize" />
   </related>
   </swi-definition>
 
@@ -1126,6 +1161,9 @@ of these numbers. These bitmaps are also useful as cursors.</p>
       <p>This SWI takes an anti-aliased font and caches a range of characters as bitmaps (see <sysvar>r_caddr</sysvar>). The cacheing can be done in any colours or screen resolution. Of course only those with foreground colour all bits set and background colour all bits clear can be used directly by <reference type="swi" name="ZapRedraw_RedrawArea" />. However, by giving a foreground colour mask of -1 and a background mask of 0 any bitmap can be drawn (see <sysvar>r_caddr</sysvar> etc). An hourglass is given with the % as the current character/256 if it takes a long time.</p>
     </use>
   <related>
+    <reference type="swi" name="ZapRedraw_SpriteSize" />
+    <reference type="swi" name="ZapRedraw_ConvertBitmap" />
+    <reference type="swi" name="ZapRedraw_CachedCharSize" />
   </related>
   </swi-definition>
 
@@ -1163,6 +1201,9 @@ of these numbers. These bitmaps are also useful as cursors.</p>
 <use>
 </use>
   <related>
+    <reference type="swi" name="ZapRedraw_SpriteSize" />
+    <reference type="swi" name="ZapRedraw_ConvertBitmap" />
+    <reference type="swi" name="ZapRedraw_CachedCharSize" />
   </related>
 </swi-definition>
 
@@ -1198,6 +1239,9 @@ of these numbers. These bitmaps are also useful as cursors.</p>
   <p>Font size is scaled up by 2^(1 - <sysvar>r_magx</sysvar>) horizontally and 2^(2 - <sysvar>r_magy</sysvar>) vertically so the characters are the same pixel size as those cached with R0 = 1.</p>
 </use>
   <related>
+    <reference type="swi" name="ZapRedraw_SpriteSize" />
+    <reference type="swi" name="ZapRedraw_ConvertBitmap" />
+    <reference type="swi" name="ZapRedraw_CachedCharSize" />
   </related>
 </swi-definition>
 
@@ -1235,6 +1279,9 @@ of these numbers. These bitmaps are also useful as cursors.</p>
       <command>PROCensure_workarea(size%)</command></p>
     </example>
   <related>
+    <reference type="swi" name="ZapRedraw_RedrawArea" />
+    <reference type="swi" name="ZapRedraw_CacheFontChars" />
+    <reference type="swi" name="ZapRedraw_AddVduBitmaps" />
   </related>
   </swi-definition>
 
@@ -1265,6 +1312,9 @@ of these numbers. These bitmaps are also useful as cursors.</p>
       <p>Where redraw% is the address of the redraw block and data% the data block returned by <reference type="swi" name="Wimp_Poll" reason="1" href="?" /> for event 1 (redraw window request).</p>
     </example>
   <related>
+    <reference type="swi" name="ZapRedraw_RedrawArea" />
+    <reference type="swi" name="ZapRedraw_GetRectangle" />
+    <reference type="swi" name="ZapRedraw_UpdateWindow" />
   </related>
   </swi-definition>
 
@@ -1292,6 +1342,8 @@ of these numbers. These bitmaps are also useful as cursors.</p>
       <p>This SWI performs fast division and modulo functions.  As the SWI overhead may be significant for this routine you may wish to find its address and call it directly.</p>
     </use>
   <related>
+    <reference type="swi" name="ZapRedraw_Version" />
+    <reference type="swi" name="ZapRedraw_MoveBytes" />
   </related>
   </swi-definition>
 
@@ -1320,6 +1372,7 @@ of these numbers. These bitmaps are also useful as cursors.</p>
       <p>Coordinates are in pixels, (0,0) at top left. It is required that R2 &gt; R0, and R3 &gt; R1. All co-ordinates must be positive and within display bounds.</p>
     </use>
   <related>
+    <reference type="swi" name="ZapRedraw_RedrawArea" />
   </related>
   </swi-definition>
 
@@ -1366,6 +1419,9 @@ of these numbers. These bitmaps are also useful as cursors.</p>
 <p>Room should be reserved for the string to grow by 8 &times; R3 characters. (eg 0,4,f,b,old,0,3,l,h) If the indicated offset (R2) is off the end of the string then it will be lengthened with spaces (&hex;20) so you should ensure R2 + 9 &times; R3 characters extra are reserved.</p>
     </use>
   <related>
+    <reference type="swi" name="ZapRedraw_AddCursor" />
+    <reference type="swi" name="ZapRedraw_PrepareDataLine" />
+    <reference type="swi" name="ZapRedraw_FindCharacter" />
   </related>
   </swi-definition>
 
@@ -1464,7 +1520,8 @@ of these numbers. These bitmaps are also useful as cursors.</p>
     </use>
     <related>
       <reference type="swi" name="ZapRedraw_FindFont" />
-    </related>
+        <reference type="swi" name="ZapRedraw_ReadVduVars" />
+  </related>
     </swi-definition>
 
   <swi-definition name="ZapRedraw_Version"
@@ -1484,8 +1541,11 @@ of these numbers. These bitmaps are also useful as cursors.</p>
     <use>
       <p>This call is used either to find out ZapRedraw's version number, or to retrieve the pointers so that the low-overhead routines can be called directly if required <strong>with caution</strong></p>
     </use>
-    <related>
-    </related>
+  <related>
+    <reference type="swi" name="ZapRedraw_Divide" />
+    <reference type="swi" name="ZapRedraw_MoveBytes" />
+    <reference type="service" name="ZapRedrawStarted" />
+  </related>
     </swi-definition>
 
   <swi-definition name="ZapRedraw_ListFonts"
@@ -1530,7 +1590,8 @@ of these numbers. These bitmaps are also useful as cursors.</p>
     </use>
     <related>
       <reference type="swi" name="ZapRedraw_FindFont" />
-    </related>
+        <reference type="swi" name="ZapRedraw_DecodeMenu" />
+  </related>
     </swi-definition>
 
   <swi-definition name="ZapRedraw_UpdateWindow"
@@ -1550,8 +1611,11 @@ of these numbers. These bitmaps are also useful as cursors.</p>
     <use>
       <p>Updates a window in a standard loop using <reference type="swi" name="Wimp_UpdateWindow" href="?" /> and repeated calls to <reference type="swi" name="ZapRedraw_RedrawArea" /> as appropriate.</p>
     </use>
-    <related>
-    </related>
+  <related>
+    <reference type="swi" name="ZapRedraw_RedrawArea" />
+    <reference type="swi" name="ZapRedraw_GetRectangle" />
+    <reference type="swi" name="ZapRedraw_RedrawWindow" />
+  </related>
     </swi-definition>
 
   <swi-definition name="ZapRedraw_ReadFontInfo"
@@ -1571,8 +1635,10 @@ of these numbers. These bitmaps are also useful as cursors.</p>
     <use>
       <p>This SWI is used to return information on a font, eg. for the Zap font list. An unknown index gives the error "Unknown ReadFontInfo index" (&hex;48489); an invalid font handle gives "Invalid font handle".</p>
     </use>
-    <related>
-    </related>
+  <related>
+    <reference type="swi" name="ZapRedraw_FindFont" />
+    <reference type="swi" name="ZapRedraw_LoseFont" />
+  </related>
     </swi-definition>
 
   <swi-definition name="ZapRedraw_ReadModeBPP"
