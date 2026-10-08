@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Types of Reset">
+<section title="Introduction and Overview">
+<p>
+Under RISC OS 3.7 and before a number of special types of reset were available to the user. Each of these reset types was triggered by holding a key during a reset. In particular :
+</p>
+<p><value-table head-number="Key" head-value="Effect">
+<value number="R">Reset all OS CMOS</value>
+<value number="Delete">Reset all CMOS</value>
+<value number="T">As R but configure the opposite video Sync</value>
+<value number="Copy">As Delete but configure the opposite video Sync</value>
+<value number="Keypad 0-9">Change configured monitor type to specified number</value>
+<value number="Keypad .">Change mode, sync and monitor type to Auto</value>
+<value number="Shift">Reverse the operation of automated boot</value>
+<value number="Keypad *">Force start up to a command line</value>
+</value-table></p><p>
+In addition, under RISC OS 3.7 and before power on reset, Break and the reset button performed slightly differently, allowing 'soft' or 'hard' resets to be performed. From RISC OS 4, the operating system treats all resets as being 'hard'.
+</p>
+<p>
+With RISC OS 4, the configuration of the monitor type was removed.
+</p>
+<p>
+With RISC OS 4.15, the system will boot into a menu environment ('Boot Menu') when the shift key is used. This can be used to boot from alternative devices or to configure different settings.
+</p>
+<p>
+With RISC OS 4.42, the only operations of these which remain are the Delete, Shift and Keypad *.
+</p>
+<p>
+In order to support multiple displays it is possible to configure the display which the system will use on startup. This can be a problem if the display configured is no longer present (for example, because the podule has been removed). If the 0 key (not the Keypad 0) is held during startup the display will (for this session) be forced to display number 0.
+</p>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
