@@ -1,0 +1,103 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Miscellaneous memory changes">
+<section title="Introduction and Overview">
+<p>
+Whilst the environment supplied by RISC OS is generally unchanged, there are certain changes to the system with regard to memory which will affect some applications. These notes are not a complete description but cover the major areas which clients may encounter. In addition, developers should consult the system dynamic areas document for specific details about dynamic areas.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Zero page">
+<p>
+The assignments of memory in zero page (&amp;0-&amp;4000) remain private to the Kernel and should not be manipulated by any component except with explicit knowledge of the system on which it is running. Certain zero page variables are exported by <reference type="swi" name="OS_ReadSysInfo" reason="6" />, and may be used with care. The organisation of the kernel workspace in zero page has changed significantly and will continue to do so in future versions.
+</p>
+<p>
+Zero page, and scratch space which follows it (&amp;4000-&amp;8000), are now read-only in user mode. This may affect applications which have written to it either accidentally or intentionally. The protection of zero page from accidental writes in user mode should ensure that random system failures are less common.
+</p>
+</subsection>
+
+<subsection title="System heap">
+<p>
+The system heap is now limited to slightly less than 2M. Under earlier versions of the operating system it was limited to just under 3M. The system heap is no longer used by FileSwitch for its own private storage (a separate dynamic area is used for its workspace), nor by the system variables (the SysVars module now controls its own dynamic area for this purpose).
+</p>
+<p>
+In addition, the system heap is now read-only in user mode. This may affect application modules which have used it as a chain point for their workspace, as the module private word pointer is within the System Heap.
+</p>
+<p>
+Components should not use the System heap for their own storage.
+</p>
+</subsection>
+
+<subsection title="IRQ stack">
+<p>
+The IRQ stack has been increased in size to 16K. As a result, it has been moved 1M lower in memory. This corresponds to the 1M change in the limit of the System Heap dynamic area. The IRQ stack is required to end on a megabyte boundary, and in rationalising the allocation its size has been increased. Had the IRQ stack remained at its previous location (&amp;01F00000), components which attempted to directly manipulate the SWI dispatch table would be unaware that they had inadvertently modified a (hopefully unused) section of the IRQ stack.
+</p>
+<p>
+Since the SWI dispatch tables should be considered OS workspace such behaviour is clearly undesirable. However, clients may be required to modify such tables. An additional pair of exports have been added to the OS_ReadSysInfo 6 kernel items to allow clients to locate the SWI dispatch table should this be necessary. Such use is, however, strongly discouraged.
+</p>
+</subsection>
+
+<subsection title="UND stack">
+<p>
+The UND stack was previously writable in user mode. The mapping has been changed to make the stack faulting in user mode.
+</p>
+</subsection>
+
+<subsection title="SVC stack">
+<p>
+In order to be able to detect a SVC stack overflow the stack now has a special protection applied to it to cause an abort when the stack is full. If an abort occurs and the stack is full or the stack pointer is outside the stack area then the SVC and IRQ stacks will be copied to the abort copy, the exception dump region will be updated, the SVC and IRQ stacks will be flattened and a fatal error will be reported.
+</p>
+<p>
+The protection applied to the stack is as follows:
+</p>
+<p><list>
+<item><p>The second from bottom 1K block (that is, stack-base + 1024 to stack-base + 2047) of the stack is marked read-only.</p></item>
+<item><p>The bottom 1K block is used to store management information such as C environment static base offsets and BTS management data, so can't be made read-only.</p></item>
+</list></p><p>
+On processors which support the feature, the protection will apply in all modes (i.e. effectively ROM). This change will have no impact on well-behaved components but in the case of a problem will report a consistent error rather than provoking random behaviour.
+</p>
+</subsection>
+
+<subsection title="OS page tables (SoftCAM)">
+<p>
+The OS page tables (SoftCAM map) provide a translation for the operating system from page numbers to logical addresses. Under earlier versions of the operating system, the area was writable in user mode. It is now faulting in user mode.
+</p>
+</subsection>
+
+<subsection title="Additional dynamic areas">
+<p>
+A number of additional dynamic areas have been created to ease the process of locating fixed regions of system memory. See the system dynamic areas document for more details. One side effect of this is that components which use the OS_ValidateAddress call to check for memory existing in regions will now report that valid memory exists in these new areas, where they previously reported none. In particular, the ROM itself is now returned as valid from this call. This is not likely to affect many applications.
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
