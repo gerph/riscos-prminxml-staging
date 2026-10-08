@@ -298,9 +298,9 @@ event to be ignored they should claim the event.</p>
 <register-use number="0"><p>Request state:</p>
 <p>
     <value-table>
-        <value number="-1">Extended request claimed for this pointer type, for relative positioning device</value>
+        <value number="-1">Extended request claimed for this pointer type, for relative positioning device (eg mouse, trackerball)</value>
         <value number="4">Extended request not understood</value>
-        <value number="5">Extended request claimed for this pointer type, for absolute positioning device</value>
+        <value number="5">Extended request claimed for this pointer type, for absolute positioning device (eg touchscreen, tablet)</value>
     </value-table>
 </p>
 </register-use>
@@ -388,6 +388,12 @@ for pushing the wheel 'away' from the user.
 </section>
 
 
+<section title="Acknowledgements">
+<p>
+Thanks to Stuart Tyrrell and Theo Markettos for their feedback and support.
+</p>
+</section>
+
 </chapter>
 
 <!-- MetaData -->
@@ -404,6 +410,9 @@ for pushing the wheel 'away' from the user.
  <history>
   <revision number="1" author="Gerph" date="17 May 2023" title="Initial version">
     <change>Created from Select technical documentation.</change>
+  </revision>
+  <revision number="2" author="Gerph" date="8 Oct 2026" title="Supplemented with the original documentation">
+    <change>Added the examples of relative and absolute positioning devices and the acknowledgements, from the original documentation (captured as HTML document version 1.03, 3 Nov 2015).</change>
   </revision>
  </history>
 
