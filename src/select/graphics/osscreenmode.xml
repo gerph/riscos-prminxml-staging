@@ -1,0 +1,750 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="OS_ScreenMode changes">
+<section title="Introduction and Overview">
+<p>
+The <reference type="swi" name="OS_ScreenMode" /> SWI has been updated to perform a number of additional functions since those documented within RISC OS PRM 5a. These are primarily in the areas of acceleration and multi-display support. The full list of OS_ScreenMode reason codes is as follows :
+</p>
+<p><value-table head-number="Reason" head-value="Operation">
+<value number="0">Select mode by number or specifier</value>
+<value number="1">Return current mode</value>
+<value number="2">Enumerate modes</value>
+<value number="3">Select monitor type</value>
+<value number="4">Configure acceleration</value>
+<value number="5">Perform screen cache clean</value>
+<value number="6">Force screen cache clean</value>
+<value number="7">Count number of screen banks available</value>
+<value number="8">Select display bank</value>
+<value number="9">Select VDU driver bank</value>
+<value number="10">Copy between banks</value>
+<value number="11">Select display device</value>
+<value number="12">Read details about display device</value>
+<value number="13">Decode mode string to mode specifier</value>
+<value number="14">Encode mode specifier as mode string</value>
+<value number="15">Select mode by string</value>
+</value-table></p>
+<p>
+The following additional calls are reserved for display drivers and their support code :
+</p>
+<p><value-table head-number="Reason" head-value="Operation">
+<value number="255">Register display driver</value>
+<value number="254">Deregister display driver</value>
+<value number="253">Read maximum display driver</value>
+</value-table></p>
+</section>
+
+<section title="Technical Details">
+<subsection title="VSync handling">
+<p>
+The display driver should only enable VSync interrupts and call the VSync dispatch routine once it has been selected through the VideoV 'select display' entry point. When another display device is selected the driver should release and disable its interrupts. On receipt of an interrupt the driver should clear the interrupt flag and call the VSync dispatch function. The VSync dispatch routine is described under <reference type="entry" name="VSyncDispatch" />.
+</p>
+</subsection>
+
+<subsection title="Display device descriptor block">
+<p>
+The display device descriptor block is a tag/value block which is used to describe the features, capabilities and other information for a display device. The tag for each block is a 4 byte word, interpreted as follows :
+</p>
+<p><bitfield-table>
+ <bit number="0-23">Identifier number</bit>
+ <bit number="24-31">Length of the value, in words, excluding the tag word</bit>
+</bitfield-table></p>
+<p>
+The following identifiers are defined :
+</p>
+<p><value-table head-number="Identifier" head-value="Meaning">
+<value number="0"><strong>End of tag list.</strong> 0 words long. This tag indicates that no further tags are present.</value>
+<value number="1"><strong>Device name.</strong> Variable number of words. This tag provides a zero-terminated string identifier to associate with this device. This is NOT a user-specified display device descriptor. It is the device descriptor unique to the hardware. Values for this might be 'VIDC', 'ViewFinder', 'SM501', or similar. Where possibly multiple devices are available (eg ViewFinder podules) it is strongly recommended that the name be suffixed by a hash followed by the unique sequence identifier (eg 'ViewFinder#0'). The sequence identifier need not be a decimal number, but it should be unique for the instance of the hardware - no two identifiers should be present at any one time. For a USB or network device, a logical location might be specified.</value>
+<value number="2"><strong>Features word.</strong> 1 word long initially (multiple words may be defined in future and should be assumed to be zero where not specified and not faulted where not understood). This tag provides a flags word describing the features provided by the display device. The following bits are allocated within the features word: no bits currently defined.</value>
+<value number="3"><strong>Display format capabilities word.</strong> Variable length. This tag provides a list of the depths which the driver is capable of supporting. One word is used for each display format: 0 = 1bpp, 1 = 2bpp, 2 = 4bpp, 3 = 8bpp, 4 = 16bpp, 5 = 32bpp, 6 = CMYK (matches with Sprite ordering), 7 = YUV, 8 = 16bpp reverse bit order. Other values are undefined. Values 6-8 are not expected to be supported by the operating system as yet.</value>
+<value number="4"><strong>Bandwidth limitations.</strong> 1 word long. This word defines the limitations on bandwidth for any mode selected. This value should be 0 to treat each mode selection on its merits in VetMode. <fixme>The details of the bandwidth limitation values need to be documented.</fixme></value>
+<value number="5"><strong>Physical memory limitations.</strong> 1 word long. This word defines the amount of memory available to the display system. This value is used to validate mode selection.</value>
+<value number="6"><strong>Expected mode alignments.</strong> 2 words long. These words define the x and y alignments expected, in bytes and lines, by the display driver. For example, if the display driver expects all mode selections to be on quad-word alignments, and that modes be a multiple of 32 lines, the values would be 16,32. The OS does not allow modes to have line lengths which are less than word-aligned. Values may be 0 to treat each mode selection on its merits in VetMode. This value is used to validate mode selection, and may provide mode substitutions.</value>
+<value number="7"><strong>Device model.</strong> Variable length. This tag is intended to provide a means by which the driver can provide more specific information about the model of the hardware that it is driving. It is intended that it be used to describe the particular hardware in order that it can be displayed to the user. This can allow the user to better describe any problems to suppliers.</value>
+<value number="8-&amp;7FFFFF">These tag values are undefined.</value>
+<value number="&amp;800000-&amp;FFFFFF"><strong>Display device specific information.</strong> Variable length. These tags are specific to the named hardware device. In order to interpret these values, clients MUST check that the named hardware device matches that of a known value.</value>
+</value-table></p>
+</subsection>
+
+<subsection title="Mode strings">
+<p>
+The mode string can take the general form specified in PRM5a-103. However, this has been extended to allow for other features which are now provided by the graphics system. The general form of the string is a space (or, less commonly, comma) separated sequence of character tagged strings. The full syntax currently supported is :
+</p>
+<p><value-table head-number="Tag" head-value="Meaning">
+<value number="X#">X resolution in pixels</value>
+<value number="Y#">Y resolution in pixels</value>
+<value number="C#">Number of colours (# = 2, 4, 16, 64, 256, 32T, 32K, 16M)</value>
+<value number="G#">Number of greys (# = 4, 16, 256)</value>
+<value number="T#">Teletext mode, with specified number of colours (# as C)</value>
+<value number="EX#">X eigen factor (# = 0, 1, 2, 3)</value>
+<value number="EY#">Y eigen factor (# = 0, 1, 2, 3)</value>
+<value number="F#">Frame rate in Hz</value>
+<value number="TX#">Teletext display width in characters</value>
+<value number="TY#">Teletext display height in characters</value>
+</value-table></p><p>
+# represents a decimal number, possibly suffixed by a magnitude.
+</p>
+<p>
+In addition, a base mode number may be specified followed by the parameters to modify, for example <userinput>"28 C32K"</userinput> for a 16bit colour version of the mode 28 resolution.
+</p>
+<p>
+The resolution (X, Y) and number of colours (C, G or T) are mandatory. C64 is used to select old style VIDC 1 modes.
+</p>
+<p>
+Under earlier versions of the Operating System (Select 3 and earlier), the desktop display manager tool used C256 to select a 64 colour mode. This has been changed. When C256 is selected a 256 colour mode is now used.
+</p>
+</subsection>
+
+<subsection title="PaletteV">
+<p>
+In addition to the extensions provided within RISC OS 3.5 for bulk palette changes and gamma correction the PaletteV reasons have been extended with explicit calls for the managing the video controller's power and for managing the screen's state. These calls were initially added for portable devices and may be useful in the future to provide additional power management functions.
+</p>
+</subsection>
+
+</section>
+
+<section title="SWI Calls">
+<subsection title="Client SWIs">
+<p>
+The following reason codes are for use by clients.
+</p>
+</subsection>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="0"
+                reasonname="OS_ScreenMode_SelectMode"
+                description="Select mode by number or specifier"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">0 (reason code)</register-use>
+ <register-use number="1">Mode number, or mode specifier</register-use>
+</entry>
+<exit>
+</exit>
+<use>
+<p>
+This SWI is used to select a screen mode for the current display. Consult PRM 5a 134.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="1"
+                reasonname="OS_ScreenMode_CurrentMode"
+                description="Return current mode"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">1 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="1">Mode number, or pointer to read only mode specifier</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the screen mode for the current display. Consult PRM 5a 137.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="2"
+                reasonname="OS_ScreenMode_EnumerateModes"
+                description="Enumerate screen modes"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">2 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="1">Mode number, or pointer to read only mode specifier</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to enumerate the screen modes available. Consult PRM 5a 138.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="3"
+                reasonname="OS_ScreenMode_SelectMonitorType"
+                description="Select monitor type"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">3 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="1">Monitor type</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to change the monitor type in use by the system. The ScreenModes module uses this to force its defined screen modes. It is reserved for internal use.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="4"
+                reasonname="OS_ScreenMode_ConfigureAcceleration"
+                description="Configure acceleration"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">4 (reason code)</register-use>
+ <register-use number="1">Flags, or -1 to read current value:
+  <bitfield-table>
+   <bit number="0">Set to suspend cached screen until mode change</bit>
+   <bit number="1">Set to suspend screen cleaning</bit>
+   <bit number="2">Set to disable hardware acceleration</bit>
+   <bit number="3-31">Reserved, must be 0</bit>
+  </bitfield-table></register-use>
+ <register-use number="2">Number of VSyncs between automatic screen cleaning (1-3), or -1 to read current value</register-use>
+</entry>
+<exit>
+ <register-use number="1">New flag state</register-use>
+ <register-use number="2">New number of VSyncs between automatic screen cleaning</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to configure the acceleration in use by the current display driver.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="5"
+                reasonname="OS_ScreenMode_CleanCache"
+                description="Perform a screen cache clean"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">5 (reason code)</register-use>
+</entry>
+<exit>
+</exit>
+<use>
+<p>
+This SWI is used to clean the cache for the screen if necessary and not disabled.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ScreenMode" reason="6" />
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="6"
+                reasonname="OS_ScreenMode_ForceCleanCache"
+                description="Force a screen cache clean"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">6 (reason code)</register-use>
+</entry>
+<exit>
+</exit>
+<use>
+<p>
+This SWI is used to clean the cache for the screen if necessary, whether disabled or not.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ScreenMode" reason="5" />
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="7"
+                reasonname="OS_ScreenMode_CountBanks"
+                description="Count number of banks"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">7 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="1">Number of available screen banks</register-use>
+</exit>
+<use>
+<p>
+This SWI returns the number of screen banks which the current display driver is capable of providing for the current screen mode. The number of banks may change with system use depending on the driver. Drivers may allocate space in order to cache private data, or for other purposes, and this may affect the number of banks which are available. It is not possible to determine the number of banks that will be available in a mode because the requirements on the driver may change when changing to that mode.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="8"
+                reasonname="OS_ScreenMode_SelectDisplayBank"
+                description="Select, or read, display or driver bank"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">8 (Select or read Display bank), 9 (Select or read Driver bank)</register-use>
+ <register-use number="1">Bank number (1..maxbank) or 0 to read currently selected bank</register-use>
+</entry>
+<exit>
+ <register-use number="1">Previous bank number</register-use>
+ <register-use number="2">New bank number</register-use>
+ <register-use number="3">New bank address</register-use>
+</exit>
+<use>
+<p>
+These SWIs (reason codes 8 and 9) are used to either read or select the bank in use for the display or the VDU drivers. It performs the same operation as <userinput>OS_Byte 112</userinput> and <userinput>113</userinput> (those calls are now directed to these OS_ScreenMode reason codes) but provides additional information. It is recommended that clients use the new OS_ScreenMode calls in preference to the older OS_Byte calls. If the bank number specified is out of range for the current driver (or its current memory configuration) the last available bank will be selected.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ScreenMode" reason="9" />
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="A"
+                reasonname="OS_ScreenMode_CopyBank"
+                description="Copy bank"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">10 (reason code)</register-use>
+ <register-use number="1">Source bank (1..maxbank)</register-use>
+ <register-use number="2">Destination bank (1..maxbank)</register-use>
+</entry>
+<exit>
+</exit>
+<use>
+<p>
+This SWI is used to copy the entire contents of a screen bank to another bank. The banks specified need not be the current or display banks. The copy operation may be accelerated where drivers are capable of this.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="B"
+                reasonname="OS_ScreenMode_SelectDisplay"
+                description="Select display device"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">11 (reason code)</register-use>
+ <register-use number="1">Display number, or -1 to read current number</register-use>
+</entry>
+<exit>
+ <register-use number="1">Previous (or current, if reading current number) display number</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to either select a new display device or to read the currently configured display device.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="C"
+                reasonname="OS_ScreenMode_ReadDisplayDetails"
+                description="Read display device details"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">12 (reason code)</register-use>
+ <register-use number="1">Display number, or -1 for current display</register-use>
+ <register-use number="2">Display descriptor identifier to read, or 0 to return entire descriptor</register-use>
+ <register-use number="3">Pointer to buffer to fill</register-use>
+ <register-use number="4">Size of buffer, or 0 to read size of buffer required</register-use>
+</entry>
+<exit>
+ <register-use number="4">Size of data written, or size of buffer needed; 0 if no such identifier exists within the descriptor</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read details from the display device descriptor used during registration of the driver. Clients which need to know details about the display system which are not supplied through the standard APIs may use this call to read the descriptor directly.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="D"
+                reasonname="OS_ScreenMode_DecodeModeString"
+                description="Decode a mode string to a mode specifier"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">13 (reason code)</register-use>
+ <register-use number="1">Pointer to mode string</register-use>
+ <register-use number="2">Pointer to mode specifier to fill in</register-use>
+ <register-use number="3">Size of mode specifier</register-use>
+</entry>
+<exit>
+ <register-use number="0-3">Preserved, or error if failed to convert</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to convert a mode string into a mode specifier. See the section on 'Mode strings' above for more details. If the specifier block is not large enough for the mode specifier an error will be returned. Because of the differences in the specifier string due to installed extensions, it is not possible to return the expected size of the specifier. Clients should expect to use at least 4 additional mode variables (NColours, Mode Flags, X Eigen Factor, Y Eigen Factor) in addition to the mode specifier header and terminator. Mode numbers may be given as a prefix to the string in order to base a new mode on a pre-existing mode.
+</p>
+<p>
+Where mode numbers are used the closest mode string will be returned. In particular the old style modes where special mode flags are set (bits 0-6) will be returned with a string which describes the base mode only without those special features.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ScreenMode" reason="E" />
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="E"
+                reasonname="OS_ScreenMode_EncodeModeString"
+                description="Encode a mode string from a mode specifier"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">14 (reason code)</register-use>
+ <register-use number="1">Pointer to mode specifier</register-use>
+ <register-use number="2">Pointer to mode string to fill in</register-use>
+ <register-use number="3">Size of mode string</register-use>
+</entry>
+<exit>
+ <register-use number="3">Negative size of buffer required, if not big enough; 0 if string was filled in</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to encode a mode string from a mode specifier. It performs the opposite translation to that of OS_ScreenMode 13. Because of limitations in the mode string format (some variables are not encoded fully within the string) the operation may not be symmetric.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ScreenMode" reason="D" />
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="F"
+                reasonname="OS_ScreenMode_SelectModeString"
+                description="Select mode by mode string"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">15 (reason code)</register-use>
+ <register-use number="1">Pointer to mode string</register-use>
+</entry>
+<exit>
+</exit>
+<use>
+<p>
+This SWI is used to select a mode given a mode string. Internally this is implemented as a conversion to a mode specifier (OS_ScreenMode 13) and mode selection (OS_ScreenMode 0), and is provided for convenience.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<subsection title="Display Driver SWIs">
+<p>
+The following reason codes are for use by display drivers and their support code.
+</p>
+</subsection>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="FF"
+                reasonname="OS_ScreenMode_RegisterDisplay"
+                description="Register display device"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">255 (reason code)</register-use>
+ <register-use number="1">Pointer to display device descriptor block</register-use>
+</entry>
+<exit>
+ <register-use number="0">Display number allocated</register-use>
+ <register-use number="1">Pointer to VSync dispatch routine</register-use>
+ <register-use number="2">R12 workspace pointer for VSync dispatch routine</register-use>
+ <register-use number="3">1 to select display, 0 to perform no action on return</register-use>
+</exit>
+<use>
+<p>
+This SWI is called by display driver modules to register a new display driver as being available during its initialisation, after claiming vectors. Drivers should store the display number allocated such that they may be triggered when they are called on VideoV.
+</p>
+<p>
+If the display allocated was previously selected, or was configured as the default, the Kernel will return 1 to indicate that the display should be selected. Drivers should call OS_ScreenMode 11 (Select display device) to select the newly registered device. If an error is returned from this call the driver may decide to select an alternative screen mode to use with OS_ScreenMode 0 (Select mode).
+</p>
+<p>
+If no suitable mode can be selected the driver should deregister itself and shut down.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ScreenMode" reason="FE" />
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="FE"
+                reasonname="OS_ScreenMode_DeregisterDisplay"
+                description="Deregister display driver"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">254 (reason code)</register-use>
+ <register-use number="1">Display number</register-use>
+</entry>
+<exit>
+ <register-use number="0-1">Preserved</register-use>
+</exit>
+<use>
+<p>
+This SWI is used by a device driver on finalisation (or at any other point) to indicate that the display driver is no longer available. It should deregister itself in this manner after releasing VideoV.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ScreenMode" reason="FF" />
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ScreenMode"
+                number="65"
+                reason="FD"
+                reasonname="OS_ScreenMode_ReadMaxDisplay"
+                description="Read maximum display driver"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">253 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="1">Maximum display number</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the highest display number allocated by the video system. Display numbers increase from 0 and thus a complete list of the drivers available can be read by iterating from 0 to the number returned from this call.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+<section title="Entry Points">
+<entry-definition name="VSyncDispatch"
+                  description="VSync dispatch routine returned by OS_ScreenMode 255"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="0">Display number to generate VSync for</register-use>
+ <register-use number="12">Workspace pointer for VSync dispatch routine</register-use>
+</entry>
+<exit>
+ <register-use number="0-12" state="preserved" />
+</exit>
+<use>
+<p>
+The VSync dispatch routine is called by a display driver on receipt of a VSync
+interrupt for a display which has been selected.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ScreenMode" reason="FF" />
+</related>
+</entry-definition>
+</section>
+
+<section title="Software vectors">
+<vector-definition name="PaletteV"
+                   number="23"
+                   reason="A"
+                   reasonname="PaletteV_InvertLCD"
+                   description="Invert LCD"
+                   irqs="undefined"
+                   fiqs="undefined"
+                   processor-mode="undefined"
+                   re-entrant="undefined">
+<entry>
+ <register-use number="0">0 to uninvert, 1 to invert</register-use>
+ <register-use number="4">10 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="4">0 if claimed</register-use>
+</exit>
+<use>
+<p>
+This vector is called to set the inversion state of the output, specifically intended for use with LCD panels. It is not implemented within current versions of RISC OS.
+</p>
+</use>
+<related>
+</related>
+</vector-definition>
+
+<vector-definition name="PaletteV"
+                   number="23"
+                   reason="B"
+                   reasonname="PaletteV_DimScreen"
+                   description="Dim screen"
+                   irqs="undefined"
+                   fiqs="undefined"
+                   processor-mode="undefined"
+                   re-entrant="undefined">
+<entry>
+ <register-use number="4">11 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="4">0 if claimed</register-use>
+</exit>
+<use>
+<p>
+This vector is called to cause the display to be dimmed. Its parameters are not defined and it is not supported by current versions of RISC OS.
+</p>
+</use>
+<related>
+</related>
+</vector-definition>
+
+<vector-definition name="PaletteV"
+                   number="23"
+                   reason="C"
+                   reasonname="PaletteV_DisableVideo"
+                   description="Disable video hardware"
+                   irqs="undefined"
+                   fiqs="undefined"
+                   processor-mode="undefined"
+                   re-entrant="undefined">
+<entry>
+ <register-use number="4">12 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="4">0 if claimed</register-use>
+</exit>
+<use>
+<p>
+This vector is called to power down the video hardware for the current display driver. The use of this call should be restricted to necessary circumstances.
+</p>
+</use>
+<related>
+</related>
+</vector-definition>
+
+<vector-definition name="PaletteV"
+                   number="23"
+                   reason="D"
+                   reasonname="PaletteV_EnableVideo"
+                   description="Enable video hardware"
+                   irqs="undefined"
+                   fiqs="undefined"
+                   processor-mode="undefined"
+                   re-entrant="undefined">
+<entry>
+ <register-use number="4">13 (reason code)</register-use>
+</entry>
+<exit>
+ <register-use number="4">0 if claimed</register-use>
+</exit>
+<use>
+<p>
+This vector is called to enable power to the video hardware for the current display driver. The use of this call should be restricted to necessary circumstances.
+</p>
+</use>
+<related>
+</related>
+</vector-definition>
+
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the entry registers of OS_ScreenMode 1, 2 and 3, which were all given as 'R0 = 0'; they are the reason codes 1, 2 and 3.</change>
+    <change>Corrected the slips 'display number of generate VSync' (to generate VSync) and 'interpretted'.</change>
+    <change>The reason code names (such as OS_ScreenMode_SelectMode) are descriptive labels for the reason codes and not names defined by the operating system.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
