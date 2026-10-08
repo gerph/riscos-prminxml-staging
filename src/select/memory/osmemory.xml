@@ -1,0 +1,352 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="OS Memory">
+<section title="Introduction and Overview">
+<p>
+OS_Memory calls have been updated. The following lists the reason codes which are allocated :
+</p>
+<p><value-table head-number="Reason" head-value="Meaning">
+<value number="0">General block operations. See PRM 5a-62</value>
+<value number="1-5">Reserved for internal use. See PRM 5a-64</value>
+<value number="6">Read size of physical memory arrangement table. See PRM 5a-65 and this document</value>
+<value number="7">Read physical memory arrangement table. See PRM 5a-66 and this document</value>
+<value number="8">Read memory amounts. See PRM 5a-68 and this document</value>
+<value number="9">Read controller presence and logical base address. See PRM 5a-69 and this document</value>
+<value number="10">Lock free pool. See this document</value>
+<value number="11">Map PCI memory. See this document</value>
+<value number="12">Recommend page. See this document</value>
+<value number="13-23">Reserved for future expansion</value>
+<value number="24">Check memory access. See this document</value>
+<value number="25">Read controller presence and physical base address. See this document</value>
+</value-table></p></section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_Memory"
+                number="68"
+                reason="6"
+                reasonname="OS_Memory_ReadTableSize"
+                description="Read size of physical memory arrangement table"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">6 (reason code), all flag bits are currently reserved and must be 0</register-use>
+</entry>
+<exit>
+ <register-use number="1">Table size</register-use>
+ <register-use number="2">Page size</register-use>
+</exit>
+<use>
+<p>
+This SWI is now deprecated.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_Memory"
+                number="68"
+                reason="7"
+                reasonname="OS_Memory_ReadTable"
+                description="Read physical memory arrangement table"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">7 (reason code), all flag bits are currently reserved and must be 0</register-use>
+ <register-use number="1">Pointer to table to fill in</register-use>
+</entry>
+<exit>
+</exit>
+<use>
+<p>
+This SWI is now deprecated and may not return reliable information for a given OS version.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_Memory"
+                number="68"
+                reason="8"
+                reasonname="OS_Memory_ReadAmounts"
+                description="Read amount of memory"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">8 + flags:
+  <bitfield-table>
+ <bit number="8-11">Type of memory:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="1">DRAM</value>
+ <value number="2">VRAM</value>
+ <value number="3">ROM</value>
+ <value number="4">I/O</value>
+ <value number="5">Softload ROM</value>
+ <value number="6+">Reserved</value>
+</value-table></bit>
+ <bit number="12-31">Reserved, must be 0</bit>
+</bitfield-table></register-use>
+</entry>
+<exit>
+</exit>
+<use>
+<p>
+This SWI is used to read the amount of various types of memory available within the machine. On modern versions of RISC OS, the amount of VRAM will be returned as 0, as VRAM is now reserved to the video driver, rather than the Kernel. The new type 5 for softload RAM indicates the amount of memory allocated from DRAM (and excluded from the value returned for type 1).
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_Memory"
+                number="68"
+                reason="9"
+                reasonname="OS_Memory_ReadControllerLogical"
+                description="Read controller presence and base logical address"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">9 (reason code), all flag bits are currently reserved and must be 0</register-use>
+ <register-use number="1">Controller ID:
+  <bitfield-table>
+ <bit number="0-7">Controller sequence number</bit>
+ <bit number="8-31">Controller type:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">EASI card access speed control</value>
+ <value number="1">EASI space</value>
+ <value number="2">VIDC1</value>
+ <value number="3">VIDC20</value>
+ <value number="4+">Reserved</value>
+</value-table></bit>
+</bitfield-table></register-use>
+</entry>
+<exit>
+ <register-use number="0">Preserved</register-use>
+ <register-use number="1">Controller logical address</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the base address of a controller in logical address space. Under modern versions of the OS the correct way to obtain access to a controller is to create a dynamic area with the controller address mapped in to it. The Kernel will not map parts of hardware memory in future versions. This SWI is thus less useful in modern OS versions. Its behaviour has been changed slightly to correct an oversight in the original design. The original definition stated that 0 could be returned for an absent controller, in addition to an error being reported for an invalid controller. The implementation now returns an error for all controllers which do not exist, and 0 will not be returned.
+</p>
+<p>
+See PRM 5a-69 for the original definition.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_Memory"
+                number="68"
+                reason="A"
+                reasonname="OS_Memory_LockFreePool"
+                description="Lock free pool"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">10 + flags:
+  <bitfield-table>
+ <bit number="8">Call made by Wimp</bit>
+ <bit number="9-31">Reserved, must be 0</bit>
+</bitfield-table></register-use>
+</entry>
+<exit>
+</exit>
+<use>
+<p>
+This SWI was allocated in RISC OS 4 for locking the free pool in order to implement Wimp_ClaimFreeMemory. The Wimp_ClaimFreeMemory call should not be used and this call is no longer used.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_Memory"
+                number="68"
+                reason="B"
+                reasonname="OS_Memory_MapPCI"
+                description="Map PCI memory"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">11 + flags:
+  <bitfield-table>
+ <bit number="8">Set to read information, clear to map PCI space</bit>
+ <bit number="9-31">Reserved, must be 0</bit>
+</bitfield-table></register-use>
+ <register-use number="1-3">Dependent on flags</register-use>
+</entry>
+<exit>
+</exit>
+<use>
+<p>
+This SWI was allocated in RISC OS 4 for mapping PCI memory within the Phoebe hardware. PCI memory allocation should now be performed by clients through the PCI manager module. The PCI manager module will use physical memory areas to provide drivers with memory mappings. This call is no longer used.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_Memory"
+                number="68"
+                reason="C"
+                reasonname="OS_Memory_RecommendPage"
+                description="Recommend page"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">12 + flags:
+  <bitfield-table>
+ <bit number="8">Set if pages should be in DMA-able memory</bit>
+ <bit number="9-31">Reserved, must be 0</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Size of contiguous region of physical memory required in bytes</register-use>
+ <register-use number="2">Log base 2 of required alignment of base of region within physical memory, between 12 (4K) and 30 (2G)</register-use>
+</entry>
+<exit>
+ <register-use number="3">Page number of first page which fulfills the requirements specified</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to recommend pages of physical RAM which are unallocated and may be used for a new dynamic area. It is expected that they will be used to create a dynamic area, or to extend an existing area. An error will be returned if no pages match the required criteria. Prior to Kernel 8.77, bit 8 was not supported. This SWI call is available from RISC OS 4 onward.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_Memory"
+                number="68"
+                reason="18"
+                reasonname="OS_Memory_CheckAccess"
+                description="Check memory access"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">24 (reason code), all flag bits are currently reserved and must be 0</register-use>
+ <register-use number="1">Low address</register-use>
+ <register-use number="2">High address</register-use>
+</entry>
+<exit>
+ <register-use number="1">Access flags:
+  <bitfield-table>
+ <bit number="0">Range is completely readable in user mode</bit>
+ <bit number="1">Range is completely writable in user mode</bit>
+ <bit number="2">Range is completely readable in privileged modes</bit>
+ <bit number="3">Range is completely writable in privileged modes</bit>
+ <bit number="4">Range is partially readable in user mode</bit>
+ <bit number="5">Range is partially writable in user mode</bit>
+ <bit number="6">Range is partially readable in privileged modes</bit>
+ <bit number="7">Range is partially writable in privileged modes</bit>
+ <bit number="8">Range is completely physically mapped</bit>
+ <bit number="9">Range is completely abortable (aborts handled by code)</bit>
+ <bit number="10-11">Reserved for future expansion</bit>
+ <bit number="12">Range is partially physically mapped</bit>
+ <bit number="13">Range is partially abortable (aborts handled by code)</bit>
+ <bit number="14-15">Reserved for future expansion</bit>
+ <bit number="16-31">Reserved for future expansion</bit>
+</bitfield-table></register-use>
+</exit>
+<use>
+<p>
+This SWI is used to determine the accessibility of a range of memory. It is similar to the <reference type="swi" name="OS_ValidateAddress" /> call in that it uses the Dynamic Area details to determine the availability of memory areas. The region from 'low address' to 'high address'-1 will be considered.
+</p>
+<p>
+The flags returned indicate the access which is available for the range. Because the range may span (multiple) page boundaries the access for the range may vary across its length. Consequently, the two extents of accessibility are returned. Bits are separated into pairs of 4 bits. The lower 4 bits indicate the lowest level of accessibility for the region specified. The upper 4 bits indicate the highest level of accessibility for the region specified. If the bit sets are identical then the accessibility of the region does not change.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_Memory"
+                number="68"
+                reason="19"
+                reasonname="OS_Memory_ReadControllerPhysical"
+                description="Read controller presence and base physical address"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">25 (reason code), all flag bits are currently reserved and must be 0</register-use>
+ <register-use number="1">Controller ID:
+  <bitfield-table>
+ <bit number="0-7">Controller sequence number</bit>
+ <bit number="8-31">Controller type:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">EASI card access speed control</value>
+ <value number="1">EASI space</value>
+ <value number="2">VIDC1</value>
+ <value number="3">VIDC20</value>
+ <value number="4">Reserved for Pace OS variants</value>
+ <value number="5">Expansion ROMs</value>
+ <value number="6-31">Reserved for Pace OS variants</value>
+ <value number="32">Primary ROM</value>
+ <value number="33">IOMD</value>
+ <value number="34">FDC37C665 or similar</value>
+ <value number="35+">Reserved for future hardware</value>
+</value-table></bit>
+</bitfield-table></register-use>
+</entry>
+<exit>
+ <register-use number="0">Preserved</register-use>
+ <register-use number="1">Controller physical address</register-use>
+</exit>
+<use>
+<p>
+This call checks for the presence of a given controller and returns its physical address. This allows hardware drivers to provide support for specific controllers which may exist at different physical locations on other hardware. This call is similar to OS_Memory 9.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the description of the result of OS_Memory 9, which gave it as the controller physical address although the call reads the logical address, 'Read size of physical memory arrangement tabl', 'been been changed' and 'which are may exist'. The reason code names (such as OS_Memory_CheckAccess) are descriptive labels for the reason codes and not names defined by the operating system.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
