@@ -128,7 +128,7 @@ It is possible to indent items within the scrolling list through extra flags on 
 
 <section title="Toolbox Methods">
 <tboxmethod-definition name="ScrollList_SetHeadingText"
-                    number="ScrollList_Base + 14"
+                    number="4028"
                     description="Set the column headings">
 <entry>
  <register-use number="0">Flags (reserved, must be 0)</register-use>
@@ -155,7 +155,7 @@ Sets the text of the column headings. See the Column headings section.
 </tboxmethod-definition>
 
 <tboxmethod-definition name="ScrollList_GetHeadingText"
-                    number="ScrollList_Base + 15"
+                    number="4029"
                     description="Read the column headings">
 <entry>
  <register-use number="0">Flags (reserved, must be 0)</register-use>
@@ -186,7 +186,7 @@ Reads the text of the column headings.
 </tboxmethod-definition>
 
 <tboxmethod-definition name="ScrollList_SetColumnProperties"
-                    number="ScrollList_Base + 20"
+                    number="402E"
                     description="Set the properties of the columns">
 <entry>
  <register-use number="0">Flags:
@@ -223,7 +223,7 @@ Sets the properties of the columns. This call is not presently implemented.
 </tboxmethod-definition>
 
 <tboxmethod-definition name="ScrollList_SetColour"
-                    number="ScrollList_Base + 8"
+                    number="4022"
                     description="Set the colours of the list">
 <entry>
  <register-use number="0">Flags:
@@ -258,7 +258,7 @@ Sets the colours used by the list.
 </tboxmethod-definition>
 
 <tboxmethod-definition name="ScrollList_GetColour"
-                    number="ScrollList_Base + 9"
+                    number="4023"
                     description="Read the colours of the list">
 <entry>
  <register-use number="0">Flags:
@@ -292,7 +292,7 @@ Reads the colours used by the list.
 </tboxmethod-definition>
 
 <tboxmethod-definition name="ScrollList_CountItems"
-                    number="ScrollList_Base + 12"
+                    number="4026"
                     description="Count the items or read the physical size of the list">
 <entry>
  <register-use number="0">Flags:
@@ -316,7 +316,7 @@ Reads the colours used by the list.
 </exit>
 <use>
 <p>
-Reads information about the list. <fixme>This method and ScrollList_AddItem are both given as ScrollList_Base + 12; one of the offsets needs to be confirmed.</fixme>
+Reads information about the list.
 </p>
 </use>
 <declaration type="prototype">
@@ -331,7 +331,7 @@ Reads information about the list. <fixme>This method and ScrollList_AddItem are 
 </tboxmethod-definition>
 
 <tboxmethod-definition name="ScrollList_AddItem"
-                    number="ScrollList_Base + 12"
+                    number="401C"
                     description="Add an item to the list">
 <entry>
  <register-use number="0">Flags:
@@ -349,7 +349,7 @@ Reads information about the list. <fixme>This method and ScrollList_AddItem are 
  <bit number="8-31">Reserved, must be 0</bit>
 </bitfield-table></register-use>
  <register-use number="1">Window object id</register-use>
- <register-use number="2">ScrollList_Base + 12</register-use>
+ <register-use number="2">ScrollList_Base + 2</register-use>
  <register-use number="3">Gadget component_id</register-use>
  <register-use number="4">Pointer to text string to add</register-use>
  <register-use number="5">Pointer to sprite area</register-use>
@@ -402,7 +402,7 @@ Adds an item to the list. The indent consists of 32 OS units per indent and can 
   </revision>
   <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
     <change>Recreated documentation in PRM-in-XML format.</change>
-    <change>Corrected the method heading 'ScrollList_GetColumnProperties', whose entry registers and C veneer are those of ScrollList_SetColumnProperties, and the missing 'for' in 'to differentiated items'.</change>
+    <change>Corrected the method heading 'ScrollList_GetColumnProperties', whose entry registers and C veneer are those of ScrollList_SetColumnProperties, the offset of ScrollList_AddItem, which was given as ScrollList_Base + 12 (the same as ScrollList_CountItems) and is ScrollList_Base + 2, and the missing 'for' in 'to differentiated items'. The method numbers are given in full, with ScrollList_Base being &amp;401A.</change>
   </revision>
  </history>
 
