@@ -1,0 +1,575 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="The Portable module">
+<section title="Introduction">
+<p>
+This module provides support for portable machines. The SWIs listed are not normally intended to be issued from user programs, they will normally be issued by other modules in the system.
+</p>
+</section>
+
+<section title="Service Calls">
+<service-definition name="Portable"
+                    number="8A"
+                    description="Portable state change request, or information">
+<entry>
+ <register-use number="1">&hex;8A (service number)</register-use>
+ <register-use number="2">Sub-reason code:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Hardware is about to be powered down</value>
+ <value number="1">Hardware has been powered up</value>
+ <value number="2">Tidy up</value>
+ <value number="3">Device is about to enter a stopped state (frozen)</value>
+ <value number="4">Device has left stopped state (awakened)</value>
+ <value number="5">Device wishes to be stopped (frozen)</value>
+ <value number="6+">Reserved for future expansion</value>
+</value-table></register-use>
+ <register-use number="3">Bit mask of which ports are being powered down (if R2 = 0) (each bit set indicates port is being powered down) or bit mask of which ports have been powered up (if R2 = 1) (each bit set indicates port has been powered up)</register-use>
+</entry>
+<exit>
+ <register-use number="1">0 if R3 = 0, else preserved to pass on</register-use>
+ <register-use number="2">Preserved</register-use>
+ <register-use number="3">Bit mask of which ports may be powered down or up (each bit set indicates no objection to change of state)</register-use>
+</exit>
+<use>
+<p>
+This call is issued before power is removed or after power is reapplied to the following:
+</p>
+<p><list>
+<item><p>Econet (bit 0)</p></item>
+<item><p>serial buffer/oscillator (bit 3)</p></item>
+<item><p>FDC oscillator (bit 14)</p></item>
+</list></p>
+<p>
+If a module wishes to prevent hardware being powered down it should clear the appropriate bit or bits in R3. In addition, if the resulting value in R3 is now zero, the module should claim the service by setting R1 to zero. (This is to prevent the call being unnecessarily passed round the rest of the modules). Otherwise the service should be passed on by preserving R1.
+</p>
+<p>
+This service call should never be claimed.
+</p>
+</use>
+<related>
+</related>
+</service-definition>
+
+<service-definition name="Portable"
+                    number="8A"
+                    reason="0"
+                    reasonname="Portable_PowerDown"
+                    description="Hardware is about to be powered down">
+<entry>
+ <register-use number="1">&hex;8A (service number)</register-use>
+ <register-use number="2">Sub-reason code (0)</register-use>
+ <register-use number="3">Bit mask of which ports are being powered down (each bit set indicates port is being powered down)</register-use>
+</entry>
+<exit>
+ <register-use number="1">0 if R3 = 0, else preserved to pass on</register-use>
+ <register-use number="2">Preserved</register-use>
+ <register-use number="3">Bit mask of which ports may be powered down (each bit set indicates no objection to change of state)</register-use>
+</exit>
+<use>
+<p>
+This call is issued before power is removed from the following:
+</p>
+<p><list>
+<item><p>Econet (bit 0)</p></item>
+<item><p>serial buffer/oscillator (bit 3)</p></item>
+<item><p>FDC oscillator (bit 14)</p></item>
+</list></p>
+<p>
+If a module wishes to prevent hardware being powered down it should clear the appropriate bit or bits in R3. In addition, if the resulting value in R3 is now zero, the module should claim the service by setting R1 to zero. (This is to prevent the call being unnecessarily passed round the rest of the modules). Otherwise the service should be passed on by preserving R1.
+</p>
+<p>
+This service call should never be claimed.
+</p>
+</use>
+<related>
+</related>
+</service-definition>
+
+<service-definition name="Portable"
+                    number="8A"
+                    reason="1"
+                    reasonname="Portable_PowerUp"
+                    description="Hardware has been powered up">
+<entry>
+ <register-use number="1">&hex;8A (service number)</register-use>
+ <register-use number="2">Sub-reason code (1)</register-use>
+ <register-use number="3">Bit mask of which ports have been powered up (each bit set indicates port has been powered up)</register-use>
+</entry>
+<exit>
+ <register-use number="1">0 if R3 = 0, else preserved to pass on</register-use>
+ <register-use number="2">Preserved</register-use>
+ <register-use number="3">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call is issued after power is reapplied to the following:
+</p>
+<p><list>
+<item><p>Econet (bit 0)</p></item>
+<item><p>serial buffer/oscillator (bit 3)</p></item>
+<item><p>FDC oscillator (bit 14)</p></item>
+</list></p>
+<p>
+The service should be passed on by preserving R1.
+</p>
+</use>
+<related>
+</related>
+</service-definition>
+
+<service-definition name="Portable"
+                    number="8A"
+                    reason="3"
+                    reasonname="Portable_Freezing"
+                    description="Device is about to enter a stopped state (frozen)">
+<entry>
+ <register-use number="1">&hex;8A (service number)</register-use>
+ <register-use number="2">Sub-reason code (3)</register-use>
+</entry>
+<exit>
+ <register-use number="1-2">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call is issued before the device is put into a stopped mode where the CPU core has been disabled. RAM continues to be refreshed and the system will probably be woken up at some future point. It is possible that the power may fail on the device before it is awakened. In such cases, the device may next be activated from a hard reset condition.
+</p>
+</use>
+<related>
+</related>
+</service-definition>
+
+<service-definition name="Portable"
+                    number="8A"
+                    reason="4"
+                    reasonname="Portable_Awakened"
+                    description="Device has left stopped state (awakened)">
+<entry>
+ <register-use number="1">&hex;8A (service number)</register-use>
+ <register-use number="2">Sub-reason code (4)</register-use>
+ <register-use number="3">Failure code:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Freeze was successful and has now returned</value>
+ <value number="1">Freeze failed to halt IDE devices</value>
+ <value number="2">Freeze failed to halt sound system</value>
+ <value number="3">Freeze failed to halt display</value>
+ <value number="4">Freeze failed to halt other devices (FDC, Econet, etc)</value>
+ <value number="5">Freeze failed to halt some device</value>
+ <value number="6">Freeze failed to enter the suspend state</value>
+ <value number="7+">Reserved failure states for future expansion</value>
+</value-table></register-use>
+</entry>
+<exit>
+ <register-use number="1-3">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call is issued after the device returns from a stopped state. It may never have physically stopped the CPU if some part of the system failed to be shut down. In such cases, it may not be necessary to fully resynchronise the environment - for example, network connections may still be active.
+</p>
+</use>
+<related>
+</related>
+</service-definition>
+
+<service-definition name="Portable"
+                    number="8A"
+                    reason="5"
+                    reasonname="Portable_StopRequest"
+                    description="Device wishes to be stopped (frozen)">
+<entry>
+ <register-use number="1">&hex;8A (service number)</register-use>
+ <register-use number="2">Sub-reason code (5)</register-use>
+</entry>
+<exit>
+ <register-use number="1">0 if call is being claimed to prevent freeze, preserved to accept freeze</register-use>
+ <register-use number="2">Preserved</register-use>
+</exit>
+<use>
+<p>
+This call is issued before the device is stopped. Any module wishing to object to the request may claim the service.
+</p>
+</use>
+<related>
+</related>
+</service-definition>
+
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="Portable_Speed"
+                number="42FC0"
+                description="Control the processor speed"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">EOR mask</register-use>
+ <register-use number="1">AND mask</register-use>
+</entry>
+<exit>
+ <register-use number="0">Old speed</register-use>
+ <register-use number="1">New speed:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Fast</value>
+ <value number="1">Slow</value>
+</value-table></register-use>
+</exit>
+<use>
+<p>
+This SWI controls the processor speed, which is reduced when the system is idle in order to save power.
+</p>
+<p>
+The new speed is calculated as follows:
+</p>
+<p><extended-example type="format">
+<userinput>new speed = (old speed AND R1) EOR R0</userinput>
+</extended-example></p></use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Portable_Control"
+                number="42FC1"
+                description="Control various power control and miscellaneous bits"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">EOR mask</register-use>
+ <register-use number="1">AND mask</register-use>
+</entry>
+<exit>
+ <register-use number="0">Old control</register-use>
+ <register-use number="1">New control</register-use>
+</exit>
+<use>
+<p>
+This SWI controls various power control and miscellaneous bits in the portable machine.
+</p>
+<p>
+The new control is calculated as follows:
+</p>
+<p><extended-example type="format">
+<userinput>new control = (old control AND R1) EOR R0</userinput>
+</extended-example></p><p>
+The bits in control are as follows:
+</p>
+<p><bitfield-table>
+ <bit number="0">Power to Econet enabled</bit>
+ <bit number="1">Power to LCD display enabled</bit>
+ <bit number="2">Power to external video display enabled</bit>
+ <bit number="3">Power to serial buffer and oscillator enabled</bit>
+ <bit number="4">Dual panel mode enabled</bit>
+ <bit number="5-6">Video clock control:
+   <value-table head-number="Value" head-value="Meaning">
+ <value number="0">External clock input</value>
+ <value number="1">Crystal oscillator, divided by 2</value>
+ <value number="2">Crystal oscillator</value>
+ <value number="3">Reserved, do not use</value>
+</value-table></bit>
+ <bit number="7">Invert video clock</bit>
+ <bit number="8">Back-light enabled</bit>
+ <bit number="9">Set: 2 extra lines on display. Clear: 1 extra line on display</bit>
+ <bit number="10">Set: 2 DRAMs used for dual panel. Clear: 1 DRAM used for dual panel</bit>
+ <bit number="11-13">Reserved</bit>
+ <bit number="14">Power to FDC oscillator enabled</bit>
+ <bit number="15">Reserved</bit>
+ <bit number="16">LCD palette set up for inverse video</bit>
+ <bit number="17">Internal tracker ball enabled</bit>
+ <bit number="18">External mouse enabled</bit>
+ <bit number="19">Power to external keyboard and mouse enabled</bit>
+ <bit number="20-31">Reserved</bit>
+</bitfield-table></p>
+<p>
+Reserved bits must not be modified, nor assumed to read any particular value.
+</p>
+<p>
+Note that the 82C711 has one oscillator which is used by the serial sub-unit and by the floppy disc controller (FDC). Power to the oscillator is removed only if bits 3 and 14 are both clear.
+</p>
+<p>
+On some computers the power to the oscillator cannot be removed because the same oscillator drives other parts of the system (eg IOEB).
+</p>
+<p>
+If this call results in bits 0, 3 or 14 changing (i.e. power being removed or applied to the serial buffer/oscillator, Econet or FDC oscillator), then <reference type="service" name="Portable" reason="0" /> is issued (see <reference type="service" name="Portable" reason="1" />).
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Portable_ReadBMUVariable"
+                number="42FC2"
+                description="Read Battery Management Unit variables"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">BMU variable number</register-use>
+</entry>
+<exit>
+ <register-use number="0">Preserved</register-use>
+ <register-use number="1">Value of variable</register-use>
+</exit>
+<use>
+<p>
+This SWI reads Battery Management Unit variables. Any variable which is not supported will return an error.
+</p>
+<p>
+The BMU variable numbers are:
+</p>
+<p><value-table head-number="Variable" head-name="Read/Write" head-value="Description">
+<value number="0" name="R">Version number and memory map of BMU microcode</value>
+<value number="1" name="R">Nominal battery capacity</value>
+<value number="2" name="R">Measured battery capacity</value>
+<value number="3" name="R">Used battery capacity</value>
+<value number="4" name="R">Usable battery capacity</value>
+<value number="5" name="R">Reserved</value>
+<value number="6" name="R/W">Charge estimate</value>
+<value number="7" name="R">Instantaneous voltage</value>
+<value number="8" name="R">Instantaneous current</value>
+<value number="9" name="R">Instantaneous temperature</value>
+<value number="10" name="R">Flag bits (see below)</value>
+<value number="11" name="R">Charge rate (bits 4 to 7)</value>
+<value number="12" name="R">Charge current</value>
+<value number="13" name="R">Discharge current</value>
+<value number="14" name="R">Voltage</value>
+<value number="15" name="R">Temperature 1</value>
+<value number="16" name="R">Temperature 2</value>
+<value number="17" name="R">Charge level</value>
+<value number="18" name="R">Status flags (as variable 10)</value>
+<value number="19" name="R">Input signals</value>
+<value number="20" name="R">Battery capacity</value>
+<value number="21" name="R">Battery time remaining in seconds</value>
+<value number="22" name="R">Maximum battery life in seconds</value>
+</value-table></p>
+<p>
+The flag bits of variable 10 are:
+</p>
+<p><bitfield-table>
+ <bit number="0">Battery has been replaced</bit>
+ <bit number="1">Lid is open</bit>
+ <bit number="2">Threshold 2 reached (battery is flat)</bit>
+ <bit number="3">Threshold 1 reached (battery is low)</bit>
+ <bit number="4">Charging system fault</bit>
+ <bit number="5">Charge state is known</bit>
+ <bit number="6">Battery present (set when battery is present, whether in use, charging or idle)</bit>
+ <bit number="7">Power connected (set when external power is available, whether charging or not)</bit>
+</bitfield-table></p>
+<p>
+Reading any variable except the flags (variable 10) will enable IRQs (the flags are read from a soft copy).
+</p>
+<p>
+Variables 0-11 were implemented within the A4 version of the Portable module. Variables 12-20 and selected variables from 0-11 were implemented within the Stork version of the Portable module. Variables 21-22 are implemented within the Virtual RiscPC version of the Portable module. Variables 0-4, 10, 11 and 14 are provided by the A9 version of the Portable.
+</p>
+<p>
+Despite this, clients should not expect any particular variables to be provided by a given implementation as hardware capabilities and software implementation may change. Clients should always attempt to read the value and take appropriate action if a failure occurs.
+</p>
+<p>
+Variables which are not supported will return with the V flag set and R0 pointing to a standard error block. Applications trying to use the more advanced features and finding they are not available should attempt to fall back to earlier methods.
+</p>
+</use>
+<related>
+<reference type="swi" name="Portable_WriteBMUVariable" />
+</related>
+</swi-definition>
+
+<swi-definition name="Portable_WriteBMUVariable"
+                number="42FC3"
+                description="Write Battery Management Unit variables"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">BMU variable number</register-use>
+ <register-use number="1">New value of variable</register-use>
+</entry>
+<exit>
+ <register-use number="0-1">Preserved</register-use>
+</exit>
+<use>
+<p>
+This SWI writes Battery Management Unit variables.
+</p>
+<p>
+The variable numbers are as for Portable_ReadBMUVariable. Variables not marked with a 'W' should not be written.
+</p>
+</use>
+<related>
+<reference type="swi" name="Portable_ReadBMUVariable" />
+</related>
+</swi-definition>
+
+<swi-definition name="Portable_CommandBMU"
+                number="42FC4"
+                description="Issue a command to the Battery Management Unit"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Reason code:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="1">Remove power</value>
+ <value number="2">Reserved</value>
+ <value number="3">Reserved</value>
+ <value number="4">Set autostart (R1 = delay in minutes - 1; eg 0 for a 1 minute delay)</value>
+ <value number="5">Turn off AC power</value>
+ <value number="6">Turn on AC power</value>
+ <value number="7">Disable power management status</value>
+</value-table></register-use>
+ <register-use number="1-5">Dependent on reason code</register-use>
+</entry>
+<exit>
+ <register-use number="1-5">Preserved</register-use>
+</exit>
+<use>
+<p>
+This SWI issues a command to the Battery Management Unit. The values of variables after a command may not change immediately after this command is issued.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Portable_ReadFeatures"
+                number="42FC5"
+                description="Read the feature set of the portable module"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+</entry>
+<exit>
+ <register-use number="1">Features of the portable module:
+  <bitfield-table>
+ <bit number="0">Portable_Speed SWI is implemented</bit>
+ <bit number="1-3">Reserved, must be zero</bit>
+ <bit number="4">Portable_Idle SWI is implemented</bit>
+ <bit number="5">Portable_Stop SWI is implemented</bit>
+ <bit number="6-31">Reserved, must be zero</bit>
+</bitfield-table></register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the features provided by the Portable module. Where this module is not present, or this SWI generates an error if called, clients should treat the features as being 0.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Portable_Idle"
+                number="42FC6"
+                description="Inform the portable module that the system is currently idle"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+</entry>
+<exit>
+</exit>
+<use>
+<p>
+This SWI places the system into idle mode. The CPU clock is stopped, but all other clocks run normally. This means the Video display and all the IO channels are active, the DRAM is refreshed, but the system consumes less power as the CPU is inactive. The CPU remains in this state until it receives a FIQ or IRQ interrupt (eg from the keyboard, floppy, centi-second timer etc).
+</p>
+<p>
+Essentially it requests that the environment be stopped until 'something interesting' happens.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Portable_Stop"
+                number="42FC7"
+                description="Stop (freeze) the Portable"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+</entry>
+<exit>
+ <register-use number="0">Reason for wake up:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="1">Keyboard interrupt</value>
+ <value number="2">RTC timer interrupt</value>
+ <value number="3+">Reserved</value>
+</value-table></register-use>
+</exit>
+<use>
+<p>
+This SWI places the machine into a 'standby' state, from which it can be awoken by certain interrupts. DRAM is set to self-refresh, and the system placed into stop mode (all clocks are stopped). Execution continues only on receipt of an external wakeup event from the keyboard or real-time-clock. Normal FIQ or IRQ or centi-second timer events cannot happen because the IO system is not clocked.
+</p>
+<p>
+Freezing of the machine may be prevented by modules through the service call <reference type="service" name="Portable" reason="5" />. This service is issued prior to attempts to freeze the machine. If no clients object to this service, <reference type="service" name="Portable" reason="3" /> will be issued and the machine shut down. Upon an interrupt, <reference type="service" name="Portable" reason="4" /> will be issued to notify clients that the power has been restored and a period of time has elapsed during which interrupts have not happened.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="Portable_Status"
+                number="42FC8"
+                description="Read the status of the Portable environment"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+</entry>
+<exit>
+ <register-use number="0">Status of the Portable environment:
+  <bitfield-table>
+ <bit number="0">Device is currently docked</bit>
+ <bit number="1">Device has external floppy disc drive connected</bit>
+ <bit number="2">Device has tracker ball connected (rather than mouse)</bit>
+ <bit number="3">Device has internal display in use</bit>
+ <bit number="4-31">Reserved, must be zero</bit>
+</bitfield-table></register-use>
+</exit>
+<use>
+<p>
+This SWI is used to read the status of the Portable environment. This allows applications to modify their behaviour, or for modules to configure their operations based on the environment in which the device is situated.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected 'before the device is stop. Any after the device wishing' to 'before the device is stopped. Any module wishing', and 'Dependant'. The sub-reason names (such as Portable_PowerDown) are descriptive labels for the sub-reason codes and not names defined by the operating system.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
