@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="RAMFS">
+<section title="Introduction and Overview">
+<p>
+In Select 3, RamFS was updated to align its SWIs with those provided by ADFS, specifically, adding RamFS_MiscOp and RamFS_SectorDiscOp with the same offset that they have within ADFS. Unfortunately, under RISC OS 5, a new SWI - DiscOp64 - was added immediately after the DescribeDisc SWI. In order to remain compatible with this system, RamFS no longer follows the same SWI numbering scheme as ADFS. The following SWIs are provided by RamFS :
+</p>
+<p><value-table head-number="SWI number" head-value="SWI name">
+<value number="&amp;amp;40780">RamFS_DiscOp</value>
+<value number="&amp;amp;40781">RamFS_NOP</value>
+<value number="&amp;amp;40782">RamFS_Drives</value>
+<value number="&amp;amp;40783">RamFS_FreeSpace</value>
+<value number="&amp;amp;40784">RamFS_NOP</value>
+<value number="&amp;amp;40785">RamFS_DescribeDisc</value>
+<value number="&amp;amp;40786">RamFS_DiscOp64</value>
+<value number="&amp;amp;40787">RamFS_NOP</value>
+<value number="&amp;amp;40788">RamFS_NOP</value>
+<value number="&amp;amp;40789">RamFS_NOP</value>
+<value number="&amp;amp;4078A">RamFS_NOP</value>
+<value number="&amp;amp;4078B">RamFS_NOP</value>
+<value number="&amp;amp;4078C">RamFS_MiscOp</value>
+<value number="&amp;amp;4078D">RamFS_SectorDiscOp</value>
+</value-table></p></section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
