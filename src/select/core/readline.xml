@@ -1,0 +1,206 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="OS_ReadLine">
+<section title="Introduction and Overview">
+<p>
+OS_ReadLine is an interface used to read a line from the current input stream. It was originally designed for Arthur, based on the OS_Word 0 system call provided by the BBC series of machines. This, and the initial 26bit limitations of the architecture, meant that the vector itself reused parts of address space which have subsequently (with ARM 6 and later, with RISC OS 3.5) been made available to users through dynamic areas.
+</p>
+<p>
+The buffer pointer in R0 is restricted by using the top two bits for flags. These two bits mean that any dynamic area in the top three quarters of memory could not be used for line buffers. Prior to Select, the top 6 bits are actually unavailable even though the lower 4 of these are unused.
+</p>
+<p>
+With Select 4 and later, it is possible to use the OS_ReadLine call to address the full range of memory through an extended interface. By setting bit 31 of R1 (the length of the line), the 'Full address range interface' will be used. Clients should use this interface if they know they are to run on Select 4 or later. Specifically, this interface is available where the ReadLine module version 0.05 is present.
+</p>
+<p>
+On both 26bit and 32bit OSs, the interface functions identically.
+</p>
+<p>
+<reference type="swi" name="OS_ReadLine32" /> will always use the 'Full address range interface', and bit 31 of R1 need not be set to indicate this.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="ReadLine Vector">
+<p>
+Because the OS_ReadLine interface has been updated, it has been necessary to update the ReadLine vector to reflect this.
+</p>
+<p>
+On 32bit systems the 'Full address range interface' will always be used for ReadLineV. On 26bit systems, bit 31 of R1 indicates whether the 'Full address range interface' or the 'Old-style interface' is present.
+</p>
+<p>
+A handler on this vector could use code similar to the following to allow it to function whatever type of system is used :
+</p>
+<p><extended-example type="asm">
+<userinput>ReadLineV_Code</userinput><br/>
+<userinput>     STMFD  sp!, {r0, r4, r14}          ; must preserve r0 and r4</userinput><br/>
+<userinput>     TST    r1, #1&lt;&lt;31                  ; check for new style interface</userinput><br/>
+<userinput>     BICNE  r1, r1, #1&lt;&lt;31              ; if so, clear the flag</userinput><br/>
+<userinput>     BNE    full_interface_in_use</userinput><br/>
+<userinput>     TEQ    pc, pc                      ; are we 32bit ?</userinput><br/>
+<userinput>     ANDNE  r4, r4, #255                ; 26bit: leave just character</userinput><br/>
+<userinput>     ANDNE  r14,r0, #63&lt;&lt;26             ; 26bit: get flag bits (top 6 bits)</userinput><br/>
+<userinput>     ORRNE  r4, r4, r14                 ; 26bit: update flags in r4</userinput><br/>
+<userinput>     BICNE  r0, r0, #63&lt;&lt;26             ; 26bit: leave just the address</userinput><br/>
+<userinput>full_interface_in_use</userinput><br/>
+<userinput>; registers now set up as described in 'Full address range interface'</userinput><br/>
+<userinput>; with r1 bit 31 clear.</userinput>
+</extended-example></p></subsection>
+
+<subsection title="Caveats">
+<p>
+This documented interface differs from that developed by Pace Microtechnology PLC. These differences are mostly compatible, but are required to ensure that applications running on 26bit systems can benefit from the expanded interface. In particular :
+</p>
+<p><list>
+<item><p>OS_ReadLine functions identically, whether invoked in 26bit or 32bit processor mode.</p></item>
+<item><p>OS_ReadLine can be used to access the full address range by setting bit 31.</p></item>
+<item><p>ReadLineV may be entered with R1 bit 31 set to indicate that the extended interface can be used.</p></item>
+</list></p></subsection>
+
+<subsection title="ReadLine module">
+<p>
+The ReadLine module provides the implementation of the OS_ReadLine and OS_ReadLine32 SWIs. It dispatches these to vector handlers appropriately for the processor upon which it is running. Where possible, the 'Full address range interface' will be degraded to the 'old-style' interface on 26bit systems.
+</p>
+</subsection>
+
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_ReadLine"
+                number="E"
+                description="Read a line of input (full address range interface)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to buffer</register-use>
+ <register-use number="1">Maximum length of line:
+  <bitfield-table>
+ <bit number="0-30">Length</bit>
+ <bit number="31">26bit: should be set to indicate the full address range is used. 32bit: ignored</bit>
+</bitfield-table></register-use>
+ <register-use number="2">Lowest character to put into buffer</register-use>
+ <register-use number="3">Highest character to put into buffer</register-use>
+ <register-use number="4">Flags and echo character:
+  <bitfield-table>
+ <bit number="0-7">Echo character (if bit 30 set)</bit>
+ <bit number="8-29">Reserved</bit>
+ <bit number="30">Use character in bits 0-7 to hide characters (for passwords)</bit>
+ <bit number="31">Don't reflect characters not entering the buffer</bit>
+</bitfield-table></register-use>
+</entry>
+<exit>
+ <register-use number="0">Preserved</register-use>
+ <register-use number="1">Length of line input; C clear if line terminated normally, C set if line terminated by escape, V set if an error occurred other than escape</register-use>
+</exit>
+<use>
+<p>
+The 'Full address range interface' is used when bit 31 of R1 is set on a 26bit system, always on a 32bit system, and always by OS_ReadLine32.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ReadLine32" />
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ReadLine"
+                number="E"
+                description="Read a line of input (old-style interface)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to buffer + flags:
+  <bitfield-table>
+ <bit number="0-25">Buffer address</bit>
+ <bit number="26-29">Ignored</bit>
+ <bit number="30">Use character in R4 bits 0-7 to hide characters (for passwords)</bit>
+ <bit number="31">Don't reflect characters not entering the buffer</bit>
+</bitfield-table></register-use>
+ <register-use number="1">Maximum length of line (bit 31 must be clear; it would cause buffer overflow if set on old systems)</register-use>
+ <register-use number="2">Lowest character to put into buffer</register-use>
+ <register-use number="3">Highest character to put into buffer</register-use>
+ <register-use number="4">Echo character in bits 0-7 (if R0 bit 30 set)</register-use>
+</entry>
+<exit>
+ <register-use number="1">Length of line input; C clear if line terminated normally, C set if line terminated by escape, V set if an error occurred other than escape</register-use>
+</exit>
+<use>
+<p>
+The old-style interface can only address the lower part of the address space.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_ReadLine32"
+                description="Read a line of input (always the full address range interface)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Pointer to buffer</register-use>
+ <register-use number="1">Maximum length of line:
+  <bitfield-table>
+ <bit number="0-30">Length</bit>
+ <bit number="31">26bit: should be set to indicate the full address range is used. 32bit: ignored</bit>
+</bitfield-table></register-use>
+ <register-use number="2">Lowest character to put into buffer</register-use>
+ <register-use number="3">Highest character to put into buffer</register-use>
+ <register-use number="4">Flags and echo character:
+  <bitfield-table>
+ <bit number="0-7">Echo character (if bit 30 set)</bit>
+ <bit number="8-29">Reserved</bit>
+ <bit number="30">Use character in bits 0-7 to hide characters (for passwords)</bit>
+ <bit number="31">Don't reflect characters not entering the buffer</bit>
+</bitfield-table></register-use>
+</entry>
+<exit>
+ <register-use number="0">Preserved</register-use>
+ <register-use number="1">Length of line input; C clear if line terminated normally, C set if line terminated by escape, V set if an error occurred other than escape</register-use>
+</exit>
+<use>
+<p>
+OS_ReadLine32 will always use the 'Full address range interface', and bit 31 of R1 need not be set to indicate this.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_ReadLine" />
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>The SWI number of OS_ReadLine32 is not given in the original and is not included.</change>
+    <change>The flag bit numbers of the old-style interface, which the captured HTML had flattened, were checked against the original documentation text.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
