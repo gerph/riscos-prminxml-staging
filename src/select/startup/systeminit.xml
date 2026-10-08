@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="System initialisation">
+<section title="Introduction and Overview">
+<p>
+During system initialisation the OS goes through a number of phases. During these phases there may be indications of the progress for diagnostic purposes. The sequence of colours displayed on VIDC systems for Kernel 9.70 is given below. Other systems may produce different colours and, due to continuous development, colours may be changed in future versions.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="System initialisation">
+<p><value-table head-number="Colour" head-value="Meaning">
+<value number="Black">System has not initialised at all - or display is not connected.</value>
+<value number="Cyan">Memory detection is in progress</value>
+<value number="Green">Memory detection complete, about to enable MMU</value>
+<value number="Light green">MMU enabled, about to enter RISC OS</value>
+</value-table></p></subsection>
+
+<subsection title="RISC OS">
+<p><value-table head-number="Colour" head-value="Meaning">
+<value number="White">Debug environment initialising (not usually seen in production OS versions)</value>
+<value number="Dark grey">Hardware vectors being initialised</value>
+<value number="Dark blue">Early system memory initialisation</value>
+<value number="Light blue">OS page table initialising</value>
+<value number="Light pink">OS page table initialisation successful</value>
+<value number="Light magenta">Dynamic area, abstraction layer, and system memory area initialisation.</value>
+<value number="Mid grey">Main OS initialisation - NVRAM reset check, and verification; Software vector table initialisation; IRQ handlers initialisation; Environment handlers initialisation; VDU subsystem initialisation; High level environment initialisation; Kernel keyboard dispatcher; PBTS structure initialisation; Page table initialisation; Module initialisation</value>
+<value number="Red">Only occurs within the above sequence if a NVRAM reset is detected.</value>
+<value number="Black">VideoHW for the system has initialised, this is usually accompanied by a flashing cursor. If the cursor stops flashing, this indicates that a ROM, or expansion card, component has either failed or is taking a long time to initialise.</value>
+<value number="&amp;lt;beep&amp;gt;">Operating system has initialised successfully and is about to begin boot from disc, or through boot menu. This is followed immediately by the display of the RISC OS banner.</value>
+</value-table></p><p>
+The positioning of the colour indicators within the system initialisation has been selected to identify the most common failure points. A correctly functioning system should not display any of the above colour indicators for more than a second. Any system failure during start up may indicate hardware failure. This may range from poorly fitted components (for example memory or expansion cards) to damaged or missing components. Check all user accessible components before contacting your supplier.
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
