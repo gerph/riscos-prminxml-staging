@@ -1,0 +1,169 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="EvaluateExpression">
+<section title="Introduction and Overview">
+<p>
+The EvaluateExpression module provides the SWI <reference type="swi" name="OS_EvaluateExpression" />. This call attempts to calculate the value of the string passed to it. Although the SWI itself is not normally used by the programmer, its effects are seen most commonly through the <userinput>*SetEval</userinput> and <userinput>*If</userinput> commands.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Operators">
+<p>
+OS_EvaluateExpression is defined to operate using a number of specified operations. These are unchanged since RISC OS 2 (and possibly earlier). Dependent on their context, the operations are applied to either numbers or strings, with the preference being for string operations.
+</p>
+<p><value-table head-number="Operator" head-value="Meaning">
+<value number="( )">Grouping operators, applied using correct mathematical precedence</value>
+<value number="- * /">Arithmetic operators</value>
+<value number="+">Arithmetic operator, or if used on strings a concatenation operator</value>
+<value number="=">Equality (either numeric or string dependent on its context, the same condition applies to all the comparison operators)</value>
+<value number="&amp;lt;&amp;gt;">Inequality</value>
+<value number="&amp;lt;">Less than</value>
+<value number="&amp;gt;">Greater than</value>
+<value number="&amp;lt;=">Less than or equal to</value>
+<value number="&amp;gt;=">Greater than or equal to</value>
+<value number="&amp;gt;&amp;gt;&amp;gt;">Logical shift right (ignores sign)</value>
+<value number="&amp;gt;&amp;gt;">Arithmetic shift right (sign extending)</value>
+<value number="&amp;lt;&amp;lt;">Shift left (arithmetic shift and logical shift are the same)</value>
+<value number="AND">Logical AND (both conditions must be true)</value>
+<value number="OR">Logical OR (either condition may be true)</value>
+<value number="EOR">Logical exclusive OR (one or the other may be true, but not both)</value>
+<value number="NOT">Negate (inverts the bitpattern of a number)</value>
+<value number="MOD">Modulo (remainder)</value>
+<value number="RIGHT">Obtain the rightmost characters from a string</value>
+<value number="LEFT">Obtain the leftmost characters from a string</value>
+<value number="STR">Convert a number to a string</value>
+<value number="VAL">Convert a string to a number</value>
+<value number="LEN">Find the length of a string</value>
+</value-table></p><p>
+In addition, the EvaluateExpression module also provides a number of extensions to these operators :
+</p>
+<subsubsection title="LEAFNAME">
+<p>
+Return the leaf name from the path specified.
+</p>
+<p><extended-example type="format">
+<userinput>Example:     LEAFNAME "ADFS::4.$.Directory.File"</userinput><br/>
+<userinput>Evaluates to: "File"</userinput>
+</extended-example></p></subsubsection>
+
+<subsubsection title="DIRNAME">
+<p>
+Return the directory name from the path specified.
+</p>
+<p><extended-example type="format">
+<userinput>Example:     DIRNAME "ADFS::4.$.Directory.File"</userinput><br/>
+<userinput>Evaluates to: "ADFS::4.$.Directory"</userinput>
+</extended-example></p></subsubsection>
+
+<subsubsection title="CANONICALISE">
+<p>
+Convert the path specified to its canonical form.
+</p>
+<p><extended-example type="format">
+<userinput>Example:     CANONICALISE "ADFS::4.$.Directory.File"</userinput><br/>
+<userinput>Evaluates to: "ADFS::HardDisc4.$.Directory.File"</userinput>
+</extended-example></p></subsubsection>
+
+<subsubsection title="TIMEFORMAT">
+<p>
+Format the current time in the format specified.
+</p>
+<p><extended-example type="format">
+<userinput>Example:     TIMEFORMAT "%24-%MI-%SE"</userinput><br/>
+<userinput>Evaluates to: "18-27-22"</userinput>
+</extended-example></p></subsubsection>
+
+<subsubsection title="SET">
+<p>
+Returns boolean value of whether a system variable is set, -1 if set, 0 if not set.
+</p>
+<p><extended-example type="format">
+<userinput>Example:     SET "Not$Set"</userinput><br/>
+<userinput>Evaluates to: 0</userinput>
+</extended-example></p></subsubsection>
+
+<subsubsection title="MODULEVERSION">
+<p>
+Returns the version number of a module multiplied by 100 or -1 if not present.
+</p>
+<p><extended-example type="format">
+<userinput>Example:     MODULEVERSION "WindowManager"</userinput><br/>
+<userinput>Evaluates to: 607</userinput>
+</extended-example></p></subsubsection>
+
+</subsection>
+
+<subsection title="Change in parsing rules">
+<p>
+The operator parsing rules have changed slightly in version 0.13 of the EvaluateExpression module. Previous versions would have given the following sequence of results :
+</p>
+<p><extended-example type="shell">
+<userinput>*set LENGTH 7</userinput><br/>
+<userinput>*eval LENGTH</userinput><br/>
+<userinput>Unknown operand</userinput><br/>
+<userinput>*set GTH 12</userinput><br/>
+<userinput>*eval LENGTH</userinput><br/>
+<userinput>Result is an integer, value :2</userinput><br/>
+<userinput>*eval length</userinput><br/>
+<userinput>Result is a string, value :7</userinput>
+</extended-example></p><p>
+That is, the operator prefix on a variable name would always be processed first, even if the operator was completely alphabetically named. The new parser will only treat alphabetic operators as being complete if they are followed by non-alphabetic characters. Thus, the above sequence of commands now produces :
+</p>
+<p><extended-example type="shell">
+<userinput>*set LENGTH 7</userinput><br/>
+<userinput>*eval LENGTH</userinput><br/>
+<userinput>Result is a string, value :7</userinput><br/>
+<userinput>*set GTH 12</userinput><br/>
+<userinput>*eval LENGTH</userinput><br/>
+<userinput>Result is a string, value :7</userinput><br/>
+<userinput>*eval length</userinput><br/>
+<userinput>Result is a string, value :7</userinput>
+</extended-example></p><p>
+This is both more obvious, and more deterministic. Where developers have used operators in this way in the past it will be necessary to insert whitespace between the operator name and its parameter. It is not expected, due to the non-obvious behaviour of such evaluation, that this will cause any problems for the majority of developers.
+</p>
+</subsection>
+
+<subsection title="Practical examples">
+<p><extended-example type="shell">
+<userinput>*SetEval Obey$AppName (LEAFNAME Obey$Dir) RIGHT (LEN (LEAFNAME Obey$Dir)-1)</userinput>
+</extended-example></p><p>
+Obey file 'which':
+</p>
+<p><extended-example type="shell">
+<userinput>IfThere Run:%0 Then SetEval Which CANONICALISE "Run:%0" Else Set Which Not on run path</userinput><br/>
+<userinput>Echo &lt;Which&gt;</userinput><br/>
+<userinput>Unset Which</userinput>
+</extended-example></p></subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the example sequence, in which the capture had 'set LENGTH 77', to 'set LENGTH 7'.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
