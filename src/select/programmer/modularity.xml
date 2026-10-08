@@ -1,0 +1,140 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Modularity within RISC OS">
+<section title="Introduction">
+<p>
+RISC OS has, from the outset, been designed to be modular in nature. This
+modularity brings many advantages, not least of which is the replaceability of
+components. It is highly desirable that components be able to handle being
+replaced whilst the system is in use. Whilst this has obvious developmental
+advantages, it also aids in upgrading components should a major failure be
+found.
+</p>
+
+<p>
+It is usual for replacement components to be loaded during the system start
+up. Toolbox is a typical example which will be loaded during the boot sequence
+to replace the default versions in ROM. As a rapidly evolving library, Toolbox
+is regularly replaced.
+</p>
+
+<p>
+Where possible it is desirable that the system not require any restart in
+order to ensure that components be loaded correctly. Although, for
+development purposes, clean environments are preferable, it is frustrating
+for users to be prompted to restart the system.
+</p>
+</section>
+
+<section title="Services for replacement modules">
+<p>
+In order that modules be able to handle replacement in a structured manner it
+is important that they correctly register with their dependencies, and
+re-register themselves when those dependencies are restarted. Examples of the
+services which must be monitored by various clients:
+</p>
+
+<p><list>
+<item><p>Filing systems must watch for <reference type="service" name="FSRedeclare" href="?" /> and on receipt should re-register themselves with FileSwitch.</p></item>
+<item><p>Network components must watch for <reference type="service" name="DCIProtocolStatus" href="?" /> and update their idea of socket handles appropriately.</p></item>
+<item><p>Network protocol components must watch for <reference type="service" name="DCIDriverStatus" href="?" /> to add interfaces to their list.</p></item>
+<item><p>Low level network components must watch for <reference type="service" name="MBufManagerStatus" href="?" /> if they use MBufManager.</p></item>
+<item><p>Econet clients should monitor <reference type="service" name="ReAllocatePorts" href="?" /> to monitor for the Econet (or NetI) module being restarted.</p></item>
+<item><p>Sound system components must watch for <reference type="service" name="Sound" href="?" /> to monitor the other sound system components restarting.</p></item>
+<item><p>Hardware drivers must watch for <reference type="service" name="BufferStarting" href="?" /> if they use BufferManager, and for <reference type="service" name="DeviceFSStarting" href="?" /> and <reference type="service" name="DeviceFSDying" href="?" /> if they use DeviceFS.</p></item>
+<item><p>Clients of ResourceFS should monitor <reference type="service" name="ResourceFSStarted" href="?" /> and <reference type="service" name="ResourceFSDying" href="?" /> for either accessing or registering their files.</p></item>
+<item><p>Freeway resource using components should monitor <reference type="service" name="FreewayStarting" href="?" /> and <reference type="service" name="FreewayTerminating" href="?" /> to register their resources.</p></item>
+<item><p>Desktop extensions should monitor <reference type="service" name="RedrawManagerInstalled" href="?" /> and <reference type="service" name="RedrawManagerDying" href="?" /> if they use the RedrawManager.</p></item>
+<item><p>Display device driver support components should monitor <reference type="service" name="DisplayStatus" href="?" /> if they must track drivers.</p></item>
+<item><p>Toolbox objects should monitor <reference type="service" name="ToolboxStarting" href="?" /> and <reference type="service" name="ToolboxDying" href="?" /> to register their objects.</p></item>
+<item><p>ImageFileRender clients should monitor <reference type="service" name="ImageFileRender_Started" href="?" /> and <reference type="service" name="ImageFileRender_Dying" href="?" />.</p></item>
+<item><p>ImageFileConvert clients should monitor <reference type="service" name="ImageFileConvert_Started" href="?" /> and <reference type="service" name="ImageFileConvert_Dying" href="?" />.</p></item>
+</list></p>
+
+<p>
+Many other examples exist at various levels, both as part of RISC OS and as
+3rd party extensions. Components should use the most suitable mechanism for
+the purpose to ensure that the system continues to function.
+</p>
+
+<subsection title="Alternative services">
+<p>
+As an alternative to registering unique services just for module start up and
+death, the service <reference type="service" name="ModuleStatus" href="?" /> may be used to identify named modules
+starting, dying and being reinstantiated. This is less ideal because it does
+not allow for different modules to be used in place of the named modules (for
+example a Sound controller with a different name to SoundDMA). However, this
+is usually not a major constraint.
+</p>
+</subsection>
+</section>
+
+<section title="Recommendations for modularity">
+<p>
+In order to be replaceable 'on the fly', components must:
+</p>
+
+<p><list>
+<item><p>Reject finalisation if they cannot be shut down safely (for example, if clients have open handles). What level of failure is acceptable for the component should be decided on a per-component basis. For example, FileSwitch will restart even though there are open files, but it will reject being restarted if it is currently in active use (threaded by some process).</p></item>
+<item><p>Finalise completely safely. All memory resources released, files should be closed, vectors released, and registrations with other components relinquished. For example, the video drivers will deregister from the Kernel and shut down their hardware into a powered down state. Aborts during finalisation will leave the module in a useless state where it cannot be removed and are - as with most aborts - unacceptable.</p></item>
+<item><p>If other components may depend on this component it is polite to inform them of both initialisation and finalisation. It is usual to inform clients through a callback on initialisation. This ensures that the SWIs for the component are present when the service is issued. Some RISC OS components issue the service directly in their initialisation code, requiring the clients to use a callback for re-registration.</p></item>
+<item><p>During initialisation the component must register with their dependencies and claim resources necessary to function. It is most useful if components do not fault the lack of their dependencies. For example, SoundChannels does not fail to initialise if SoundDMA is not present, but will initialise into a state where it is ready to run once SoundDMA has started. This allows components to be restarted in any order. There are good reasons why certain components must be loaded in particular orders, but where possible this should be avoided.</p></item>
+<item><p>Should any dependencies of the module die they will notify the module through the Service interface. The module should place itself into a state where it is safe to function. It is desirable that the component be functional in this state but quiescent until the dependencies return. For example, sound voices may register with SoundChannels, even though SoundDMA has not initialised, and will be functional when SoundDMA starts.</p></item>
+</list></p>
+</section>
+
+<section title="Modularity and applications">
+<p>
+In many cases there is no mechanism to notify applications of state changes
+within modules. Components may use their own mechanisms for determining the
+state of their dependency module. Usually this involves the opaque handles
+returned from modules being validated by some mechanism. This can cause the
+application to terminate if it is unexpected, or for operations to be
+cancelled. Component replacement is expected within an active system, but side
+effects are usually unavoidable. Replacement of, for example, the Internet
+module will be handled gracefully by most module components, but applications
+will usually fail in their active operations due to invalid socket errors.
+Because the module claimants will (usually) obtain lower socket numbers than
+the applications had been allocated, this does not cause the applications to
+access data intended for the module-claimed sockets. The possibility should
+not, however, be ignored.
+</p>
+</section>
+
+<section title="Module stacks">
+<p>
+Complex stacks of components, such as the network stack, may have many
+dependencies. It is important that, where possible, these dependencies are
+given due attention to ensure that they are restartable with minimal effort.
+The Internet module, for example, can be reinitialised and the dependant
+components will attempt to re-assign a useful system using dynamic allocation
+of addresses and other methods as configured.
+</p>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
