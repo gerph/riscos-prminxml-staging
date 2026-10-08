@@ -1,0 +1,108 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Shrinkable dynamic areas">
+<section title="Introduction and Overview">
+<p>
+Shrinkable dynamic areas are dynamic areas which may be resized at the request of the Kernel in order to free memory for other uses. This allows cache and buffer information to be retained as long as there is not pressure for memory in other areas. This can allow more of the system's memory to be utilised without unduly restricting the functionality of the system by fixed allocations. In order to create a shrinkable dynamic area bit 9 should be set on creation with OS_DynamicArea 0.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Caveats">
+<p>
+Using shrinkable dynamic areas should only be done with care. It is usually necessary to track the area size using the area handler. The PreShrink and PreGrow handlers must enforce limitations on the size changes if the area is currently being used. Any external system call may cause a memory allocation and thus the areas may need to be protected in order that, on return from the call, the memory which was allocated has been removed by the Kernel.
+</p>
+<p>
+If multiple areas are used by a single client they should be aware of the obvious consequence of increasing the size of one causing a request to decrease the size of another. Where the areas are co-dependant it may be necessary to include special semaphores to protect against the regions being reduced due to this internal contention for memory.
+</p>
+</subsection>
+
+<p>
+When the Kernel needs to increase the size of a dynamic area beyond the size available in the Free Pool or Application space it will make a call to the dynamic area handler 'test shrink' reason code, described under <reference type="entry" name="DynamicAreaHandler_TestShrink" />.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_DynamicArea"
+                number="66"
+                reason="5"
+                reasonname="OS_DynamicArea_ReturnAvailable"
+                description="Return available space"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">5</register-use>
+ <register-use number="1">Area number to exclude from total, or -1 to include all areas</register-use>
+</entry>
+<exit>
+ <register-use number="2">Total amount of free space (bytes)</register-use>
+</exit>
+<use>
+<p>
+This SWI calculates the amount of available space on the system, allowing for the shrinkable dynamic areas. The total is the sum of the free pool size and the size available from all the shrinkable dynamic areas.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+<section title="Entry Points">
+<entry-definition name="DynamicAreaHandler_TestShrink"
+                  description="Dynamic area handler: test how far the area could shrink"
+                  irqs="undefined"
+                  fiqs="undefined"
+                  processor-mode="undefined"
+                  re-entrant="undefined">
+<entry>
+ <register-use number="0">4</register-use>
+ <register-use number="4">Current size of area in bytes</register-use>
+ <register-use number="5">Page size in bytes</register-use>
+ <register-use number="12">Workspace for dynamic area handler</register-use>
+</entry>
+<exit>
+ <register-use number="3">Maximum amount the area could shrink by</register-use>
+</exit>
+<use>
+<p>
+This entry point is called by the Kernel to determine the amount of space which is available within the dynamic area if requested. The handler should try to return the size as quickly as it can as this call may be made when the current system free space is requested. It is not used when the Kernel reclaims space, only when the space available is requested with OS_DynamicArea 5.
+</p>
+</use>
+<related>
+<reference type="swi" name="OS_DynamicArea" reason="5" />
+</related>
+</entry-definition>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>The reason code name OS_DynamicArea_ReturnAvailable is a descriptive label for the reason code and not a name defined by the operating system.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
