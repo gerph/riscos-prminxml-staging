@@ -1,0 +1,512 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="The graphics system">
+<section title="Overview">
+<p>
+The graphics system in RISC OS is made up of many different components. Each of these components provides some facilities to the whole. For the most part, graphics operations are abstracted through a system of vectored system calls (SWIs). These are dispatched to claimants, allowing extension of the standard graphical operations.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Major components">
+<p>
+The major components in the graphics system are :
+</p>
+<subsubsection title="Kernel">
+<p>
+The Kernel provides core graphics capabilities for output to a raster buffer used by the Video* drivers to display video.
+</p>
+<p>
+In addition to this, it provides rudimentary support for simple sprite (bitmap) operations.
+</p>
+<p>
+See PRM 1-527 - 1-834 (chapters VDU drivers and Sprites) for fundamental details.
+</p>
+<p>
+See the <reference type="document" href="teletext" name="VDU code changes" /> section for changes to the VDU codes.
+</p>
+<p>
+See the <reference type="document" href="vduvariables" name="VDU variables" /> document for updated VDU variables.
+</p>
+<p>
+See the <reference type="document" href="screenmodes" name="System Sprite Pool" /> section for changes to the system sprite area.
+</p>
+<p>
+See the <reference type="document" href="multidrivers" name="Display changes" /> document for the changes made by multiple display drivers.
+</p>
+<p>
+See the <reference type="document" href="osscreenmode" name="OS_ScreenMode changes" /> document for details of the new reason codes for OS_ScreenMode, allowing mode string processing, display device manipulation and bank selections.
+</p>
+</subsubsection>
+
+<subsubsection title="VideoHW*">
+<p>
+The VideoHW-prefixed modules provide the hardware support for displaying graphics through the raster buffer. The driver modules may also provide acceleration for their hardware where appropriate. Multiple hardware driver modules may be present, and may provide a variable number of physical displays which graphics output may be displayed on.
+</p>
+<p>
+Contact your supplier for details of how to communicate with the driver system.
+</p>
+</subsubsection>
+
+<subsubsection title="VideoSW">
+<p>
+The VideoSW module provides a software implementation of the graphics operations which the graphics system provides. It provides support for simple line and block based graphic operations, and simple bitmap font rendering.
+</p>
+<p>
+Contact your supplier for details of how to communicate with the driver system.
+</p>
+</subsubsection>
+
+<subsubsection title="VideoTTX">
+<p>
+The VideoTTX module provides an implementation of the teletext screen modes. It can be used in any depth, at any resolution.
+</p>
+<p>
+See the <reference type="document" href="teletext" name="Teletext" /> document for more information.
+</p>
+</subsubsection>
+
+<subsubsection title="ScreenModes">
+<p>
+The ScreenModes module provides a centralised point for defining modes (resolution, DPI and colour depth groups). The module provides enumeration of screen modes, and mode information through a number of system calls.
+</p>
+<p>
+See PRM 5a-99 to 141 and the <reference type="document" href="screenmodes" name="ScreenModes" /> document for more information.
+</p>
+</subsubsection>
+
+<subsubsection title="ColourTrans">
+<p>
+Colour translations for different modes are provided by the ColourTrans module. All colour selection passes (via DrawV) to ColourTrans.
+</p>
+<p>
+See PRM 3-335 (ColourTrans chapter).
+</p>
+<p>
+See the <reference type="document" href="sprites/colourmap" name="ColourMapping of deep sprites" /> document and the <reference type="document" href="colourmap" name="Colour Map module" /> document for changes to palette operations.
+</p>
+</subsubsection>
+
+<subsubsection title="SpriteExtend">
+<p>
+The Sprite Extension module provides more complex sprite operations which are not present in the kernel. Rendering of scaled and transformed sprites is the primary function of the SpriteExtend module.
+</p>
+<p>
+In addition, SpriteExtend provides facilities for rendering most common JPEGs held within JFIF or Exif format files. Non-baseline JPEGs are supported by using CompressJPEG to provide an intermediate format.
+</p>
+<p>
+See <reference type="document" href="sprites/colourmap" name="ColourMapping of deep sprites" /> for details of the deep sprite translation table format.
+</p>
+<p>
+See <reference type="document" href="sprites/cmyk" name="CMYK sprites" /> for details of CMYK sprites.
+</p>
+<p>
+See <reference type="document" href="sprites/alphachannel" name="Alpha-channel sprites" /> for details of alpha-channel sprites.
+</p>
+<p>
+See <reference type="document" href="sprites/alphamask" name="Alpha mask promotion and demotion" /> for details of the mask changes on alpha-channel sprites.
+</p>
+<p>
+See <reference type="document" href="sprites/tiling" name="Tiled sprite plotting" /> for details of the sprite tiling operation.
+</p>
+<p>
+See <reference type="document" href="sprites/translucency" name="Translucent sprite operation" /> for details of the sprites plotted at a translucency level.
+</p>
+<p>
+See <reference type="document" href="sprites/errors" name="Sprite errors" /> for details of the errors returned by SpriteExtend for both sprite and JPEG operations.
+</p>
+<p>
+See <reference type="document" href="sprites/spritevclaimants" name="SpriteV claimants" /> for details of the new services for other SpriteV claimants.
+</p>
+<p>
+See <reference type="document" href="sprites/plotactions" name="Sprite Plot Actions" /> for an index of the Plot Action for OS_SpriteOps.
+</p>
+</subsubsection>
+
+<subsubsection title="Draw">
+<p>
+The Draw module provides vector graphic rendering facilities. The Draw module is based on the primitives provided by the PostScript language for path rendering.
+</p>
+<p>
+See PRM 3-523.
+</p>
+</subsubsection>
+
+<subsubsection title="FontManager">
+<p>
+The FontManager provides scaleable, vector based, anti-aliased font rendering operations.
+</p>
+<p>
+See PRM 3-403.
+</p>
+</subsubsection>
+
+<subsubsection title="InverseTable">
+<p>
+The InverseTable module provides supporting tables for BlendTable and FontManager to make rendering blended objects to 256 colour modes possible. InverseTable generates tables to convert 5 bit colour components to colour indices and vice-versa.
+</p>
+<p>
+See the <reference type="document" href="inversetable" name="InverseTable" /> document for more information.
+</p>
+</subsubsection>
+
+<subsubsection title="BlendTable">
+<p>
+The BlendTable module provides supporting tables for SpriteExtend to allow it to render translucent objects in shallow colour (&lt;=8 bit per pixel) modes.
+</p>
+<p>
+See the <reference type="document" href="blendtable" name="BlendTable" /> document for more information.
+</p>
+</subsubsection>
+
+<subsubsection title="DrawFile">
+<p>
+The DrawFile module provides rendering facilities for the filetype used by the Draw application. Extensions to the DrawFile module can be provided through the use of service calls. DrawFile provides an ImageFileConvert interface for the generation of SVG files.
+</p>
+<p>
+See the <reference type="document" href="colourmapdraw" name="ColourMapping in Drawfiles" /> document for the colour mapping interface for drawfile rendering.
+</p>
+</subsubsection>
+
+<subsubsection title="CompressJPEG (aka JCompMod)">
+<p>
+The CompressJPEG module provides transcoding and creation facilities for JPEGs. Given RGB input data, CompressJPEG can create a JPEG at a given quality. The CompressJPEG module can also be used to transcode (convert to another variant of JPEG) a JPEG. This facility is used by SpriteExtend to allow it to render progressive (multi-pass) JPEGs.
+</p>
+<p>
+See PRM 5a-609 and the <reference type="document" href="compressjpeg" name="CompressJPEG module" /> document for more information.
+</p>
+</subsubsection>
+
+<subsubsection title="PNG">
+<p>
+The PNG module provides an interface for converting (but not rendering) PNG graphics to or from raster images. The PNG module can be used to generate sprites from PNGs and vice-versa, and to extract information about the image.
+</p>
+<p>
+See the <reference type="document" href="png" name="PNG module" /> document for more information.
+</p>
+</subsubsection>
+
+<subsubsection title="SpriteUtils">
+<p>
+The SpriteUtils module provides facilities from earlier versions of the Operating System based around the 'System Sprite Area' - a shared pool of sprites. Since RISC OS 2, use of the system sprite area has been deprecated.
+</p>
+<p>
+See PRM 1-746 and the <reference type="document" href="screenmodes" name="System Sprite Pool" /> section for more information.
+</p>
+</subsubsection>
+
+<subsubsection title="ImageFileRender">
+<p>
+The ImageFileRender module provides an abstracted means of rendering different forms of files. ImageFileRender itself supports rendering of Sprite, DrawFile and JPEG format files. Other components provide additional facilities for non-native filetypes.
+</p>
+<p>
+See the <reference type="document" href="imagefilerender" name="The Image File Renderer" /> document for more information.
+</p>
+</subsubsection>
+
+<subsubsection title="ImageFileConvert">
+<p>
+The ImageFileConvert module provides an abstracted means of converting between different forms of files.
+</p>
+<p>
+See the <reference type="document" href="imagefileconvert" name="ImageFileConvert" /> document for more information.
+</p>
+</subsubsection>
+
+</subsection>
+
+<subsection title="Smaller components">
+<p>
+In addition to these major components, a collection of smaller components provide facilities for the ImageFileRender and ImageFileConvert modules :
+</p>
+<subsubsection title="ConvertPNG">
+<p>
+The ConvertPNG module provides SWIs, and an ImageFileConvert interface for converting between Sprite and PNG files. Through ImageFileConvert, this allows rendering of PNG files with ImageFileRender.
+</p>
+<p>
+See the <reference type="document" href="convertpng" name="ConvertPNG" /> document for more information.
+</p>
+</subsubsection>
+
+<subsubsection title="ConvertSprite">
+<p>
+The ConvertSprite module provides SWIs, and an ImageFileConvert interface for creating Sprite files from arbitrary rendering routines. ConvertSprite will provide ImageFileConvert facilities for any type registered with ImageFileRender, allowing vector formats to be converted to bitmaps.
+</p>
+<p>
+See the <reference type="document" href="convertsprite" name="ConvertSprite" /> document for more information.
+</p>
+</subsubsection>
+
+<subsubsection title="ConvertGIF">
+<p>
+The ConvertGIF module provides an ImageFileConvert interface for converting GIF files to sprites.
+</p>
+<p><fixme>No specific documentation is available for this module.</fixme></p>
+</subsubsection>
+
+<subsubsection title="ConvertXBM">
+<p>
+The ConvertXBM module provides an ImageFileConvert interface for converting XBM files to sprites.
+</p>
+<p><fixme>No specific documentation is available for this module.</fixme></p>
+</subsubsection>
+
+<subsubsection title="ConvertSun">
+<p>
+The ConvertSun module provides an ImageFileConvert interface for converting Sun Raster files to sprites.
+</p>
+<p><fixme>No specific documentation is available for this module.</fixme></p>
+</subsubsection>
+
+<subsubsection title="ConvertBMP">
+<p>
+The ConvertBMP module provides an ImageFileConvert interface for converting Windows bitmap (.bmp) files to sprites.
+</p>
+<p>
+See the <reference type="document" href="convertbmp" name="ConvertBMP" /> document for more information.
+</p>
+</subsubsection>
+
+<subsubsection title="ConvertPNM">
+<p>
+The ConvertPNM module provides an ImageFileConvert interface for converting Portable Net Map (.pnm, .pgm, .pbm) files to sprites.
+</p>
+<p><fixme>No specific documentation is available for this module.</fixme></p>
+</subsubsection>
+
+<subsubsection title="ConvertPCX">
+<p>
+The ConvertPCX module provides an ImageFileConvert interface for converting PCX files to sprites.
+</p>
+<p><fixme>No specific documentation is available for this module.</fixme></p>
+</subsubsection>
+
+<subsubsection title="ConvertICO">
+<p>
+The ConvertICO module provides an ImageFileConvert interface for converting .ico (Windows icon) files to sprites.
+</p>
+<p><fixme>No specific documentation is available for this module.</fixme></p>
+</subsubsection>
+
+<subsubsection title="ConvertClear">
+<p>
+The ConvertClear module provides an ImageFileConvert interface for converting RISC OS Translator's 'Clear' files to sprites.
+</p>
+<p><fixme>No specific documentation is available for this module.</fixme></p>
+</subsubsection>
+
+<subsubsection title="ImageFileRender_Artworks">
+<p>
+The ImageFileRender_Artworks module provides SWIs and an ImageFileRender interface for rendering Artworks files.
+</p>
+<p><fixme>No specific documentation is available for this module.</fixme></p>
+</subsubsection>
+
+<subsubsection title="ColourMap">
+<p>
+The ColourMap module provides a means by which 'standard' colour map descriptors may be constructed using simple SWI calls rather than embedding assembler in each component.
+</p>
+<p>
+See the <reference type="document" href="colourmap" name="Colour Map module" /> document for the module API.
+</p>
+</subsubsection>
+
+<subsubsection title="FontMap">
+<p>
+The FontMap module provides a means by which font names can be converted to non-native formats. It is used by the DrawFile module as an aid to SVG creation, and by the WMF decoder to translate fonts to native format.
+</p>
+<p>
+See the <reference type="document" href="fontmap" name="FontMap module" /> document for more information.
+</p>
+</subsubsection>
+
+</subsection>
+
+<subsection title="Entry points">
+<p>
+Entry points used by the graphics components :
+</p>
+<subsubsection title="VideoV">
+<p>
+The Video Vector is the entry point through which most primitive graphics operations are passed by the Kernel's graphics system. The vector is claimed by both the VideoHW and VideoSW driver modules in order to allow the operations to be accelerated. The video operations are split into different classes in which apply to different parts of the video system.
+</p>
+<p>
+Contact your supplier for details of how to communicate with the driver system.
+</p>
+</subsubsection>
+
+<subsubsection title="SpriteV">
+<p>
+The Sprite Vector is the entry point through which all sprite operations are passed in order to satisfy them. Sprite operations are split between Kernel and SpriteExtend but can be extended by other components through the Sprite vector. When printing, the Sprite vector is usually claimed to ensure that all sprite operations are sent to the output device.
+</p>
+<p>
+See <reference type="document" href="sprites/spritevclaimants" name="SpriteV claimants" /> for details of the new services for other SpriteV claimants.
+</p>
+</subsubsection>
+
+<subsubsection title="ColourV">
+<p>
+The Colour Vector is the entry point through which all colour selection operations are performed. ColourV is claimed by ColourTrans to provide colour matching.
+</p>
+<p>
+See the ColourTrans documentation in PRM 3-335 for details of the operations provided by this vector.
+</p>
+</subsubsection>
+
+<subsubsection title="PaletteV">
+<p>
+The Palette Vector provides a mechanism to read and write the current palette in an abstract manner. It is provided by the Kernel. Certain operations are monitored by other modules to ensure that changes to the palette are reflected in their internal state.
+</p>
+<p>
+See PRM 1-104 for the basic reason codes.
+</p>
+<p>
+See PRM 5a-122 for the reason codes added in RISC OS 3.5-3.6.
+</p>
+<p>
+See <reference type="document" href="osscreenmode" name="OS_ScreenMode changes" /> for reason codes added after RISC OS 3.7 (primarily portable-specific).
+</p>
+</subsubsection>
+
+<subsubsection title="DrawV">
+<p>
+The Draw Vector is the entry point for all Draw operations. All vector operations are passed through this vector by the Draw module. During printing operations, the DrawV is usually redirected to the printer driver for rendering.
+</p>
+<p>
+See PRM 3-523 (chapter Draw module).
+</p>
+</subsubsection>
+
+<subsubsection title="DrawObjectRender service">
+<p>
+The DrawObjectRender service is issued when the DrawFile module encounters an object which it does not understand. It is expected that extension components provide the rendering facilities for the object.
+</p>
+<p>
+See PRM 1-520 for the fundamental definition.
+</p>
+<p>
+See the <reference type="document" href="colourmapdraw" name="ColourMapping in Drawfiles" /> document for the extended calls for plotting DrawFile Objects with colour maps.
+</p>
+</subsubsection>
+
+<subsubsection title="ImageFileRender registered functions">
+<p>
+Components registered with ImageFileRender will be called through interfaces they have provided when operations on their filetype is required.
+</p>
+<p>
+See the <reference type="document" href="imagefilerender" name="The Image File Renderer" /> document for details on registering new renderers.
+</p>
+</subsubsection>
+
+<subsubsection title="ImageFileConvert registered functions">
+<p>
+Components registered with ImageFileConvert will be called through interfaces they have provided when operations on their filetype is required.
+</p>
+<p>
+See the <reference type="document" href="imagefileconvert" name="ImageFileConvert" /> document for details on registering new converters.
+</p>
+</subsubsection>
+
+</subsection>
+
+<subsection title="Changes to the graphics system">
+<p>
+The graphics system as a whole has had a number of changes applied to it which may affect certain applications. Many of the components have been extended to provide greater facilities to others. In order to explain where changes have taken place, the change will be documented, followed by the components that are affected. More information can be found within the <reference type="document" href="videov" name="Video drivers" /> document, which covers more recent changes.
+</p>
+<subsubsection title="CMYK sprites">
+<p>
+Since RISC OS 3.6, this format has been allocated but unsupported by the operating system. This is now supported within the OS. CMYK sprites are held in 32bits containing the Cyan, Magenta, Yellow and Black components, rather than Red, Green and Blue components.
+</p>
+<p><list>
+<item><p><strong>Kernel:</strong> The Kernel will now provide information on these sprites through the standard OS_ReadModeVariable (and OS_ReadVduVariables) calls. Refer to the <reference type="document" href="sprites/cmyk" name="CMYK sprites" /> document for more details about CMYK sprites.</p></item>
+<item><p><strong>ColourTrans:</strong> ColourTrans has been updated to generate tables of CMYK-formatted pixel translation tables and to return suitable information for rendering to CMYK format sprites.</p></item>
+<item><p><strong>SpriteExtend:</strong> SpriteExtend can render CMYK sprites through its scaled and transformed entry points. SpriteExtend can render to a CMYK output using both RGB and CMYK input sprites.</p></item>
+</list></p>
+</subsubsection>
+
+<subsubsection title="JPEG rendering">
+<p>
+JPEG rendering has been improved in a number of ways to allow a greater range of JPEGs to be rendered.
+</p>
+<p><list>
+<item><p><strong>SpriteExtend:</strong> The SpriteExtend module provides the core code to render JPEGs and so has undergone extensive changes. A greater number of sampling ratios are now understood by the renderer, and some latent faults in rendering of obscure ratios have been corrected. The renderer is capable of processing JPEGs with Y sampling ratios of 1x1, 1x2, 2x1, 2x2 (earlier versions), and 4x1 and 4x2 (new). The renderer cannot handle U or V sampling ratios other than 1x1. Under previous versions, rendering a small (&lt;17% scaling) JPEG to a greyscale output would result in corrupt output. This has been addressed. Where JPEGs are scaled up in 256 colour modes using the 'dithered' mode, the output is now dithered in a similar manner as that of sprites with the 'dithered' bit set. Where the JPEG cannot be processed by SpriteExtend, a number of more descriptive error messages are now returned.</p></item>
+<item><p><strong>CompressJPEG:</strong> The CompressJPEG module has been extended to support transcoding to convert progressive JPEGs to baseline JPEGs.</p></item>
+</list></p>
+</subsubsection>
+
+<subsubsection title="Colour mapping">
+<p>
+Colour mapping allows the colour system to be manipulated for certain operations. ColourTrans has, since RISC OS 3, provided a mechanism for generating pixel translation tables for shallow sprites (&lt;= 8 bit per pixel). However, this mechanism does not scale well to true colour. Colour mapping routines follow the same mechanism as that used by ColourTrans pixel translation table transfer functions to translate a RGB palette entry to a destination entry.
+</p>
+<p>
+Typically, colour mapping would be used to affect the brightness, contrast, or to fade or highlight an image.
+</p>
+<p><list>
+<item><p><strong>SpriteExtend:</strong> Sprite and JPEG rendering can use colour mapping to translate the colours in the deep colour sprites.</p></item>
+<item><p><strong>DrawFile:</strong> DrawFile rendering can use colour mapping to translate the colours before rendering. Vectors, text areas, text, sprites and JPEGs are rendered through the colour mapping functions.</p></item>
+<item><p><strong>ImageFileRender:</strong> ImageFileRender is able to provide colourmapping where the underlying modules are capable of colour mapping. Any type converted through sprite before rendering will be capable of using colour map descriptors, as will any type converted through Drawfile. The Artworks renderer also supports colourmapping through ImageFileRender.</p></item>
+<item><p><strong>ColourMap:</strong> The ColourMap module provides a means by which colour map descriptors for any of the above components may be created.</p></item>
+</list></p>
+</subsubsection>
+
+<subsubsection title="Alpha-channel">
+<p>
+A new sprite type has been introduced which allows 8 bits per mask pixel of translucency. This means that for any sprite using this new type, the pixels can blend to the background.
+</p>
+<p><list>
+<item><p><strong>SpriteExtend:</strong> Can be used to render alpha-channel sprites both scaled and transformed, using colourmapping and translucency if required.</p></item>
+<item><p><strong>ColourTrans:</strong> Generates a greyscale palette when output is directed to the mask of an alpha-channel sprite. This allows it to be used like a normal image for rendering to.</p></item>
+<item><p><strong>Kernel:</strong> The Kernel understands and returns correct values when output is directed to alpha channel sprites. Graphics operations on redirected alpha-channel sprites work - on the whole - just like binary masked sprites.</p></item>
+</list></p>
+</subsubsection>
+
+<subsubsection title="Translucent rendering">
+<p>
+The standard 8 plot operations (overwrite, OR, AND, EOR, invert, NOP, AND NOT, and OR NOT) are used for rendering sprites. Sprites themselves may contain masks to make parts of the sprite opaque or transparent. Whether the sprite contains binary or alpha-channel data, it is now possible to make the entire sprite translucent when rendered. 256 degrees of translucency are available (subject to colour depth restrictions).
+</p>
+<p><list>
+<item><p><strong>SpriteExtend:</strong> Sprite and JPEG rendering can use translucent rendering to allow them to be rendered 'over' the background image.</p></item>
+<item><p><strong>BlendTable:</strong> The BlendTable module is a new module created to generate translation tables for shallow depth modes where the size of the palette is not prohibitive. For deep modes, the blend must be calculated by clients (SpriteExtend generates code for these cases).</p></item>
+<item><p><strong>InverseTable:</strong> The InverseTable module has been extended to provide generation of tables for other modes than the present one.</p></item>
+</list></p>
+</subsubsection>
+
+<subsubsection title="Multiple display drivers">
+<p>
+Multiple display drivers may be active concurrently within RISC OS. The changes necessitated by support for multiple drivers are documented more fully in the <reference type="document" href="multidrivers" name="Display changes" /> document.
+</p>
+</subsubsection>
+
+</subsection>
+
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the slips 'spites' (sprites), 'The ConvertPNG module provides SWIs, and an ImageFileConvert interface for creating Sprite files' under ConvertSprite (it is the ConvertSprite module), and the missing 'for' in the descriptions of the ConvertXBM, ConvertSun, ConvertPNM, ConvertPCX, ConvertICO and ConvertClear modules.</change>
+    <change>The reference to the 'VideoOverview' document is given as a reference to the Video drivers document.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
