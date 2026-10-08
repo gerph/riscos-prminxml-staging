@@ -52,13 +52,14 @@ the operating system may treat such faults differently.
  </maintainer>
  <disclaimer>
     <p>
-        &copy; Gerph, 2013-2026.
+        &copy; Gerph, 2006-2026.
     </p>
  </disclaimer>
 
  <history>
-  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
-    <change>Original documentation (HTML document version 1.03).</change>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
   </revision>
   <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
     <change>Recreated documentation in PRM-in-XML format.</change>

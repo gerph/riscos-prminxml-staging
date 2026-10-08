@@ -63,7 +63,7 @@ been decoded.
 <userinput>&amp;01c07ef0 (SVC) : Vector &amp;04      called &amp;03824a30</userinput><br/>
 <userinput>                                 {-&gt; Module UtilityModule Code=RdchV_Code}</userinput><br/>
 <userinput>&amp;01c07f14 (SVC) : SWI &amp;20004        called by &amp;023e3770</userinput><br/>
-<userinput>                                       {lineeditor Code}</userinput>
+<userinput>                                       {Module LineEditor Code}</userinput>
 </extended-example></p>
 <p>
 This indicates that a SWI &amp;20004 was called by the LineEditor module, from
@@ -262,7 +262,18 @@ The areas list contains the named areas on the system (Dynamic Areas). Each area
 has a record of the extent which is allocated and flags, as well as the total
 memory covered by the area. This description takes one of two forms, the first of
 which is the most common, and the second is only used for the lower half doubly
-mapped dynamic areas. The fields which make up the lines are:
+mapped dynamic areas. The first form is:
+</p>
+<p><extended-example type="format">
+<userinput>&lt;start&gt;-&lt;mapped-end&gt;/&lt;maximum-end&gt;     : &lt;name&gt;          &lt;access&gt;; &lt;flags&gt;</userinput>
+</extended-example></p>
+<p>and the second form is:
+</p>
+<p><extended-example type="format">
+<userinput>&lt;minimum-start&gt;-&lt;mapped-lower&gt;/&lt;start&gt; : &lt;name&gt;          &lt;access&gt;; &lt;flags&gt;</userinput>
+</extended-example></p>
+<p>
+The fields which make up the lines are:
 </p>
 <p><value-table head-number="Field" head-value="Meaning">
 <value number="&amp;lt;start&amp;gt;">The start address of the dynamic areas.</value>
@@ -274,9 +285,6 @@ mapped dynamic areas. The fields which make up the lines are:
 <value number="&amp;lt;access&amp;gt;">Indicates the type of access which is possible on the area.</value>
 <value number="&amp;lt;flags&amp;gt;">Specifies any special flags that the area has.</value>
 </value-table></p>
-<p>
-<fixme>The layouts of the two forms of line, which showed the order of these fields, were lost from the source of this document.</fixme>
-</p>
 
 <p>
 The access attributes for the area are described in terms of the user-mode access
@@ -404,6 +412,7 @@ for the above description format, the current definitions are:
 <value number="&hex;0000D"><userinput>Abort trap|flags %02x, addr %1x+%22d, called %3t, r12=%4x</userinput></value>
 <value number="&hex;0000E"><userinput>Module init|called %1t, r11=%2x, title='%0s'</userinput></value>
 <value number="&hex;0000F"><userinput>Module final|called %1t, r11=%2x, title='%0s'</userinput></value>
+<value number="&hex;00020"><userinput>FSwitch %18[8=Open,C=GetBytes,10=PutBytes,14=Args,18=Close,1C=File,24=Func,28=GBPB]|called %2t, r0=%0d</userinput></value>
 </value-table></p>
 </subsection>
 </section>
@@ -460,17 +469,18 @@ enable options which would otherwise clutter the output on a 'live' system.
  </maintainer>
  <disclaimer>
     <p>
-        &copy; Gerph, 2013-2026.
+        &copy; Gerph, 2006-2026.
     </p>
  </disclaimer>
 
  <history>
-  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
-    <change>Original documentation (HTML document version 1.03).</change>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
   </revision>
   <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
     <change>Recreated documentation in PRM-in-XML format.</change>
-    <change>Corrected evident slips: the example description gave the address of the calling module as &amp;023e770 where the listing shows &amp;023e3770, and the field header of the BTS marker format read 'BTS-adddress'. The two line layouts of the areas list were lost from the capture and are noted as such in the document.</change>
+    <change>Corrected evident slips: the example description gave the address of the calling module as &amp;023e770 where the listing shows &amp;023e3770, and the field header of the BTS marker format read 'BTS-adddress'. The two line layouts of the areas list and the FSwitch BTS type definition, which the captured HTML lacked, were restored from the original documentation text.</change>
  </revision>
  </history>
 
