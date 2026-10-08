@@ -1,0 +1,323 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Display changes">
+<section title="Introduction and Overview">
+<p>
+The management of video within modern versions of RISC OS has changed significantly. Most graphics primitives may be accelerated by hardware and many operations have been changed slightly because of this. This document describes the changes in more detail and the changes which will be necessary to ensure that code continues to function within the new environment.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Memory management">
+<p>
+With the advent of multiple display drivers the concept of a single 'screen memory' area is obsolete. This means that Dynamic Area 2, previously allocated to the screen memory, is no longer used. In order that clients which merely check this value do not fail the area is provided by the LegacyScreen module. The content of this area and its size have no relationship to the video system and are merely provided to ensure that applications which attempt to check video size by using this area do not fail immediately.
+</p>
+<p>
+VDU variable 148 continues to provide the address of the screen as used by the VDU drivers, and variable 149 provides the address of the screen as used by the hardware. That is, the address pointed to by variable 148 is where data will be written, and the address pointed to by variable 149 is the currently visible data. VDU variable 150 contains the total size of the screen area as declared by the display driver. However this value cannot be relied on for selecting screen banks because of driver limitations.
+</p>
+</subsection>
+
+<subsection title="Screen banks">
+<p>
+Because memory management for video drivers may not be related to the total memory available to the video drivers - usually because of buffer alignment, or reserved memory - it is not sufficient to read the total size of the video memory and divide by the screen size to obtain the number of screen banks. New <reference type="swi" name="OS_ScreenMode" /> reason codes have been created to ensure that these operations can be performed reliably within the constraints of the driver.
+</p>
+<p>
+Because of driver configuration issues it is not guaranteed that any bank other than the display or driver bank will be mapped in to logical memory. Indeed, certain drivers may choose (at their discretion) to re-map logical memory in order to make banks available. Consequently, the arrangement of the logical addresses which correspond to screen banks may not match that of the previous versions of RISC OS. In particular banks may not follow on from one another in memory.
+</p>
+<p>
+In order to inform the driver that screen banks are to be used the banks to be accessed should be selected (using <userinput>OS_Byte 112</userinput> or <userinput>113</userinput>). This will ensure that the driver assigns video memory to the bank and does not use the memory for its own purposes (caching, internal buffers, etc).
+</p>
+</subsection>
+
+<subsection title="Shadowed modes">
+<p>
+Shadowed modes are no longer supported by RISC OS. These modes are numbered 128-255 and would implicitly select the second bank of screen memory. With the advent of Arthur, these modes were of much less use. Attempting to select shadowed modes may result in undefined behaviour.
+</p>
+<p><list>
+<item><p><userinput>OS_Byte 114</userinput> (Write shadow/non-shadow state) now performs no action.</p></item>
+<item><p><userinput>OS_Byte 117</userinput> (Read VDU status) will never return with bit 4 set.</p></item>
+</list></p><p>
+The default bank for all modes (for <userinput>OS_Byte 112</userinput> and <userinput>113</userinput>) will always be bank 1.
+</p>
+</subsection>
+
+<subsection title="Hardware acceleration">
+<p>
+Hardware acceleration is provided by the display driver transparently from all user operations. Where hardware acceleration is not available software equivalent functions will be available. Direct screen access should be avoided where standard OS functions can be employed instead. In particular, video access may be significantly slower than normal memory. On certain hardware, the video memory may be marked as cacheable as was the case under RISC OS 4.
+</p>
+</subsection>
+
+<subsection title="Screen mode limitations">
+<p>
+In order to ensure that the system can be simplified and advance in a useful manner certain features have been dropped from screen modes. The shadowed mode selection has already been mentioned. In addition, modes which have different BPP and BPC values are no longer supported and will provide undefined behaviour. This means that modes 2, 4, 5, 10 are no longer available. These should not affect many applications as most should have been updated to be mode independent already.
+</p>
+<p>
+Gap modes may be supported at the discretion of the video driver. This means that modes 3, 6, 7, 11 and 14 may not appear the same on different hardware.
+</p>
+<p>
+Mode 23 was defined in order to support monitors which were much higher resolution than the standard VGA monitors of the time. However, technology has made such systems obsolescent. In particular, this mode used 'double height characters'. These are no longer supported and mode 23 may revert to being a standard 1 BPP mode with 8x8 pixel characters.
+</p>
+<p>
+In addition, modes may be limited in the number of colours that may be displayed. Usually this affects modes with 16 or fewer colours as these are not supported by some modern graphics hardware.
+</p>
+</subsection>
+
+<subsection title="Teletext mode">
+<p>
+Teletext modes are no longer implemented as a 16 colour, low resolution mode. Any resolution and number of colours may now be used for a teletext mode, although obviously with less than 16 colours its usefulness will be limited. By default the resolution and colours selected by mode 7 is now equivalent to that of mode 28. Alternative teletext resolutions may be used, however. Consult the <reference type="document" href="teletext" name="Teletext" /> and <reference type="document" href="osscreenmode" name="OS_ScreenMode changes" /> documents for details.
+</p>
+</subsection>
+
+<subsection title="BBC style 6845 control">
+<p>
+The BBC style 6845 video controller registers are now restricted to only two reason codes. <reference type="vdu" name="VDU 23,0,10" /> (program cursor start) and <reference type="vdu" name="VDU 23,0,11" /> (program cursor end) are the only operations supported by this VDU operation. In particular, this means that VDU 23,0,8 (set interlace) is no longer supported by RISC OS.
+</p>
+</subsection>
+
+<subsection title="Interlace">
+<p>
+Whilst the 6845 control sequence for changing the interlace as an immediate operation is no longer supported, the interlace control for the next mode change through <userinput>OS_Byte 144</userinput> (also through the legacy command <userinput>*TV</userinput>) remains supported. However, the driver may at its discretion ignore the value supplied by the user.
+</p>
+</subsection>
+
+<subsection title="Text window scrolling">
+<p>
+For compatibility with the BBC Master the VDU 23,7 operation allows horizontal scrolling to be performed within the text window in either character or byte steps. Horizontal text window scrolling is no longer supported in byte steps and all such scroll operations will only be performed for a single character.
+</p>
+</subsection>
+
+<subsection title="OS_Word operations">
+<p>
+Many OS_Word operations have been modified to be passed to external components (on WordV), rather than being handled directly by the Kernel. These should not be noticeable in general, but in particular <userinput>OS_Word 22</userinput> (Write screen base) is no longer supported.
+</p>
+</subsection>
+
+<subsection title="Poly-HLine operation">
+<p>
+In order to take advantage of hardware acceleration where available, a new variable has been added to the VDU Variables to provide a callable function to plot a sequence of horizontal lines. The HLine function (VDU variable 166) provided a single horizontal line. Whilst this can be accelerated, it is usually more efficient for hardware to accumulate a number of these lines and issue a single 'Poly-HLine' operation. The PolyHLineAddr VDU Variable (193) provides this function pointer.
+</p>
+</subsection>
+
+<subsection title="Service calls">
+<p>
+The current display output may be changed by a call to <reference type="swi" name="OS_ScreenMode" reason="B" />. Clients which track the registration of display devices may use a new service call (<reference type="service" name="DisplayStatus" />) to track these changes. A service (<reference type="service" name="DisplayChanged" />) will be issued to inform clients of the display driver change, as well as a 'switching output to sprite', if the current destination is the display.
+</p>
+<p>
+VDU variable 192 (&amp;C0) can be read to obtain the current display number.
+</p>
+</subsection>
+
+<subsection title="VIDC Type 3 mode selectors">
+<p>
+The VIDC type 3 mode selectors have been extended to allow additional facilities to be encoded within the control parameters. The full list of control parameters is :
+</p>
+<p><value-table head-number="Control" head-value="Parameter and range">
+<value number="1">LCD mode - boolean</value>
+<value number="2">LCD dual-panel mode - boolean</value>
+<value number="3">LCD offset register 0 - 0-255</value>
+<value number="4">LCD offset register 1 - 0-255</value>
+<value number="5">Hi-Res mode - boolean</value>
+<value number="6">DAC control - boolean (1 if unspecified)</value>
+<value number="7">RGB pedestal enables - bit 0: R enabled; bit 1: G enabled; bit 2: B enabled (%111 if unspecified)</value>
+<value number="8">External register bits 0-7 - 0-255</value>
+<value number="9">Reserved</value>
+<value number="10">Reserved</value>
+<value number="11">DPMS power saving - bit 0: disable H sync; bit 1: disable V sync (this is the standard DPMS mapping)</value>
+<value number="12">Vertical offset in scan lines - -2047 - 2047</value>
+<value number="13">Interlace - boolean</value>
+</value-table></p>
+<p>
+Boolean values are 0 or 1 for disable or enable respectively. Values outside range for non-bitfields are undefined. Unspecified bitfields must be set to 0. Where not specified, all control items default to 0 when absent from the list.
+</p>
+</subsection>
+
+<subsection title="Obsolete VDU variables">
+<p>
+VDU variable 172 (VIDCClockSpeed) no longer has any meaning under RISC OS.
+</p>
+</subsection>
+
+<subsection title="Circle limitations">
+<p>
+The OS_Plot codes for circle fill, circle outline, arc, segment and sector have never supported the more esoteric modes which may be selected by RISC OS. Specifically, these operations do not perform as desired when highly rectangular pixel modes are selected. That is, modes where the eigen factors for X and Y differ by more than 1. Modes where the eigen factors are identical are square pixel modes and rendering of circles will be performed correctly. Modes where the eigen factors differ by 1 are rectangular pixel modes and rendering will be performed correctly. Modes where the factors differ by more than 1 are highly rectangular (for example EX0 EY2 would indicate a ratio of 1:4) and circles will not be plotted correctly.
+</p>
+<p>
+This is not a change to the previous behaviour, but has not been documented in the past.
+</p>
+</subsection>
+
+<subsection title="OS_Plot 'move' modifier">
+<p>
+Where possible the OS_Plot move modifier has been updated to be shortcut such that the 'no-operation' does not occur. In particular the fill line left and right operations will continue to perform driver memory access as this operation has side effects. It is not expected that this change will give a performance increase, as most operations will be performed as a simple move operation (OS_Plot 4) which was already optimised to avoid such memory access.
+</p>
+</subsection>
+
+<subsection title="Acceleration of graphics primitives">
+<p>
+In addition to the new operations already documented, many of the existing graphics primitives are candidates for acceleration through a new interface. All the primitives are provided with software implementations to ensure that a fallback operation is provided where acceleration is not present, and when acceleration is inappropriate (for example, when redirected to sprite).
+</p>
+<p>
+The following operations are available for acceleration :
+</p>
+<p><list>
+<item><p>Text character plotting</p></item>
+<item><p>Text cursor plotting</p></item>
+<item><p>Text region clearing (including CLS)</p></item>
+<item><p>Rectangle fill</p></item>
+<item><p>Triangle fill</p></item>
+<item><p>Parallelogram fill</p></item>
+<item><p>Block copy</p></item>
+<item><p>Circle outline</p></item>
+<item><p>Circle fill</p></item>
+<item><p>Circle arc</p></item>
+<item><p>Circle segment</p></item>
+<item><p>Circle sector</p></item>
+<item><p>Ellipse outline</p></item>
+<item><p>Ellipse fill</p></item>
+<item><p>Fill to condition, right</p></item>
+<item><p>Fill to condition, left and right</p></item>
+<item><p>Flood fill</p></item>
+<item><p>Multiple horizontal line (PolyHLine)</p></item>
+<item><p>Full screen scroll (as a hardware scroll operation)</p></item>
+<item><p>Screen bank copying</p></item>
+</list></p><p>
+Additional primitive operations may be accelerated in future. Accelerated drivers may provide additional acceleration through the defined interfaces which RISC OS already provides.
+</p>
+</subsection>
+
+<subsection title="Display selection">
+<p>
+The display device in use can be selected using <reference type="swi" name="OS_ScreenMode" reason="B" /> (select display). The user interface for this is found on the DisplayManager menu. The display device to use can be configured with <userinput>*Configure DisplayNumber</userinput>, or through the BootMenu. During system startup the display device can be forced to the native device (display 0) by holding down the '0' key (see the ResetTypes document). The <reference type="document" href="videoguard" name="VideoGuard" /> module provides protection against being stuck in an invalid display.
+</p>
+</subsection>
+
+</section>
+
+<section title="VDU Codes">
+<vdu-definition name="VDU 23,0,10" description="Program the cursor start position and flash state">
+<syntax>VDU 23,0,10,value|</syntax>
+<use>
+<p>
+This VDU sequence is used to program the cursor start position and its flash state. The value takes the form:
+</p>
+<p><bitfield-table>
+ <bit number="0-4">Start line</bit>
+ <bit number="5-6">Flash state:
+  <value-table head-number="Value" head-value="Meaning">
+   <value number="0">Always on</value>
+   <value number="1">Always off</value>
+   <value number="2">Fast flash</value>
+   <value number="3">Slow flash</value>
+  </value-table>
+ </bit>
+ <bit number="7">Reserved, must be 0</bit>
+</bitfield-table></p>
+</use>
+</vdu-definition>
+
+<vdu-definition name="VDU 23,0,11" description="Program the cursor end position">
+<syntax>VDU 23,0,11,value|</syntax>
+<use>
+<p>
+This VDU sequence is used to program the cursor end position. The value is the end line number.
+</p>
+</use>
+</vdu-definition>
+
+</section>
+
+<section title="Service Calls">
+<service-definition name="DisplayChanged"
+                    number="DE"
+                    description="The display has been changed">
+<entry>
+ <register-use number="0">Progress of the change:
+  <value-table head-number="Value" head-value="Meaning">
+   <value number="0">Display is in the process of being changed</value>
+   <value number="1">Display has been changed fully</value>
+  </value-table>
+ </register-use>
+ <register-use number="1">&hex;DE (service number)</register-use>
+ <register-use number="2">New display number</register-use>
+ <register-use number="3">0</register-use>
+</entry>
+<exit>
+ <register-use number="0-1" state="preserved" />
+</exit>
+<use>
+<p>
+This service is issued when the display is changed. It must not be claimed. The
+value in R0 indicates progress of the display change. This service is issued
+twice, once with R0 = 0, and then with R0 = 1. This separation is intended to
+allow components to update specific values, in particular the ScreenModes
+module must update its state on the first service call in order that the
+subsequent mode change is successful. R3 will be set to 0 to indicate that the
+mode has been reselected. Other values may indicate alternate behaviour in
+future.
+</p>
+</use>
+<related>
+<reference type="service" name="DisplayStatus" />
+</related>
+</service-definition>
+
+<service-definition name="DisplayStatus"
+                    number="DF"
+                    description="The state of a display driver has changed">
+<entry>
+ <register-use number="0">Reason:
+  <value-table head-number="Value" head-value="Meaning">
+   <value number="0">Device deregistered</value>
+   <value number="1">Device registered</value>
+  </value-table>
+ </register-use>
+ <register-use number="1">&hex;DF (service number)</register-use>
+ <register-use number="2">Display device number</register-use>
+ <register-use number="3">Display descriptor (for registration only)</register-use>
+</entry>
+<exit>
+ <register-use number="0-3" state="preserved" />
+</exit>
+<use>
+<p>
+This service is issued when the state of a display driver has changed. Although
+only two reason codes are used at present others may be added for related
+operations. The service is issued for deregistration and registration after the
+operation has been performed successfully.
+</p>
+</use>
+<related>
+<reference type="service" name="DisplayChanged" />
+</related>
+</service-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the slips 'Mode 23 was was defined' and 'These are may longer be supported' (no longer supported).</change>
+    <change>The VDU 23,0,10 and VDU 23,0,11 definitions are given here; the Teletext document refers to them.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
