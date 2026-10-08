@@ -91,6 +91,7 @@
     <section title="Networking" dir="networking">
         <page href="sharefs">ShareFS module</page>
         <page href="mbufmanager">MBufManager</page>
+        <page href="netl">NetI changes</page>
         <page href="addresscollisions">Internet address collision</page>
         <page href="linkstatus">DCI Driver Link Status</page>
         <page href="routerdiscovery">RouterDiscovery</page>

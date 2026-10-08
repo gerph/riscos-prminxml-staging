@@ -1,0 +1,91 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="NetI changes">
+<section title="Introduction and Overview">
+<p>
+This document describes the changes made to the NetI module, supplementing the
+original documentation of the module.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Zero-Configuration networking issues">
+<p>
+The NetI module has been updated to address a few issues which arose after
+changes were made in Select 3 to introduce Link-Local address configuration.
+The NetI module will now ignore any link-local addresses as candidates for the
+automatic network map construction. Link-local addresses have 16 bits which
+describe the network and may co-exist with other non-link-local addresses.
+They are not suitable for use as a NetI network address.
+</p>
+</subsection>
+
+<subsection title="Machine types">
+<p>
+The machine types returned by the machine peek operation have been updated to
+reflect the modern systems. A reservation has been made for the Iyonix
+(although the Iyonix presently claims to be a RiscPC system). The A9 has also
+been added to the list (and is reported correctly).
+</p>
+
+<p>The full list of machine types is (original list in PRM 2-635):</p>
+
+<p><value-table head-number="Machine type" head-value="Machine">
+<value number="&hex;0000">Reserved</value>
+<value number="&hex;0001">BBC (OS 1 or 2)</value>
+<value number="&hex;0002">Atom</value>
+<value number="&hex;0003">System 3 or 4</value>
+<value number="&hex;0004">System 5</value>
+<value number="&hex;0005">Master 128 (OS 3)</value>
+<value number="&hex;0006">Electron (OS 0)</value>
+<value number="&hex;0007">Archimedes (OS 6)</value>
+<value number="&hex;0008">Reserved</value>
+<value number="&hex;0009">Acorn Communicator</value>
+<value number="&hex;000A">Master 128 Econet Terminal (OS 4)</value>
+<value number="&hex;000B">Acorn Filestore</value>
+<value number="&hex;000C">Master 128 Compact (OS 5)</value>
+<value number="&hex;000D">Acorn Ecolink card for Personal Computers</value>
+<value number="&hex;000E">Acorn Unix workstation (RISCiX)</value>
+<value number="&hex;000F">Acorn RiscPC</value>
+<value number="&hex;0010">CTL Iyonix</value>
+<value number="&hex;0011">A9</value>
+<value number="&hex;1040">JGH Spectrum</value>
+<value number="&hex;1041">JGH Amstrad CPC</value>
+<value number="&hex;FFF8">SJ GP Server</value>
+<value number="&hex;FFF9">SJ 80386 unix</value>
+<value number="&hex;FFFA">SCSI interface</value>
+<value number="&hex;FFFB">SJ Research IBM PC Econet interface</value>
+<value number="&hex;FFFC">Nascom 2</value>
+<value number="&hex;FFFD">Research Machines 480Z</value>
+<value number="&hex;FFFE">SJ Research File Server</value>
+<value number="&hex;FFFF">Z80 CP/M</value>
+</value-table></p>
+</subsection>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+ </revision>
+ </history>
+
+</meta>
+</riscos-prm>
