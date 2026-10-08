@@ -1,0 +1,101 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Buffers">
+<section title="Introduction and Overview">
+<p>
+Certain internal buffers have changed in operation from Kernel 9.01 onward. This mainly affects the legacy interfaces which have been carried forward from the BBC. The following should be read with reference to PRM 1-162.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Buffer 0 (Keyboard)">
+<p>
+Remains as before, 255 byte limit.
+</p>
+<p>
+Note that this is not necessarily 255 characters, or 255 key presses depending on the territory in use, etc.
+</p>
+<p>
+This buffer is now managed by the BufferManager module, instead of the Kernel.
+</p>
+</subsection>
+
+<subsection title="Buffer 1 (Serial input)">
+<p>
+Buffer is now limited to 32767 bytes, rather than the 255 byte limit which was previously used.
+</p>
+<p>
+This buffer is now managed by the BufferManager module, instead of the Kernel. Instead of being registered with Buffer_Register, the buffer is created with Buffer_Create. For details of the distinction, consult the PRMs.
+</p>
+</subsection>
+
+<subsection title="Buffer 2 (Serial output)">
+<p>
+Buffer is now limited to 32767 bytes, rather than the 191 byte limit which was previously used.
+</p>
+<p>
+This buffer is now managed by the BufferManager module, instead of the Kernel. Instead of being registered with Buffer_Register, the buffer is created with Buffer_Create. For details of the distinction, consult the PRMs.
+</p>
+</subsection>
+
+<subsection title="Buffer 3 (Printer)">
+<p>
+Remains as for RISC OS 3 systems, defined by <userinput>*Configure PrinterBufferSize</userinput>. Since Select 2, however, the default value for the buffer size on a NVRAM reset is now 32K rather than 1K.
+</p>
+<p>
+In the future this buffer may be managed by a dedicated support module.
+</p>
+</subsection>
+
+<subsection title="Buffer 4-7 (Sound 0-3)">
+<p>
+Legacy BBC buffers with no use under RISC OS. These will return errors on data insertion and removal (failure to insert or remove flagged).
+</p>
+</subsection>
+
+<subsection title="Buffer 8 (Speech)">
+<p>
+Legacy BBC buffer with no use under RISC OS. This will return errors on data insertion and removal (failure to insert or remove flagged).
+</p>
+</subsection>
+
+<subsection title="Buffer 9 (Mouse)">
+<p>
+This buffer is now managed by the OSPointer module from Kernel 8.56 onward. Operations on the buffer will function as before but will be managed by BufferManager on behalf of OSPointer rather than by the kernel.
+</p>
+</subsection>
+
+<p>
+These changes are not expected to affect most applications. The effect on legacy BBC applications is expected to be minimal because the buffers removed are only 3 bytes in length. Users should benefit from the increased size of the serial buffers.
+</p>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected 'These will return errors' to 'This will return errors' for the single speech buffer.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
