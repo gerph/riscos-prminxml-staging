@@ -1,0 +1,112 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Alpha mask promotion and demotion">
+<section title="Introduction and Overview">
+<p>
+Since Select 3 additional mask operations are available for alpha-channel sprites. These allow the alpha channel to be added or removed using a new SpriteOp call.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Alpha-channel removal">
+<p>
+When removing the mask the 'cut off point' given in bits 0-7 will be used to decide which pixels will be masked and which will be solid. Any alpha-channel values which match or exceed the cut off point will be made solid. Any values which are below the cut off point will be made masked. The special value 0 is used to indicate that the operation should only reduce the mask if it is already binary - that is, if it consists of totally solid and totally masked pixels.
+</p>
+<p>
+If bit 8 is set, the special case of a totally solid image will be reduced to no mask at all.
+</p>
+<p>
+Examples on different sprite types :
+</p>
+<p><value-table head-number="Sprite" head-value="Result">
+<value number="Sprite with solid mask (all &amp;FF)">Will be reduced to 1bpp if b8 clear. Will be removed if b8 set.</value>
+<value number="Sprite with binary mask (all &amp;FF or &amp;00)">Will be reduced to 1bpp if b0-7 clear. Will be reduced to 1bpp with cutoff if any b0-7 set.</value>
+<value number="Sprite with variable mask (any values)">Will be ignored if b0-7 clear. Will be reduced to 1bpp with cutoff if any b0-7 set.</value>
+</value-table></p><p>
+The most usual use of this call would be to set bit 8 to remove the mask if it serves no purpose and to set the cut-off point at 128, making this a binary mask at the half-way point.
+</p>
+</subsection>
+
+<subsection title="Alpha-channel promotion">
+<p>
+Sprites may be promoted to alpha channel by setting bit 31. Bits 0-8 have no meaning when adding an alpha channel. If a mask already exists it will be promoted to alpha-channel. If no mask is present, the sprite will be promoted to be alpha-channel and a completely solid mask added.
+</p>
+</subsection>
+
+<subsection title="Typical operations">
+<p>
+Some typical operations that you might wish to perform are listed below, together with the method of achieving them :
+</p>
+<p><list>
+<item><p>Add an alpha-channel mask to an existing 1bpp sprite: <userinput>OS_SpriteOp 38 (&amp;26)</userinput>, flags = b31</p></item>
+<item><p>Convert an alpha-channel sprite to a form that can be used on pre-Select 3 systems: <userinput>OS_SpriteOp 38 (&amp;26)</userinput>, flags = b8 + 128</p></item>
+<item><p>Reduce an alpha-channel sprite to its most compact form: <userinput>OS_SpriteOp 38 (&amp;26)</userinput>, flags = b8 + 128</p></item>
+<item><p>Remove an alpha-channel mask: <userinput>OS_SpriteOp 30 (&amp;1E)</userinput>. Note that this leaves the sprite as an alpha-channel sprite. You will have to modify the sprite type to remove the alpha-channel bit (bit 31 of the sprite mode) if you wish to use a 1 bpp mask.</p></item>
+</list></p></subsection>
+
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_SpriteOp"
+                number="2E"
+                reason="26"
+                reasonname="OS_SpriteOp_AlphaMask"
+                description="Add or remove alpha-channel mask on a sprite"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">Reason code (38 + area type)</register-use>
+ <register-use number="1">Pointer to sprite area</register-use>
+ <register-use number="2">Pointer to sprite, or pointer to sprite name</register-use>
+ <register-use number="3">Flags:
+  <bitfield-table>
+   <bit number="0-7">Cut off point for mask reduction, or 0 to only reduce the mask if it is binary</bit>
+   <bit number="8">Remove mask if completely unnecessary</bit>
+   <bit number="9-30">Reserved</bit>
+   <bit number="31">Set to add an alpha-channel, clear to remove an alpha channel</bit>
+  </bitfield-table></register-use>
+</entry>
+<exit>
+ <register-use number="3">0 if no area size change was necessary; additional space required if call failed (V set)</register-use>
+</exit>
+<use>
+<p>
+This call is used to add or remove an alpha-channel mask on a sprite. This call
+will only function on 'new format' sprites - those using the sprite type.
+Operations on 'old format' sprites - those defined using mode numbers - will be
+faulted. The sprite type will have been modified by this call - there is no need
+for users of this call to modify the sprite data itself.
+</p>
+</use>
+</swi-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
