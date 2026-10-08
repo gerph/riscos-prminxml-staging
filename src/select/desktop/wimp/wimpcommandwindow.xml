@@ -1,0 +1,75 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Wimp_CommandWindow">
+<section title="Introduction and Overview">
+<p>
+From Select 1 onward Wimp_CommandWindow has been extended to provide information about its current state. This information can be used to determine whether or not an operation will trigger the display of a command window.
+</p>
+<p>
+Under normal circumstances, when a task is started by the Window Manager the command window is marked as 'pending'. In this state, any output to the screen through the standard VDU calls will cause the command window to be opened; the state will then be set to 'open'. If the task registers with the Window Manager with Wimp_Initialise however, the command window is marked as 'inactive'. These states can be changed through the use of Wimp_CommandWindow as described in the PRMs.
+</p>
+<p>
+The new call allows clients to identify what state the command window is currently in.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="Wimp_CommandWindow"
+                number="400EF"
+                reason="2"
+                reasonname="Wimp_CommandWindow_ReadState"
+                description="Read the state of the command window"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">2 (read state)</register-use>
+</entry>
+<exit>
+ <register-use number="0">State:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">The command window is inactive</value>
+ <value number="1">The command window is pending</value>
+ <value number="2">The command window is open</value>
+</value-table></register-use>
+</exit>
+<use>
+<p>
+This SWI is used to find the state of the command window.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
