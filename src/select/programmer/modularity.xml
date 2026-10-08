@@ -63,7 +63,7 @@ the purpose to ensure that the system continues to function.
 <subsection title="Alternative services">
 <p>
 As an alternative to registering unique services just for module start up and
-death, the service <reference type="service" name="ModuleStatus" href="?" /> may be used to identify named modules
+death, the service <reference type="service" name="ModuleStatus" /> may be used to identify named modules
 starting, dying and being reinstantiated. This is less ideal because it does
 not allow for different modules to be used in place of the named modules (for
 example a Sound controller with a different name to SoundDMA). However, this
