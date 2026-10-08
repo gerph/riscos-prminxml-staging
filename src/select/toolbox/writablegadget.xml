@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Writable Gadget">
+<section title="Introduction and Overview">
+<p>
+The Writable gadget was changed with Window 1.85.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Change in button type">
+<p>
+Because of changes necessitated by other gadgets the writable gadget is now of type 'Write/Click/Drag' (button type 14). This means that mouse click events will appear for this Writable gadgets. For the most part this should not affect any correctly written application. Applications which are affected by this new behaviour should be modified to confirm that the gadget from which they are receiving a mouse click is in fact the gadget they believe it to be.
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
