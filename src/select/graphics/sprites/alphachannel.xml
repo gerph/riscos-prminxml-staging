@@ -1,0 +1,108 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Alpha-channel sprites">
+<section title="Introduction and Overview">
+<p>
+Previous versions of RISC OS have provided sprites with binary masks. Select 3 brings support for a new type of sprite to the operating system. These 'Alpha-channel' sprites provide 8 bits of mask data, allowing each pixel within the image to have one of 256 levels of translucency.
+</p>
+<p>
+In RISC OS 3.5, the 'sprite type' was introduced, allowing for a greater range of sprite types. This range has been expanded to include these alpha channel sprites. Sprites under RISC OS 3.6 used a standard 1 bit per mask pixel. This ensured that the mask data was reduced to the smallest it could be for the image. Under RISC OS Select 3, the mask data on these alpha-channel sprites is 8 bits per mask pixel.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Sprite mode word">
+<p>
+The new definition of the sprite mode word is as follows :
+</p>
+<p><bitfield-table>
+ <bit number="0">Set (indicator that this is a new format sprite)</bit>
+ <bit number="1-13">Horizontal dots per inch</bit>
+ <bit number="14-26">Vertical dots per inch</bit>
+ <bit number="27-30">Sprite type:
+  <value-table head-number="Value" head-value="Meaning">
+   <value number="0">Old format mode word (mode is a standard number)</value>
+   <value number="1">1 bpp</value>
+   <value number="2">2 bpp</value>
+   <value number="3">4 bpp</value>
+   <value number="4">8 bpp</value>
+   <value number="5">16 bpp</value>
+   <value number="6">24 bpp</value>
+   <value number="7">CMYK</value>
+   <value number="8">24 bpp compact format (allocated but not used)</value>
+   <value number="9">JPEG data (allocated but not used)</value>
+   <value number="10-15">Reserved</value>
+  </value-table>
+ </bit>
+ <bit number="31">If set, alpha channel data present; if clear, binary mask data present. May NOT be set for type 0 sprites.</bit>
+</bitfield-table></p>
+<p>
+The 'dots per inch value' only reliably supports values of 11, 23, 45, 90 and 180 under any version of the operating system.
+</p>
+</subsection>
+
+<subsection title="Mask data">
+<p>
+Image data within alpha-channel sprites is identical to that within the non-alpha-channel sprite. Mask data, however, is 8 bits wide per pixel, rather than 1 bit per pixel. Within the mask data, the value 0 indicates a completely transparent pixel, and the value 255 indicates a completely opaque pixel.
+</p>
+<p>
+Images with the alpha channel bit set but no mask data present will be treated as if the alpha channel bit was not present.
+</p>
+</subsection>
+
+<subsection title="Operations">
+<p>
+Sprite operations on alpha-channel sprites should perform exactly as expected. Rendering alpha-channel sprites using scaling or transformation is supported. Reading mask values from sprites will return values from 0 to 255 from the alpha-channel. Writing to the mask will write those values to the mask. When output is redirected to an alpha-channel mask, the mask is treated as a greyscale from black (0, completely translucent) through to white (255, completely opaque).
+</p>
+<p>
+Rendering alpha-channel images through a colour-map, or with translucency is supported, as is rendering scaled with dithering (although in this last case the quality reduces with the increase in translucency). For example a 50% translucent alpha-channel image would appear more translucent than a normal alpha-channel image.
+</p>
+<p>
+Applications which directly manipulate mask data or who provide their own rendering of sprites may not function correctly with these new alpha-channel sprites.
+</p>
+</subsection>
+
+<subsection title="Rendering to paletted frame buffers">
+<p>
+When rendered to paletted frame buffers alpha-channel sprites cannot perform as well as when rendered to 16bpp or 24bpp buffers. For reference, the following operations are performed :
+</p>
+<p><list>
+<item><p>When rendered to 8bpp a similar scheme to that used by FontManager is used - using the InverseTable module to provide a conversion between destination index and RGB value. These tables have a resolution of 5 bits per component, therefore a quantisation effect will be observed. This may be most visible in a linear scaled output (such as greyscale).</p></item>
+<item><p>When rendering to 4bpp or lower BlendTable is used to generate matching tables at 6 levels, providing 8 levels of translucency over the entire image (6 blend tables, plus 2 'pass through' conditions for totally opaque and totally transparent pixels).</p></item>
+<item><p>When rendering to 16 bpp the alpha-channel is quantised to 5 bits before being used to calculate the output value. This may have a noticeable effect on linear fades of the alpha-channel.</p></item>
+<item><p>When rendering in 24 bpp the alpha-channel is calculated correctly using the full 8 bits.</p></item>
+</list></p><p>
+Within the change documentation, the phrase 'opaque sprites' is used for the new alpha-channel sprite format. A little more information can be found in the summaries for SpriteExtend, ColourTrans, Kernel and ConvertPNG.
+</p>
+</subsection>
+
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected 'allocated by not used' to 'allocated but not used'.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
