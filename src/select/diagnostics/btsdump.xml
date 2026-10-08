@@ -1,0 +1,478 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Back Trace Structure Dump tool">
+<section title="Introduction">
+<p>
+The Back Trace Structure (BTS) chain is a feature provided by some Kernels and
+components to allow failures within the system to be diagnosed. Usually this is
+most useful during development, but it is envisaged that support will remain
+within the distributed release systems. The implementation of the BTS is not
+addressed here.
+</p>
+
+<p>There are three categories of Kernel:</p>
+<p><list>
+<item><p>BTS-unaware Kernels - these are Kernels which know nothing of BTS and upon which BTS-active components will FAIL. All Kernels prior to 7.94 are BTS-unaware.</p></item>
+<item><p>BTS-aware Kernels - these are Kernels which know that BTS is available to developers and will provide the necessary support for it. However, they do not include the BTS details for the kernel operations themselves. Thus only client-provided BTS details will be provided. All Kernels from 7.94 onward are BTS-aware.</p></item>
+<item><p>BTS-active Kernels - these are Kernels which record details using the BTS for their own activities. Kernels after 7.94 can be optionally built with this option.</p></item>
+</list></p>
+<p>
+The BTSDump tool can, therefore, be used on BTS-aware and BTS-active Kernels. It
+will report a failure on BTS-unaware Kernels.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Output">
+<p>
+The tool provides a number of command line switches to determine the amount of
+information which is decoded and displayed. The information is displayed in a
+standard manner:
+</p>
+<p><list>
+<item><p>The top of the output contains the most recent event.</p></item>
+<item><p>The bottom of the output contains the initiating event.</p></item>
+<item><p>Related sections are indented to similar levels.</p></item>
+<item><p>Hexadecimal values, such as addresses, are displayed preceded by an ampersand ('&amp;') or '0x' sequence.</p></item>
+<item><p>Decimal values, such as indices, are displayed unprefixed.</p></item>
+<item><p>Register names are displayed together with the APCS-R binding where appropriate. (APCS-A is not used within the BTSDump tool).</p></item>
+</list></p>
+<subsubsection title="Reading the output">
+<p>
+It is recommended that the trace output be read from the bottom toward the top.
+This will provide an indication of the path through the operating system and
+extension components. Each un-indented line indicates a BTS marker which has
+been decoded.
+</p>
+
+<p>The BTS marker decoding has a standard format:</p>
+<p><extended-example type="format">
+<userinput>&lt;BTS-address&gt; (&lt;stack&gt;) : &lt;type&gt;    &lt;arguments&gt;        {&lt;region&gt; }</userinput>
+</extended-example></p><p><value-table head-number="Field" head-value="Meaning">
+<value number="&amp;lt;BTS-address&amp;gt;">Describes the place on the stack (IRQ or SVC) at which the BTS was placed</value>
+<value number="&amp;lt;stack&amp;gt;">The stack type on which it was placed, which implies the processor mode at that time.</value>
+<value number="&amp;lt;type&amp;gt;">The general operation type which is being recorded.</value>
+<value number="&amp;lt;arguments&amp;gt;">Describes the operation further, usually indicating the parameters in force at the time, any source location and any destination location. Source locations are usually described by the phrase 'called by &lt;addr&gt;', and indicate how the control reached this point. Destination locations are usually described by the phrase 'called &lt;addr&gt;', and indicate where control is going after leaving this point.</value>
+<value number="&amp;lt;region&amp;gt;">If present, indicates a named region within which the source and destination reside. The source will be listed first if present and a named region is known. The destination will be listed second if present and a named region is known. The destination is always preceded by a '-&gt;' to distinguish it from the source. If the destination has been given an address which has a function signature, the name will be given, preceded by an '='.</value>
+</value-table></p>
+<p>For example, the following pair of lines may have been displayed:</p>
+<p><extended-example type="format">
+<userinput>&amp;01c07ef0 (SVC) : Vector &amp;04      called &amp;03824a30</userinput><br/>
+<userinput>                                 {-&gt; Module UtilityModule Code=RdchV_Code}</userinput><br/>
+<userinput>&amp;01c07f14 (SVC) : SWI &amp;20004        called by &amp;023e3770</userinput><br/>
+<userinput>                                       {lineeditor Code}</userinput>
+</extended-example></p>
+<p>
+This indicates that a SWI &amp;20004 was called by the LineEditor module, from
+&amp;023e3770. Subsequently this resulted in a vector call being made to vector
+&amp;04, which was then dispatched to &amp;03824a30. This was within the
+UtilityModule, and refers to the named function 'RdchV_Code'.
+</p>
+</subsubsection>
+</subsection>
+
+<subsection title="APCS backtraces">
+<p>
+Certain types of BTS may have recorded information about the APCS stack frame at
+the time of the operation. Details about the APCS stack frame will be given
+below the BTS marker which recorded it. This indicates that it describes the
+state before the BTS marker was placed on the stack. By default, the C backtrace
+is not displayed and a reminder will instead be shown:
+</p>
+<p><extended-example type="format">
+<userinput>C-environment present, but not displayed (use -c)</userinput>
+</extended-example></p>
+<p>
+When enabled the APCS (C language, usually) backtrace will be displayed. This
+will be surrounded by two lines describing the APCS state, in the form:
+</p>
+<p><extended-example type="format">
+<userinput>Leave C-environment: FP was &lt;fp-on-leaving&gt;</userinput><br/>
+<userinput>&lt;backtrace&gt;</userinput><br/>
+<userinput>&lt;cmhg-register-set&gt;</userinput><br/>
+<userinput>Enter C-environment: SP was &lt;sp-on-entry&gt;, PC was &lt;caller&gt;  {&lt;region&gt; }</userinput>
+</extended-example></p><p><value-table head-number="Field" head-value="Meaning">
+<value number="&amp;lt;fp-on-leaving&amp;gt;">Gives the frame pointer value that was stored with the BTS, and which was the starting point of the backtrace.</value>
+<value number="&amp;lt;backtrace&amp;gt;">Describes the APCS function calls which were active at the time of the fault. See below for more details.</value>
+<value number="&amp;lt;cmhg-register-set&amp;gt;">If present, indicates that the register set passed in to the veneer which was entered is available. Not all entry sequences are able to be decoded by the BTSDump, but a best-effort will be made. By default the register set will not be displayed.</value>
+<value number="&amp;lt;sp-on-entry&amp;gt;">Gives the stack pointer value at the time of the entry into the APCS-tracing environment.</value>
+<value number="&amp;lt;caller&amp;gt;">Indicates the caller which initiated the transition into the APCS-tracing environment.</value>
+</value-table></p>
+<p>
+The backtrace itself consists of a number of grouped function descriptions.
+Because the details about the parameters are much greater than those for the BTS
+the description of a single function spans multiple lines. It is important to
+recognise that the backtrace dump differs from the standard SharedCLibrary
+backtrace in that arguments for functions are displayed after the functions
+rather than before them. Conceptually this is because the arguments are set up
+before the function call is made. Visually, this makes it much easier to read.
+</p>
+
+<p>The format of the function descriptions is simpler than that of the BTS markers:</p>
+<p><extended-example type="format">
+<userinput>&lt;address&gt;: &lt;function-name&gt;</userinput><br/>
+<userinput>              Arg &lt;arg-number&gt;: &lt;hex-value&gt; &lt;decoded-content&gt;</userinput>
+</extended-example></p><p><value-table head-number="Field" head-value="Meaning">
+<value number="&amp;lt;address&amp;gt;">Describes the point at which control left this point</value>
+<value number="&amp;lt;function-name&amp;gt;">Describes the function which was called to reach this point. &lt;address&gt; may lie outside the named function if the function called other functions which do not place frame information upon the stack.</value>
+<value number="&amp;lt;arg-number&amp;gt;">The argument number for this function. Not all function arguments may be determined by the backtrace. In particular, functions with more than 5 arguments will most likely not be recognised.</value>
+<value number="&amp;lt;hex-value&amp;gt;">The value of the argument. On rare occasions this may consist of multiple values, such as when the argument is a double.</value>
+<value number="&amp;lt;decoded-content&amp;gt;">The content of the argument will be guessed at by the backtracer. String pointers are usually recognised, although only the first 16 characters will be displayed. Signatured function pointer will be recognised. Word-aligned pointers to valid memory will have the first four words displayed.</value>
+</value-table></p>
+<p>For example, the following lines might be displayed:</p>
+<p><extended-example type="format">
+<userinput>385dc70: mm_lookup_by_ftname</userinput><br/>
+<userinput>         Arg 1: 0xffffffff -1</userinput><br/>
+<userinput>         Arg 2: 0x00000001 1</userinput><br/>
+<userinput>3b8c43c: mm_translate</userinput><br/>
+<userinput>         Arg 1: 0x01c07f9c 29392796 -&gt; [0x00000001] [0xffffffff] [0x00000001] [0xffffffff]</userinput>
+</extended-example></p>
+<p>
+This indicates that the 'mm_translate' function was called with a single
+argument. It was probably a pointer to some data, of which the first four values
+were 1,-1,1,-1.
+</p>
+
+<p>
+This then called the 'mm_lookup_by_ftname' function, passing two parameters, a -1
+and a 1.
+</p>
+</subsection>
+
+<subsection title="Register sets">
+<p>
+Some BTS types, for example the 'Exception' type, as well as the APCS backtrace,
+can display a 'register set'. The meaning of these registers is dependent on
+where it is being displayed. For the Exception type, the register set indicates
+the registers which were in place at the time of the exception. For the CMHG
+register set, it indicates the 10 registers which were passed to the entry point,
+and which may have been subsequently updated.
+</p>
+
+<p>
+By default, register sets are not displayed and a reminder notice is instead
+shown. The register dump takes a simple form:
+</p>
+<p><extended-example type="format">
+<userinput>&lt;register&gt;=&lt;value&gt; &lt;hex-value&gt; &lt;decoded-content&gt;</userinput>
+</extended-example></p><p><value-table head-number="Field" head-value="Meaning">
+<value number="&amp;lt;register&amp;gt;">Names the register, or the PSR in the case of full register dumps.</value>
+<value number="&amp;lt;hex-value&amp;gt;">Value of this register in the register-set</value>
+<value number="&amp;lt;decoded-content&amp;gt;">As described above</value>
+</value-table></p>
+<p>
+In the case of the PSR, the decoded content will describe the flags which are set
+and the mode of the processor:
+</p>
+<p><extended-example type="format">
+<userinput>&lt;mode&gt; &lt;instruction-set&gt; &lt;mask-flags&gt; &lt;condition-flags&gt;</userinput>
+</extended-example></p><p><value-table head-number="Field" head-value="Meaning">
+<value number="&amp;lt;mode&amp;gt;">Gives the name of the mode, or its binary equivalent</value>
+<value number="&amp;lt;instruction-set&amp;gt;">Describes the instruction set in force - ARM, or Thumb.</value>
+<value number="&amp;lt;mask-flags&amp;gt;">Indicates which masking flags are set, lower case indicating an unset flag, upper case indicating a set flag: i = IRQ; f = FIQ</value>
+<value number="&amp;lt;condition-flags&amp;gt;">Indicates which condition flags are set, lower case indicating an unset flag, upper case indicating a set flag: v = Overflow; c = Carry; z = Zero; n = Negative</value>
+</value-table></p>
+</subsection>
+
+<subsection title="Disassembly dumps">
+<p>
+The BTS types which include a source location can display a disassembly dump of
+the preceding instructions prior to the operation. By default these are disabled
+and a reminder will be shown instead. The disassembly will be familiar to most
+developers:
+</p>
+<p><extended-example type="format">
+<userinput>&lt;address&gt; : &lt;ascii&gt; : &lt;hex-value&gt; : &lt;disassembly&gt;</userinput>
+</extended-example></p><p><value-table head-number="Field" head-value="Meaning">
+<value number="&amp;lt;address&amp;gt;">Gives the address of this value and instruction</value>
+<value number="&amp;lt;ascii&amp;gt;">Shows the ASCII representation of the 4 bytes which make up the hex-value</value>
+<value number="&amp;lt;hex-value&amp;gt;">The value of the word at the address</value>
+<value number="&amp;lt;disassembly&amp;gt;">The ARM disassembly of the code at that address</value>
+</value-table></p>
+<p>
+Note: Thumb is not supported yet; not all interfaces provide a PSR to be able to
+select the correct mode for this. And of course, RISC OS does not function in
+Thumb mode.
+</p>
+
+<p>
+The disassembly may include indications of function signatures, and branching
+instructions may give the name of the function if it is present.
+</p>
+</subsection>
+
+<subsection title="Interactive interface">
+<p>
+The tool may be invoked with an interactive interface. In this mode, the system
+can be examined by commands issued to the tool. The commands can be listed by
+typing 'help'. Most commands supply syntax messages when they are invoked
+incorrectly. The current commands available are:
+</p>
+<p><value-table head-number="Command" head-value="Meaning">
+<value number="dump">Dump the BTS chain</value>
+<value number="processor">Display processor details</value>
+<value number="osversion">Display OS version details</value>
+<value number="time">Display time of failure</value>
+<value number="help">Display list of commands</value>
+<value number="quit">Exit the shell</value>
+<value number="disassemble">Disassemble a chunk of memory</value>
+<value number="dis">(as above)</value>
+<value number="memoryi">(as above)</value>
+<value number="areas">Display areas list</value>
+<value number="savearea">Force the saving of an area to a file</value>
+<value number="modules">Display modules list</value>
+<value number="savemodule">Force the saving of a module to a file</value>
+<value number="knownmemory">Display known memory regions</value>
+<value number="stacks">Display stack details</value>
+<value number="platform">Display platform details</value>
+<value number="version">Display command version</value>
+<value number="whereis">Locate an address</value>
+<value number="option">Set options</value>
+</value-table></p>
+<p>
+The interactive interface is most useful when dumps have been obtained from
+remote systems to display details about the environment in which the failure took
+place.
+</p>
+</subsection>
+
+<subsection title="Modules list">
+<p>
+The modules list is recorded both to ensure that an accurate record of the
+version numbers is retained and to identify the location in memory of the code in
+case it is referenced. Each line of the modules definition follows the following
+format:
+</p>
+<p><extended-example type="format">
+<userinput>&lt;title&gt;    &lt;code-range&gt; &lt;workspace-range&gt; &lt;help-text&gt;</userinput>
+</extended-example></p><p><value-table head-number="Field" head-value="Meaning">
+<value number="&amp;lt;title&amp;gt;">The module title</value>
+<value number="&amp;lt;code-range&amp;gt;">The range of the module code</value>
+<value number="&amp;lt;workspace-range&amp;gt;">If given, defines the range of the workspace as read from the private word.</value>
+<value number="&amp;lt;help-text&amp;gt;">The module help text, which includes the version and date</value>
+</value-table></p>
+</subsection>
+
+<subsection title="Areas list">
+<p>
+The areas list contains the named areas on the system (Dynamic Areas). Each area
+has a record of the extent which is allocated and flags, as well as the total
+memory covered by the area. This description takes one of two forms, the first of
+which is the most common, and the second is only used for the lower half doubly
+mapped dynamic areas. The fields which make up the lines are:
+</p>
+<p><value-table head-number="Field" head-value="Meaning">
+<value number="&amp;lt;start&amp;gt;">The start address of the dynamic areas.</value>
+<value number="&amp;lt;mapped-end&amp;gt;">The limit of the assigned memory for the dynamic area</value>
+<value number="&amp;lt;maximum-end&amp;gt;">The full extent of the dynamic area.</value>
+<value number="&amp;lt;minimum-start&amp;gt;">The full lower extent of the doubly mapped dynamic area.</value>
+<value number="&amp;lt;mapped-lower&amp;gt;">The start of the lower mapped region of a doubly mapped dynamic area.</value>
+<value number="&amp;lt;name&amp;gt;">The dynamic area name.</value>
+<value number="&amp;lt;access&amp;gt;">Indicates the type of access which is possible on the area.</value>
+<value number="&amp;lt;flags&amp;gt;">Specifies any special flags that the area has.</value>
+</value-table></p>
+<p>
+<fixme>The layouts of the two forms of line, which showed the order of these fields, were lost from the source of this document.</fixme>
+</p>
+
+<p>
+The access attributes for the area are described in terms of the user-mode access
+which is possible:
+</p>
+<p><value-table head-number="Access" head-value="Meaning">
+<value number="User R/W">All access is allowed</value>
+<value number="User R/O">User mode writing disallowed</value>
+<value number="User fault">User mode access (read or write) disallowed</value>
+<value number="Unmapped">All access disallowed (both user and privileged) because no memory is mapped</value>
+</value-table></p>
+<p>The flags indicates certain special flags that the area has:</p>
+<p><value-table head-number="Flag" head-value="Meaning">
+<value number="Double-lo">The area is doubly mapped, and this is the lower section.</value>
+<value number="Double-hi">The area is doubly mapped, and this is the upper section.</value>
+<value number="Sparse">The area is sparse. The details for sparse-mapped areas may not be accurate.</value>
+<value number="Heap">The area contains an OS_Heap managed by OS_DynamicArea.</value>
+<value number="Physical">The area contains physically mapped memory.</value>
+<value number="Abortable">The area can handle aborts.</value>
+<value number="Domain">The area has a domain allocated to it.</value>
+</value-table></p>
+</subsection>
+
+<subsection title="Preserving a record of state">
+<p>
+The BTSDump tool may be used to write a record of the system state after an abort
+has happened. This record can then be transmitted to other developers, or recorded
+for later diagnosis. To do this, the tool records, as it performs and displays the
+backtrace, the accesses it makes to memory. This record, the memory it refers to,
+and some system information can then be written to a file. In order that the most
+information is recorded, it is necessary to enable as many of the options as
+possible. All the features which are available during direct debugging of a 'live'
+system are available when displaying the preserved record.
+</p>
+
+<p>
+The recommended command for recording the system's state before sending the file
+to another user would be:
+</p>
+<p><extended-example type="shell">
+<userinput>*BTSDump -aW &lt;filename&gt;</userinput>
+</extended-example></p>
+<p>This enables all the features and writes the results to a file.</p>
+</subsection>
+
+<subsection title="Private use BTS types, and extending BTSDump">
+<p>
+The BTSDump tool can be used to interpret any correctly formed BTS details. The
+tool knows only about the types which were registered and in use when it was
+built. Unknown types will be displayed using a generic form indicating the type
+number and any known parameters. This description can be replaced by setting a
+system variable to indicate the use of new BTS types. For each unknown type, a
+system variable will be looked up in the form
+<sysvar>BTS$Type_<userreplace>#####</userreplace></sysvar>. The value of this
+variable will be interpreted and displayed. In order to align the text sensibly
+in the output, a vertical bar ('|') is used to separate the type name from its
+arguments. The '%' character is used to escape a special value which is read from
+the arguments.
+</p>
+
+<p>
+The '%' character is followed by a single character argument number (0-9) to
+which this special value relates. This may, optionally, be followed by a number
+(1-9) indicating the number of characters of padding which should be used to
+display the value. This is then followed by the type of the argument which is
+usually a single character.
+</p>
+
+<p>More succinctly, the special values take the following form:</p>
+<p><extended-example type="format">
+<userinput>%&lt;argument&gt;[&lt;pad&gt;]&lt;type&gt;  : Display special value</userinput>
+</extended-example></p><p><value-table head-number="Field" head-value="Meaning">
+<value number="&amp;lt;argument&amp;gt;">The argument number (0-9)</value>
+<value number="&amp;lt;pad&amp;gt;">An optional field padding</value>
+<value number="&amp;lt;type&amp;gt;">The type of argument being displayed</value>
+</value-table></p>
+<p>The types of arguments which can be interpreted are:</p>
+<p><value-table head-number="Type" head-value="Meaning">
+<value number="x">a hex value</value>
+<value number="s">a control-terminated string</value>
+<value number="P">a PSR value</value>
+<value number="d">a decimal value</value>
+<value number="f">the address of the caller (this will be used as a means for providing a caller disassembly, and described within the &amp;lt;region&amp;gt; in the output)</value>
+<value number="t">the address of the callee (this will be described within the &amp;lt;region&amp;gt; in the output)</value>
+<value number="[">an enumeration of named types (see below)</value>
+<value number="r">a register dump at the given argument offset (r0-r15) (this may be followed by a string enclosed in [] giving details about the dump)</value>
+<value number="R">a register dump at the given argument offset (r0-r15, PSR) (this may be followed by a string enclosed in [] giving details about the dump)</value>
+</value-table></p>
+<p>
+The enumeration set consists of a list of comma separated values which the
+argument value means, each of which is associated with an incrementing value
+(starting at 0). The value may be prefixed by a hex value and an '=' character to
+explicitly state the value associated with the given name. Enumerations are
+usually used to describe reason codes. For example, the Code variable type uses
+'%0[read,write]' to indicate that a value of 0 means 'read' and a value of 1 means
+'write'. See the FileSwitch type for more details.
+</p>
+
+<p>
+When assigning values to variables it should be remembered that the '|' character
+in a *Set command must be escaped as '||' to avoid GSTrans expansion, and within
+Obey files, the '%' character must be escaped as '%%' to avoid argument
+substitution.
+</p>
+</subsection>
+
+<subsection title="Built in BTS type definitions">
+<p>
+The BTSDump tool has a number of built in type definitions, as described in the
+above section. As a reference for the present commands, and to provide examples
+for the above description format, the current definitions are:
+</p>
+<p><value-table head-number="Type" head-value="Definition">
+<value number="&hex;00002"><userinput>Exception|called by %1f, CPSR %0P%2R[Exception]</userinput></value>
+<value number="&hex;00003"><userinput>IRQ device %0d|when at %1f, called %2t</userinput></value>
+<value number="&hex;00004"><userinput>SWI %05x|called by %1f</userinput></value>
+<value number="&hex;00005"><userinput>SWI %15x|called %0t</userinput></value>
+<value number="&hex;00006"><userinput>Vector %12x|called %0t</userinput></value>
+<value number="&hex;00007"><userinput>Transient-CB|called %0t, r12=%1x</userinput></value>
+<value number="&hex;00008"><userinput>Ticker event|called %0t, r12=%1x</userinput></value>
+<value number="&hex;00009"><userinput>Service %16x|called %2t, r0=%1x</userinput></value>
+<value number="&hex;0000A"><userinput>Event</userinput></value>
+<value number="&hex;0000B"><userinput>Code-var %0[read,write]|called %1t</userinput></value>
+<value number="&hex;0000C"><userinput>Aborting|called by %1f, CPSR %0P</userinput></value>
+<value number="&hex;0000D"><userinput>Abort trap|flags %02x, addr %1x+%22d, called %3t, r12=%4x</userinput></value>
+<value number="&hex;0000E"><userinput>Module init|called %1t, r11=%2x, title='%0s'</userinput></value>
+<value number="&hex;0000F"><userinput>Module final|called %1t, r11=%2x, title='%0s'</userinput></value>
+</value-table></p>
+</subsection>
+</section>
+
+<section title="System Variables">
+<sysvar-definition name="BTS$Type_#####"
+                   description="Definition of a private use BTS type">
+<use>
+<p>
+For an unknown BTS type, BTSDump looks up the variable whose name ends in the
+5-character, 0 padded, hexadecimal type number, and uses its value to describe the
+type. See <reference type="subsection" name="Private use BTS types, and extending BTSDump">Private use BTS types, and extending BTSDump</reference>
+for the format of the value.
+</p>
+</use>
+</sysvar-definition>
+</section>
+
+<section title="*Commands">
+<command-definition name="BTSDump" description="Display, record or play back the BTS chain">
+<syntax>
+ <optional><switch name="h"/></optional> <optional><switch name="a"/></optional> <optional><switch name="c"/></optional> <optional><switch name="r"/></optional> <optional><switch name="d"/></optional> <optional><switch name="q"/></optional> <optional><switch name="i"/></optional> <optional><switch name="e"><userreplace>command</userreplace></switch></optional> <optional><switch name="W"><userreplace>filename</userreplace></switch></optional> <optional><switch name="R"><userreplace>filename</userreplace></switch></optional>
+</syntax>
+<parameter switch="h">Display this help message</parameter>
+<parameter switch="a">Enable all options</parameter>
+<parameter switch="c">Enable the processing of APCS stack frames</parameter>
+<parameter switch="r">Enable the processing of register details</parameter>
+<parameter switch="d">Enable disassembly of surrounding regions</parameter>
+<parameter switch="q">Quieten some reminder messages</parameter>
+<parameter switch="i">Launch interactive shell</parameter>
+<parameter switch="e" name="command">Execute a command without invoking the shell</parameter>
+<parameter switch="W" name="filename">Write a record of the details for later playback</parameter>
+<parameter switch="R" name="filename">Read a recorded list of the details written by -W</parameter>
+<use>
+<p>
+The command line options allow the operation of the tool to be modified. Most
+enable options which would otherwise clutter the output on a 'live' system.
+</p>
+</use>
+<example>
+<command>*BTSDump -aW &lt;filename&gt;</command>
+</example>
+<related>
+<reference type="sysvar" name="BTS$Type_#####" />
+</related>
+</command-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected evident slips: the example description gave the address of the calling module as &amp;023e770 where the listing shows &amp;023e3770, and the field header of the BTS marker format read 'BTS-adddress'. The two line layouts of the areas list were lost from the capture and are noted as such in the document.</change>
+ </revision>
+ </history>
+
+</meta>
+</riscos-prm>

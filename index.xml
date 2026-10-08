@@ -127,6 +127,7 @@
         <page href="bts">Back Trace Structures</page>
         <page href="backgrounderror">Background errors</page>
         <page href="diagdump">DiagnosticDump overview</page>
+        <page href="btsdump">Back Trace Structure Dump tool</page>
     </section>
     <section title="Boot sequence" dir="boot">
         <page href="configure-plugins">Configure plugins</page>
