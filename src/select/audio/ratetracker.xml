@@ -74,9 +74,7 @@ Warm Silence Software can be reached at the following addresses:
 <userinput>            Oxfordshire</userinput><br/>
 <userinput>            OX20 1XX</userinput><br/>
 <userinput>     Email: info@wss.co.uk</userinput><br/>
-<userinput>       WWW: http://www.wss.co.uk/</userinput><br/>
-<userinput>   Tel/Fax: 01608 737172</userinput><br/>
-<userinput>    Mobile: 07558 467642</userinput>
+<userinput>       WWW: http://www.wss.co.uk/</userinput>
 </extended-example></p>
 </subsection>
 </section>
@@ -103,6 +101,7 @@ Warm Silence Software can be reached at the following addresses:
   <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
     <change>Recreated documentation in PRM-in-XML format.</change>
     <change>Spelt 'licence' (as a noun) in British English; the original read 'license'.</change>
+    <change>The telephone, fax and mobile numbers in the contact addresses are not carried over.</change>
   </revision>
  </history>
 
