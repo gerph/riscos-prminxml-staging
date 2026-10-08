@@ -1,0 +1,105 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="MBufManager">
+<section title="Introduction and Overview">
+<p>
+This document describes the changes made to MBufManager, supplementing the
+original documentation of the module.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="MBuf Scavenging">
+<p>
+MBufManager has been updated to address problems with exhaustions which are
+common when network speed and packet processing speed differ by a significant
+margin. When MBufManager discovers that not enough space remains to perform an
+allocation it will request that clients obtain more space through the
+<reference type="service" name="MBufManagerStatus" reason="2" /> 'scavenge'
+service. Clients should respond to this service by releasing MBufs which they
+do not need for their continued operation. The number of MBufs released is not
+important, and clients may wish to release only a single chain per request.
+Usually the MBufs released will contain cached data which can be reconstructed
+or incomplete buffered network data which will be retransmitted.
+</p>
+
+<p>
+This allows the MBufManager to recover from low memory situations. See the
+Internet document for the specific behaviour of the Internet module.
+</p>
+
+<p>
+The statistics returned by the *ShowStat tool (and other statistics capable
+interfaces) now includes the number of successful scavenges. Where such
+scavenges are counted, this indicates that the system has recovered from a
+situation where previously an MBuf exhaustion would have been reported. MBuf
+exhaustion only occurs when no clients can return MBufs to the manager on a
+scavenge call.
+</p>
+</subsection>
+
+<subsection title="Larger MBuf allocations">
+<p>
+Under earlier versions of MBufManager the amount of space allocated to the
+MBufManager was fixed at 128K. The minimum allocation is now 512K, and
+increases with the size of memory up to a maximum of around 5M. This increase
+may not be necessary for the vast majority of users, but for high network use
+it may prevent the slower scavenge operations and thus speed up transfers.
+</p>
+</subsection>
+</section>
+
+<section title="Service Calls">
+<service-definition name="MBufManagerStatus" number="A2" reason="2" reasonname="Scavenge"
+                    description="Request that clients release spare MBufs">
+<entry>
+ <register-use number="0">&hex;02 (reason code); the defined reason codes are:
+  <value-table head-number="Reason" head-value="Meaning">
+   <value number="&hex;00">Module has started</value>
+   <value number="&hex;01">Module is stopping</value>
+   <value number="&hex;02">Scavenge request</value>
+  </value-table>
+ </register-use>
+ <register-use number="1">&hex;A2 (Service_MBufManagerStatus)</register-use>
+</entry>
+<exit>
+ <register-use number="0-1" state="preserved"/>
+</exit>
+<use>
+<p>
+This service call is issued to request that clients release any spare MBufs
+such that MBufManager may fulfil an allocation request.
+</p>
+</use>
+<related>
+<reference type="service" name="MBufManagerStatus" reason="0" href="?" />
+</related>
+</service-definition>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2013-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="3 Nov 2015" title="Initial version">
+    <change>Original documentation (HTML document version 1.03).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+ </revision>
+ </history>
+
+</meta>
+</riscos-prm>
