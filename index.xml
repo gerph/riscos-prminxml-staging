@@ -71,12 +71,47 @@
             <page href="pointer-supplement">Pointer devices</page>
         </section>
     </section>
+    <section title="Input" dir="input">
+        <page href="keyvdebounce">KeyV changes for input debounce</page>
+        <page href="keyvextendedinput">Augmentation of KeyV for modern keyboard systems</page>
+        <page href="osword21">OS_Word 21</page>
+        <page href="ps2driver">PS2Driver</page>
+        <page href="windowscroll">WindowScroll module</page>
+    </section>
     <section title="Desktop" dir="desktop">
         <page href="iconbarfiledrags">Icon bar file drags</page>
         <page href="filters-iconborders">Icon border filters</page>
         <page href="taskmanager">Task Manager</page>
+        <page href="displaymanager">DisplayManager</page>
+        <page href="errorlog">ErrorLog</page>
+        <page href="draganobject">DragAnObject</page>
+        <page href="dragasprite">DragASprite</page>
+        <page href="clipboardholder">Clipboard Holder</page>
+        <page href="fileraction">FilerAction update</page>
+        <page href="shareicons">Remote disc types</page>
+        <page href="iconset">Icon set</page>
+        <page href="pinboard">Pinboard</page>
+        <page href="redrawmanager">Rendering into Windows</page>
+        <page href="taskwindow">TaskWindow module</page>
         <section title="Wimp" dir="wimp">
             <page href="iconpriorities">Iconbar priorities</page>
+            <page href="backgroundtile">Window background tiling</page>
+            <page href="iconesgs">Icon ESGs</page>
+            <page href="icontinting">Tinting validation</page>
+            <page href="icontransitions">Icon Transitions</page>
+            <page href="priorityspritepool">Priority sprite pool</page>
+            <page href="toolorder">Tool furniture ordering</page>
+            <page href="toolsprites">Tool sprites</page>
+            <page href="wimpcnp">WindowManager cut and paste</page>
+            <page href="wimpcommandwindow">Wimp_CommandWindow</page>
+            <page href="wimpploticon">Wimp_PlotIcon</page>
+            <page href="wimpreadsysinfo">Wimp_ReadSysInfo</page>
+            <page href="wimptextop">Wimp_TextOp</page>
+            <page href="wimpedge">Screen edge notifications</page>
+            <page href="wimpextend257">Wimp_Extend 257</page>
+            <page href="wimpextend258">Wimp_Extend 258</page>
+            <page href="windowhandles">Window handles</page>
+            <page href="windowstacks">Window stacks</page>
         </section>
     </section>
     <section title="Hardware" dir="hardware">
