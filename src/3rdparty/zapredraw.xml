@@ -1158,7 +1158,7 @@ of these numbers. These bitmaps are also useful as cursors.</p>
       <register-use number="0 (and flags)">Corrupted</register-use>
     </exit>
     <use>
-      <p>This SWI takes an anti-aliased font and caches a range of characters as bitmaps (see <sysvar>r_caddr</sysvar>). The cacheing can be done in any colours or screen resolution. Of course only those with foreground colour all bits set and background colour all bits clear can be used directly by <reference type="swi" name="ZapRedraw_RedrawArea" />. However, by giving a foreground colour mask of -1 and a background mask of 0 any bitmap can be drawn (see <sysvar>r_caddr</sysvar> etc). An hourglass is given with the % as the current character/256 if it takes a long time.</p>
+      <p>This SWI takes an anti-aliased font and caches a range of characters as bitmaps (see <sysvar>r_caddr</sysvar>). The caching can be done in any colours or screen resolution. Of course only those with foreground colour all bits set and background colour all bits clear can be used directly by <reference type="swi" name="ZapRedraw_RedrawArea" />. However, by giving a foreground colour mask of -1 and a background mask of 0 any bitmap can be drawn (see <sysvar>r_caddr</sysvar> etc). An hourglass is given with the % as the current character/256 if it takes a long time.</p>
     </use>
   <related>
     <reference type="swi" name="ZapRedraw_SpriteSize" />

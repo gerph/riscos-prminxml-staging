@@ -36,7 +36,7 @@ Certain combinations are nonsensical, and extreme care should be observed when s
 <value number="B=bctir R=hvr T=hs">Upside down RISC OS style</value>
 <value number="T=btisc R=tvr B=hr">Typical of another well known OS</value>
 <value number="T=bcti R=svr B=hr">Strange titlebar below scrollbar</value>
-<value number="B=t L=bcisvh B=hr">Unuseful, but interesting tool layout</value>
+<value number="B=t L=bcisvh B=hr">Not useful, but interesting tool layout</value>
 </value-table></p><p>
 In particular, it should be noted that the toggle size icon and the resize icon may not function as desired if they move away from their more common locations.
 </p>

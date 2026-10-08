@@ -41,7 +41,7 @@ For OS_DynamicArea 0, the following flags are used :
  <bit number="4">Area is not bufferable (PRM 5a-54)</bit>
  <bit number="5">Area is not cacheable (PRM 5a-54)</bit>
  <bit number="6">Area is doubly mapped (PRM 5a-54)</bit>
- <bit number="7">Area is not user resizeable (PRM 5a-54)</bit>
+ <bit number="7">Area is not user resizable (PRM 5a-54)</bit>
  <bit number="8">Area requires specific pages of memory (PRM 5a-54)</bit>
  <bit number="9">Area is shrinkable (<reference type="document" href="shrinkabledas" name="Shrinkable dynamic areas" />)</bit>
  <bit number="10">Area is sparse (<reference type="document" href="sparsedas" name="Sparse Dynamic Areas" />)</bit>

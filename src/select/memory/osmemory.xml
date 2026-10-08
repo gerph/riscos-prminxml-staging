@@ -222,7 +222,7 @@ This SWI was allocated in RISC OS 4 for mapping PCI memory within the Phoebe har
  <register-use number="2">Log base 2 of required alignment of base of region within physical memory, between 12 (4K) and 30 (2G)</register-use>
 </entry>
 <exit>
- <register-use number="3">Page number of first page which fulfills the requirements specified</register-use>
+ <register-use number="3">Page number of first page which fulfils the requirements specified</register-use>
 </exit>
 <use>
 <p>

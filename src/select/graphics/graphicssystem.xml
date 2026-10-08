@@ -137,7 +137,7 @@ See PRM 3-523.
 
 <subsubsection title="FontManager">
 <p>
-The FontManager provides scaleable, vector based, anti-aliased font rendering operations.
+The FontManager provides scalable, vector-based, anti-aliased font rendering operations.
 </p>
 <p>
 See PRM 3-403.

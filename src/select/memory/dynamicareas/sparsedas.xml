@@ -58,7 +58,7 @@ This SWI is used to claim an area of a Sparse Dynamic Area for use by the client
 </exit>
 <use>
 <p>
-This SWI is used to release areas of memory previously claimed back in to the free pool, unmapping the area requested. If not all of the region can be released, an error will occur.
+This SWI is used to release areas of memory previously claimed back into the free pool, unmapping the area requested. If not all of the region can be released, an error will occur.
 </p>
 </use>
 <related>
