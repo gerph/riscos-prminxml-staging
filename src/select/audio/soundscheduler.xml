@@ -95,7 +95,7 @@ not capable of the operation and the client must fall back to the old style
 </p>
 
 <p>
-<fixme>The original wording for a schedule type with bits 0-1 clear reads 'call Sound_ControlPacked otherwise R1 is a function to call'; which condition selects the function call is not stated.</fixme>
+<fixme>With bits 0-1 of R1 clear, the SWI either calls Sound_ControlPacked or treats R1 as a function to call; the condition which selects between them is not documented.</fixme>
 </p>
 </use>
 <related>
