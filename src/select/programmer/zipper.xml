@@ -106,6 +106,9 @@ file cannot be opened, an error will be returned.</p>
  <register-use number="0">Flags (reserved, must be 0)</register-use>
  <register-use number="1">Unzip handle</register-use>
 </entry>
+<exit>
+ <register-use number="0-9" state="preserved"/>
+</exit>
 <use>
 <p>This SWI is used to close an archive previously opened for extraction.</p>
 
@@ -318,7 +321,7 @@ content of the archive. This area can be read through this call.</p>
 <p>This SWI is used to enumerate the objects in the archive. Data is written
 in the order given in the flags table above. The interface is intentionally
 similar to OS_GBPB. This makes its use as a direct replacement for
-OS_GBPB simple.
+OS_GBPB 10 simple.
 </p>
 
 </use>
@@ -461,9 +464,12 @@ interface to OS_File 5.</p>
  <register-use number="2">Pointer to filename of file to read</register-use>
  <register-use number="3">Pointer to password to use, if bit 6 set</register-use>
 </entry>
+<exit>
+ <register-use number="0-9" state="preserved"/>
+</exit>
 
 <use>
-<p>This SWI is used to open a file in an archive for reading.</p>
+<p>This SWI is used to open a file in an archive for reading. Because of the linear structure of zip files, only a single file within the archive may be opened for reading. If a second file within the archive is opened for writing before the first is closed, an error will be returned.</p>
 
 </use>
 
@@ -488,6 +494,9 @@ interface to OS_File 5.</p>
  <register-use number="0">Flags (reserved, must be 0)</register-use>
  <register-use number="1">Unzip handle</register-use>
 </entry>
+<exit>
+ <register-use number="0-9" state="preserved"/>
+</exit>
 
 <use>
 <p>This SWI is used to close a file in an archive opened for reading. An
@@ -624,6 +633,9 @@ file cannot be opened, an error will be returned.</p>
  <register-use number="0">Flags (reserved, must be 0)</register-use>
  <register-use number="1">Zip handle</register-use>
 </entry>
+<exit>
+ <register-use number="0-9" state="preserved"/>
+</exit>
 <use>
 <p>This SWI is used to close an archive previously opened for writing.</p>
 
@@ -715,10 +727,13 @@ file cannot be opened, an error will be returned.</p>
  </register-use>
  <register-use number="9">Pointer to password to use, if bit 6 set</register-use>
 </entry>
+<exit>
+ <register-use number="0-9" state="preserved"/>
+</exit>
 
 <use>
 <p>This SWI is used to open a file in an archive for writing, or to create
-a directory.</p>
+a directory. Because of the linear structure of zip files, only a single file within the archive may be opened for writing. If a second file within the archive is opened for writing before the first is closed, an error will be returned.</p>
 
 </use>
 
@@ -777,6 +792,9 @@ a directory.</p>
  <register-use number="2">Pointer to buffer of data to write</register-use>
  <register-use number="3">Length of buffer</register-use>
 </entry>
+<exit>
+ <register-use number="0-9" state="preserved"/>
+</exit>
 
 <use>
 <p>This SWI is used to write data to the currently opened file in the

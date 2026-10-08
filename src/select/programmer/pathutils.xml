@@ -38,7 +38,7 @@ which are used as references to multiple paths in filenames.
 </entry>
 <exit>
  <register-use number="0-2" state='preserved'/>
- <register-use number="3">Number of spare bytes in the buffer</register-use>
+ <register-use number="3">Number of spare bytes in the buffer, or the negative of the length required if R3 was 0 on entry</register-use>
  <register-use number="4">Context value, or -1 if complete (and the other registers are invalid)</register-use>
  <register-use number="5">Variable type that the value was expanded from</register-use>
  <register-use number="6">Depth the value was expanded from</register-use>
