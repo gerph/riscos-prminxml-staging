@@ -1,0 +1,348 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="OS_Module changes">
+<section title="Introduction and Overview">
+<p>
+In order to accommodate some of the extensions to the system which are planned for the future and for the current release, two new OS_Module entry points, changes to existing OS_Module entry points and a service call have been added. One of these OS_Module calls enables enumeration of modules with a pointer to the private word. Previously it was only possible to obtain the value of the private word. Consequently, providing functions which are akin to those provided by the kernel was not possible without some knowledge of the private memory locations. This new call allows some previously internal functions to be delegated to code outside the kernel.
+</p>
+<p>
+Another of the OS_Module calls provides a counterpart to the <userinput>*Unplug</userinput> and <userinput>*RMInsert</userinput> commands. This allows modules to be unplugged or inserted without passing through OS_CLI. This may be more desirable where OS_CLI is not recommended (for example, within service calls or other background operations).
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Changes to existing reasons">
+<p>
+The change to the existing OS_Module entry points is a slight modification of the state of modules returned by OS_Module 19 and 20 (enumerate ROM modules) to allow the indication of modules which are 'unsuitable for this operating system'.
+</p>
+</subsection>
+
+<subsection title="New services">
+<p>
+To provide information to clients about modules presently running on the machine, a new service - <reference type="service" name="ModuleStatus" /> - has been created. This is primarily for use of new extension modules, but clients monitoring the module chain may find this information more useful. In particular, for speed certain clients may wish to cache the module chain details in a manner appropriate for their operation rather than using the standard OS_Module calls.
+</p>
+<p>
+<reference type="service" name="ModulePreInit" /> has been extended to allow it to reject modules. This service was introduced in RISC OS 3.7 to allow load-time patching of module code which was not StrongARM safe. The extension allows checking code to explicitly reject (with an error) any module which is not deemed safe to run on the platform.
+</p>
+</subsection>
+
+<subsection title="SWI name translation">
+<p>
+The SWI name to number lookup has been made significantly faster from Kernel 9.54 onward. However, this has a side effect for the SWI name decoding code entry point. This is a rarely used entry point which can be used to translate named SWIs to numbers within the module. This entry point will still be called if the SWI prefix given in the SWI decoding table is matched, or if the module title is matched. However, it may not be called under other circumstances.
+</p>
+<p>
+Previously the entry point in a module FooDecoder whose SWI prefix was Foo would be called, even though the SWI name being looked up was Bar_PlotBaz. With Kernel 9.54, such entries may not be called if the module title or SWI prefix do not match. In future versions of the operating system this entry point may not be called at all, as it is rarely useful and is not known to be used on any software. As such, the entry point is deprecated.
+</p>
+</subsection>
+
+<subsection title="Module initialisation, finalisation and preferred instance">
+<p>
+<strong>Module initialisation</strong> is issued immediately after the modules service handler becomes valid, and after the initialisation entry has been called and returned no errors. As a result, a new-born module will see its instance appear at its service handler if it claims this service.
+</p>
+<p>
+Loading a module, or creating a new instance will generate this service call. The initial module created will also issue the preferred instance service.
+</p>
+<p>
+<strong>Module finalisation</strong> is issued after the modules service handler has been removed and the modules finalisation code has been called. Killing an instance (including the last one) will generate this service call.
+</p>
+<p>
+<strong>Module preferred instance:</strong> when the preferred instance changes for a module, this service call is issued. The postfix string and private word pointer will be 0 if there is no preferred instance. This happens when the last instance of a module has been killed.
+</p>
+</subsection>
+
+<subsection title="Module services">
+<p>
+From RISC OS 4, the Kernel supports a slightly revised module format in order to allow a much more efficient kernel implementation of service call distribution. The revised format is designed to give explicit information on service calls of interest to a module, while being backward compatible with old RISC OS kernels.
+</p>
+<subsubsection title="Revised format for service call handler">
+<p>
+The meaning and format of the module header is unchanged from that in the Programmer's Reference Manual (PRM 1-205). The entry and exit conditions for the service call handler are unchanged from those in the PRM (PRM 1-210).
+</p>
+<p>
+A table that specifies the service calls of interest to the module is added to the specification. The presence of this table is indicated by a magic instruction as the first instruction of the service handler code. The table is then referenced by an anchor word that immediately precedes the magic instruction. Hence, the required form of the service handler is as follows (where svc is the address of the handler code, found from offset &amp;0C of the header as usual):
+</p>
+<p><value-table head-number="Address" head-value="Contents">
+<value number="svc - 4">Table offset (from module start) to service table</value>
+<value number="svc">&amp;E1A00000 (magic instruction, MOV r0,r0)</value>
+<value number="svc + 4...">Handler code as recommended in PRM 1-211 ...</value>
+</value-table></p><p>
+The anchor word at svc-4 can contain 0, meaning that no static service table is specified. This is reserved only for rare cases (see recommended use, below); a service table must be provided where possible. The format of the table referenced by the anchor word at svc-4 is as follows:
+</p>
+<p><offset-table>
+ <offset number="0">Flags word:
+  <bitfield-table>
+ <bit number="0">If set, call service handler with R1 set to index into table of service call. If clear, call service handler with R1 set to the service number</bit>
+ <bit number="1-31">Reserved, must be 0</bit>
+</bitfield-table></offset>
+ <offset number="4">Offset (from module start) to handler code</offset>
+ <offset number="8">Number of first service call of interest</offset>
+ <offset number="12">Number of second service call of interest</offset>
+ <offset number="...">Further service call numbers of interest</offset>
+ <offset number="X">Table terminator</offset>
+</offset-table></p>
+<p>
+The service number fields must be listed in strict ascending order of service call number. RISC OS will reject any module which does not have a sorted list.
+</p>
+<p>
+The svc_offset should specify an entry for code that directly dispatches a service call known to be in the set of interest. That is, it can skip the code that rejects unrecognised service call numbers as outlined in PRM 1-211. (The rejection code must remain for kernels that do not use the table.)
+</p>
+</subsubsection>
+
+<subsubsection title="Requirements for new modules">
+<p>
+New modules that have no service call handler are unaffected; they specify 0 at offset &amp;0C of the module header as usual.
+</p>
+<p>
+All other new modules must use the revised format. The new format is fully backward compatible while allowing newer kernels the chance to compile fast service call distribution chains.
+</p>
+<p>
+Hence, all new modules must have the magic instruction (at svc) that identifies the new format, and also the table anchor word (at svc-4).
+</p>
+<p>
+All new modules should have a properly compiled table (at svc_tab) of all service calls that can be of interest to any of the module's instantiations at any time during the module's residence. The handler code itself should follow the form recommended in PRM 1-211, and the code entry from the table should skip the pre-rejection code, as discussed above.
+</p>
+<p>
+The requirement allows efficient use of the table by new kernels, while also being efficient on old kernels. (On old kernels it is the time for the handler code to reject many unrecognised service calls, rather the time to dispatch recognised calls, that will typically be most significant; hence the recommended form already in PRM 1-211.)
+</p>
+<p>
+Only rare exceptions to the requirement for a table are allowed; namely, where the set of service calls is extremely large, or is unbounded in some way. The strong recommendation is that only if modules would require a table of more than 1k bytes (more than approximately 250 service call numbers) should the table be omitted.
+</p>
+<p>
+Modules that seem to require table omission should be redesigned or eliminated wherever possible. Otherwise, they should still have the magic instruction at svc, and specify an offset of 0 in the anchor word at svc-4. This ensures that old format modules can always be distinguished from new format modules.
+</p>
+<p>
+The reason for requiring only rare omission of the table is that such non-compliant modules require costly service call distribution. Note that the RISC OS 4 kernel may choose to pass service calls to non-compliant modules only after passing to all relevant compliant modules, regardless of module instantiation order. (This only affects cases where service calls may be claimed.)
+</p>
+</subsubsection>
+
+<subsubsection title="Recommendation for old modules">
+<p>
+Old modules that have no service call handler are unaffected; they specify 0 at offset &amp;0C of the module header as usual.
+</p>
+<p>
+All other old modules should be updated to the new format at source where possible. The reason for this is that old format modules require costly service call distribution. Note that the RISC OS kernel may choose to pass service calls to old format modules only after passing to all relevant new format modules, regardless of module instantiation order. (This only affects cases where service calls may be claimed.)
+</p>
+</subsubsection>
+
+<subsubsection title="Backward compatibility">
+<p>
+The new format should be 100% backward compatible. The only issue is the possibility of an old module whose first instruction of its service call handler happens to be the magic instruction. Such a module would confuse a new kernel (which would most likely reject it as broken). This is an extremely unlikely event, since the magic instruction is a NOP. A simple fix would be to use a different NOP code in such a module, but a binary update as above would be far preferable.
+</p>
+</subsubsection>
+
+<subsubsection title="Forward compatibility">
+<p>
+RISC OS kernels will support old and new format modules, but all modules should be created as, or moved to, the new format wherever possible (see discussion above). A future release of the kernel may refuse to support old format modules.
+</p>
+</subsubsection>
+
+<subsubsection title="Module flags word">
+<p>
+To differentiate between 32bit and 26bit modules, an extension block and flags word has been defined as part of the module header. The format for this header is described in detail in the <reference type="document" href="../programmer/codeformats" name="Code execution changes" /> document.
+</p>
+</subsubsection>
+
+</subsection>
+
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_Module"
+                number="1E"
+                reason="13"
+                reasonname="OS_Module_EnumerateROMModulesWithVersion"
+                description="Enumerate ROM modules (with version number)"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">19 or 20</register-use>
+ <register-use number="1">Module number, or 0 to start</register-use>
+ <register-use number="2">Section number (0-8 for podules, -1, -2, etc for ROM)</register-use>
+</entry>
+<exit>
+ <register-use number="1">Next module number</register-use>
+ <register-use number="2">Preserved</register-use>
+ <register-use number="3">Pointer to module name</register-use>
+ <register-use number="4">State of module:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="-2">Module is unsuitable</value>
+ <value number="-1">Module is unplugged</value>
+ <value number="0">Module is inserted but not current in module chain</value>
+ <value number="1">Module is active</value>
+ <value number="2">Module is running</value>
+</value-table></register-use>
+ <register-use number="5">Chunk number of expansion card</register-use>
+ <register-use number="6">BCD version number (when R0 = 20 on entry only)</register-use>
+</exit>
+<use>
+<p>
+This SWI is called to enumerate the ROM system modules. More information can be found on PRM 1-246 and PRM 1-247. The call is extended from that description by returning -2 to indicate that a module is not suitable for the operating system. This is a diagnostic aid for locating non-32bit modules within podules. Future changes to the module format notwithstanding, the -2 value should not be seen on 26bit systems.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_Module"
+                number="1E"
+                reason="16"
+                reasonname="OS_Module_EnumerateWithPrivateWord"
+                description="Enumerate modules with private word pointer"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">22</register-use>
+ <register-use number="1">Module number</register-use>
+ <register-use number="2">Incarnation number</register-use>
+</entry>
+<exit>
+ <register-use number="1-2">Updated</register-use>
+ <register-use number="3">Pointer to module code</register-use>
+ <register-use number="4">Pointer to private word, or 0 if module was not correctly unlinked</register-use>
+ <register-use number="5">Pointer to postfix string</register-use>
+</exit>
+<use>
+<p>
+This SWI is equivalent to that for enumerating modules except that instead of the private word being returned, a pointer to the private word is used, as would be used on entry to routines handled by the module.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_Module"
+                number="1E"
+                reason="17"
+                reasonname="OS_Module_UnplugInsert"
+                description="Unplug or insert modules"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">23</register-use>
+ <register-use number="1">Module name</register-use>
+ <register-use number="2">1 to insert, 0 to unplug</register-use>
+ <register-use number="3">Podule number, or &amp;80000000 for 'all versions'</register-use>
+</entry>
+<exit>
+ <register-use number="0-3">Preserved</register-use>
+</exit>
+<use>
+<p>
+This SWI performs the same operation as <userinput>*Unplug</userinput> and <userinput>*RMInsert</userinput> on modules, allowing them to be omitted during initialisation.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+<section title="Service Calls">
+<service-definition name="ModuleStatus"
+                    number="D8"
+                    description="Significant event has occurred to a module">
+<entry>
+ <register-use number="0">Operation:
+  <value-table head-number="Value" head-value="Meaning">
+ <value number="0">Module initialisation</value>
+ <value number="1">Module finalisation</value>
+ <value number="2">Preferred instance has changed</value>
+ <value number="3">Instance renamed</value>
+</value-table></register-use>
+ <register-use number="1">&hex;D8 (service call number)</register-use>
+ <register-use number="2">Pointer to module base</register-use>
+ <register-use number="3">Pointer to private word</register-use>
+ <register-use number="4">Pointer to module title</register-use>
+ <register-use number="5">Pointer to postfix string</register-use>
+ <register-use number="6">Pointer to new instance name (for 'instance renamed')</register-use>
+</entry>
+<exit>
+ <register-use number="0-6">Preserved</register-use>
+</exit>
+<use>
+<p>
+This service is issued by the kernel after significant events have occurred to a module.
+</p>
+</use>
+<related>
+<reference type="service" name="ModulePreInit" />
+</related>
+</service-definition>
+
+<service-definition name="ModulePreInit"
+                    number="B9"
+                    description="A module is about to be initialised">
+<entry>
+ <register-use number="0">Module base address</register-use>
+ <register-use number="1">&hex;B9 (service number)</register-use>
+ <register-use number="2">Module length + 4</register-use>
+</entry>
+<exit>
+ <register-use number="0">Pointer to error block if module has been rejected, preserved otherwise</register-use>
+ <register-use number="1">0 if module has been rejected, preserved otherwise</register-use>
+ <register-use number="2">0 if module has been rejected, preserved otherwise</register-use>
+</exit>
+<use>
+<p>
+This service is issued just before a module is initialised. When a module is *RMLoaded (or equivalent):
+</p>
+<p><list type="ordered">
+<item><p>The module is loaded into memory</p></item>
+<item><p>The module is unsqueezed if necessary</p></item>
+<item><p><reference type="service" name="ModulePreInit" /> is issued</p></item>
+<item><p>OS_SynchroniseCodeAreas is called</p></item>
+<item><p>Initialisation code is issued</p></item>
+<item><p><reference type="service" name="ModuleStatus" /> (initialisation) is issued</p></item>
+</list></p>
+<p>
+This service call is intended to allow run-time patching of modules.
+</p>
+<p>
+Earlier documentation (supplied with RISC OS 3.7) indicated that the service may be claimed by clients. This is discouraged as it prevents other modules from seeing the service and applying their patches. The call should only be claimed if the module's initialisation should be rejected and an error returned. If rejected, R2 should be set to 0 to indicate that this is an error being returned, rather than just a claim as previously documented. R0 should point to a standard error block which will be returned to the caller.
+</p>
+<p>
+The documentation in the RISC OS 3.7 notes of R2 on entry was in error. The size supplied in R2 is the module length + 4. Patching modules should be aware of this as the module may exist at the end of the RMA and thus have no memory mapped for the apparent last word. This behaviour has been retained in order to ensure consistent use across OS versions.
+</p>
+</use>
+<related>
+<reference type="service" name="ModuleStatus" />
+</related>
+</service-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Corrected the slips 'a a properly compiled table', 'to omitted' (to be omitted), the duplicated 'the new format' in the forward compatibility paragraph, and 'translate' to 'translated' in the SWI name translation section. The reason code names (such as OS_Module_UnplugInsert) are descriptive labels for the reason codes and not names defined by the operating system.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
