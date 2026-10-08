@@ -1,0 +1,95 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Sparse Dynamic Areas">
+<section title="Introduction and Overview">
+<p>
+Sparse dynamic areas are dynamic areas whose memory allocation is not linear from the base of the area. Such regions might be used to release memory back to the RISC OS pool or to provide a virtual memory implementation. The Sparse dynamic areas are created with bit 10 set. Subsequently they should be resized by the SparseClaim and SparseRelease reason codes.
+</p>
+</section>
+
+<section title="SWI Calls">
+<swi-definition name="OS_DynamicArea"
+                number="66"
+                reason="9"
+                reasonname="OS_DynamicArea_SparseClaim"
+                description="Ensure region of sparse dynamic area is mapped to valid memory"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">9</register-use>
+ <register-use number="1">Area number</register-use>
+ <register-use number="2">Base of region to claim</register-use>
+ <register-use number="3">Size of region</register-use>
+</entry>
+<exit>
+ <register-use number="0-3">Preserved</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to claim an area of a Sparse Dynamic Area for use by the client. The size requested will be rounded up to a page. If not all of the region can be mapped in, an error will occur.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+<swi-definition name="OS_DynamicArea"
+                number="66"
+                reason="A"
+                reasonname="OS_DynamicArea_SparseRelease"
+                description="Allow region of sparse dynamic area to release memory to free pool"
+                irqs="undefined"
+                fiqs="undefined"
+                processor-mode="undefined"
+                re-entrant="undefined">
+<entry>
+ <register-use number="0">10</register-use>
+ <register-use number="1">Area number</register-use>
+ <register-use number="2">Base of region to release</register-use>
+ <register-use number="3">Size of region</register-use>
+</entry>
+<exit>
+ <register-use number="0-3">Preserved</register-use>
+</exit>
+<use>
+<p>
+This SWI is used to release areas of memory previously claimed back in to the free pool, unmapping the area requested. If not all of the region can be released, an error will occur.
+</p>
+</use>
+<related>
+</related>
+</swi-definition>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>The reason code names (OS_DynamicArea_SparseClaim and OS_DynamicArea_SparseRelease) are descriptive labels for the reason codes and not names defined by the operating system.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
