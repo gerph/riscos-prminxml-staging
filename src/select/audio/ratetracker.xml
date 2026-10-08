@@ -1,0 +1,110 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="RateTracker">
+<section title="Introduction and Overview">
+<p>
+RateTracker is a simple module designed to be used in conjunction with the SharedSound supplied with modern RISC OS versions and originally developed by Expressive Software Projects (ESP).
+</p>
+<p>
+SharedSound provides a mechanism for several different claimants to use the sound system at the same time, possibly at different frequencies. At no point however does SharedSound ever set the global sound system frequency.
+</p>
+<p>
+The original idea of this is that a user could set the global system frequency once at start-up (typically to whatever it is configured to be). Nothing should ever change this and everything should run happily from that point onwards. A user can therefore select the sound frequency that is right for the processing power of their machine and not ever have to worry again.
+</p>
+<p>
+Sadly, as not everything uses SharedSound this falls down a bit; often 'badly behaved', pre-SharedSound, applications come along and set the frequency to whatever they need. SharedSound does its best to cope by telling its registered sound handlers (the applications/modules actually producing sound) to resample their output to a different frequency.
+</p>
+<p>
+This can lead to SharedSound putting up with a less than ideal sound rate; either samples are needlessly resampled to a higher rate, or they are played at less than their full resolution.
+</p>
+<p>
+RateTracker is an attempt to cure this problem. Once a second it scans the registered handlers using SharedSound; if nothing is registered it does nothing. Otherwise it sets the global sound frequency to be the highest frequency currently requested.
+</p>
+<p>
+This means that:
+</p>
+<p><list>
+<item><p>A handler should never be asked to resample its output up unnecessarily (*).</p></item>
+<item><p>In the most common situation of just one sound source operating at a time the global sound system will be set to the rate that that source has requested (thus eliminating any aliasing effects) (*).</p></item>
+<item><p>When several sources are playing together the lower quality sources will not cause the higher quality one to be 'dragged down' to their level.</p></item>
+</list></p><p>
+(*) Subject to the underlying sound system supporting the requested rate.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Possible future extensions">
+<p>
+Have configurable minimum/maximum sample rates. The minimum rate should allow forced oversampling at low rates and maximum rate should will limit CPU usage.
+</p>
+</subsection>
+
+<subsection title="Copyright">
+<p>
+The RateTracker module and associated files are Copyright &copy; 2001 Robin Watts for Warm Silence Software Ltd, all rights reserved.
+</p>
+<p>
+They may be freely copied and distributed for non-commercial use provided no charge (other than possibly a nominal media charge) is made, and that the associated ReadMe files are included.
+</p>
+<p>
+Inclusion with a commercial product or on a magazine disc/CD is not permitted without the authors permission, though this permission will not generally be withheld (basically I want to keep track of where it goes!). The author reserves the right to charge a licence fee for the use of this software in any commercial system.
+</p>
+</subsection>
+
+<subsection title="Warranty">
+<p>
+This is an unwarranted product. I'll say that again; no warranty is given. If it eats your data, scares your children or impregnates your cat, its your problem.
+</p>
+<p>
+This is an unsupported product. Warm Silence Software Ltd cannot *promise* to offer any advice, help or other support for this module, but we may be able to help out with simple problems; feel free to contact us - at worst we'll ignore you.
+</p>
+</subsection>
+
+<subsection title="Contact addresses">
+<p>
+Warm Silence Software can be reached at the following addresses:
+</p>
+<p><extended-example type="format">
+<userinput>Snail Mail: Warm Silence Software Ltd</userinput><br/>
+<userinput>            PO Box 28</userinput><br/>
+<userinput>            Woodstock</userinput><br/>
+<userinput>            Oxfordshire</userinput><br/>
+<userinput>            OX20 1XX</userinput><br/>
+<userinput>     Email: info@wss.co.uk</userinput><br/>
+<userinput>       WWW: http://www.wss.co.uk/</userinput><br/>
+<userinput>   Tel/Fax: 01608 737172</userinput><br/>
+<userinput>    Mobile: 07558 467642</userinput>
+</extended-example></p>
+</subsection>
+</section>
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.</p>
+    <p>
+        The RateTracker module is &copy; Robin Watts for Warm Silence Software Ltd, 2001; see the Copyright section.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Spelt 'licence' (as a noun) in British English; the original read 'license'.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
