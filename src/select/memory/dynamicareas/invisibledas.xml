@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Non-User-Visible Dynamic Areas">
+<section title="Introduction and Overview">
+<p>
+From Kernel 9.02, a new flag (bit 18) has been added to OS_DynamicArea 0. This flag bit is not interpreted by the Kernel. It indicates that the dynamic area should not be visible to the user. It should only be interpreted by applications which display memory areas to the user, such as TaskManager. It is intended to be used as a means of indicating that a dynamic area does not contribute to the memory usage of the machine - such as a mapping of hardware registers.
+</p>
+<p>
+Although names will not be displayed to users it is useful for diagnostic purposes to include a readable name within the Dynamic Area registration. It is recommended that hardware register allocations be registered with a name of the form 'HW: &lt;component&gt;'. This should allow such uses to be identified by diagnostic tools.
+</p>
+<p>
+Most clients using this flag will be expected to include the 'non-user-draggable' flag and either reject attempts to resize the area or lock it subsequent to its creation.
+</p>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
