@@ -1,0 +1,131 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Acceleration and support provided by VideoHWVF">
+<section title="Introduction and Overview">
+<p>
+The VideoHWVF module 0.47 provides hardware acceleration using the features of an AGP graphics card, accessed through the ViewFinder podule. The acceleration provided is described below. It covers the vast majority of common operations which are used by applications. The operations are broken down into the core components for the abstracted video system.
+</p>
+<p>
+All features which are not supported by the hardware driver will be deferred to the software driver which will use direct screen access to provide the required operation, or update its internal state.
+</p>
+<p>
+Glossary :
+</p>
+<p><value-table head-number="Term" head-value="Meaning">
+<value number="'Not supported'">The hardware driver does not provide any facilities for this feature; it will be passed to the software driver.</value>
+<value number="'Supported'">The hardware driver provides this facility but it does not gain from specialised hardware features for faster operation.</value>
+<value number="'Accelerated'">The hardware driver provides this facility and uses specialised hardware features to improve performance.</value>
+</value-table></p></section>
+
+<section title="Technical Details">
+<subsection title="Text (VDU4-style text output)">
+<p><value-table head-number="Operation" head-value="Support">
+<value number="VideoV_Text_ChangeDestination">Supported</value>
+<value number="VideoV_Text_DefineChar">Supported</value>
+<value number="VideoV_Text_SetTextColour">Supported</value>
+<value number="VideoV_Text_WriteTextChar">Accelerated</value>
+<value number="VideoV_Text_TextCursor">Accelerated</value>
+<value number="VideoV_Text_ClearBox">Accelerated</value>
+</value-table></p></subsection>
+
+<subsection title="VDU graphics operations">
+<p><value-table head-number="Operation" head-value="Support">
+<value number="VideoV_Graf_SetColour1">Accelerated [1]</value>
+<value number="VideoV_Graf_SetColour2">Accelerated [1]</value>
+<value number="VideoV_Graf_ChangeDestination">Supported</value>
+<value number="VideoV_Graf_ChangeBase">Supported</value>
+<value number="VideoV_Graf_ReadPrimitives">Supported</value>
+<value number="VideoV_Graf_Rectangle">Accelerated</value>
+<value number="VideoV_Graf_Triangle">Accelerated [3]</value>
+<value number="VideoV_Graf_Parallelogram">Accelerated [3]</value>
+<value number="VideoV_Graf_BlockCopy">Accelerated</value>
+<value number="VideoV_Graf_CircleOutline">Accelerated [3]</value>
+<value number="VideoV_Graf_CircleFill">Accelerated [3]</value>
+<value number="VideoV_Graf_CircleArc">Accelerated [3]</value>
+<value number="VideoV_Graf_CircleSegment">Accelerated [3]</value>
+<value number="VideoV_Graf_CircleSector">Accelerated [3]</value>
+<value number="VideoV_Graf_EllipseOutline">Accelerated [3]</value>
+<value number="VideoV_Graf_EllipseFill">Accelerated [3]</value>
+<value number="VideoV_Graf_FillRight">Not supported</value>
+<value number="VideoV_Graf_FillLeftAndRight">Not supported</value>
+<value number="VideoV_Graf_FillFlood">Not supported</value>
+<value number="VideoV_Graf_PolyHLine">Accelerated</value>
+</value-table></p></subsection>
+
+<subsection title="Graphics primitives">
+<p><value-table head-number="Operation" head-value="Support">
+<value number="HLine">Accelerated</value>
+<value number="VLine">Accelerated</value>
+<value number="Point">Accelerated</value>
+</value-table></p></subsection>
+
+<subsection title="Mouse pointer operations">
+<p><value-table head-number="Operation" head-value="Support">
+<value number="VideoV_Pointer_Define">Supported</value>
+<value number="VideoV_Pointer_Select">Supported</value>
+<value number="VideoV_Pointer_Update">Supported</value>
+<value number="VideoV_Pointer_Remove">Supported</value>
+<value number="VideoV_Pointer_SetPalette">Supported [4]</value>
+</value-table></p></subsection>
+
+<subsection title="Mode / screen operations">
+<p><value-table head-number="Operation" head-value="Support">
+<value number="VideoV_Mode_VetMode">Supported</value>
+<value number="VideoV_Mode_SetMode">Supported</value>
+<value number="VideoV_Mode_Scroll">Accelerated</value>
+<value number="VideoV_Mode_SetPalette">Supported</value>
+<value number="VideoV_Mode_Enable">Supported</value>
+<value number="VideoV_Mode_Disable">Supported</value>
+<value number="VideoV_Mode_PowerSave">Supported</value>
+<value number="VideoV_Mode_SetRGBTable">Supported</value>
+<value number="VideoV_Mode_AccelConfigure">Supported [2]</value>
+<value number="VideoV_Mode_AccelControl">Supported [2]</value>
+<value number="VideoV_Mode_DisplaySelect">Supported</value>
+<value number="VideoV_Mode_BankCount">Supported</value>
+<value number="VideoV_Mode_BankDisplay">Supported</value>
+<value number="VideoV_Mode_BankDriver">Supported</value>
+<value number="VideoV_Mode_BankCopy">Accelerated</value>
+<value number="Mode change fade">Supported</value>
+<value number="VSync IRQ provision">Supported</value>
+<value number="Monitor EDID acquisition">Supported</value>
+</value-table></p></subsection>
+
+<subsection title="Notes">
+<p><list>
+<item><p>Multi-operation ECF's cannot be supported.</p></item>
+<item><p>Due to hardware restrictions cache cleaning is fixed at '1 VSync'.</p></item>
+<item><p>The operation is accelerated indirectly via the graphics primitives.</p></item>
+<item><p>The H/W pointer is 2 colour plus transparent. The RISC OS (3 colour plus transparent) pointer is translated. Colour 1 and either colour 2 or 3 are used.</p></item>
+</list></p><p><fixme>The notes are referred to from the table by the numbers [1] to [4] in the order given above. A revision of this document for the same module version lists the text and Triangle to EllipseFill operations as not supported in the base build, the Graf colour operations and Point as supported or accelerated subject to framebuffer access, and DrawV and SpriteV as not supported in the base build (with SpriteReason_TileSpriteScaled accelerated when viable); virtual modes are not supported in the base build, and rotated modes are not supported. Which revision applies to the released module needs to be confirmed.</fixme></p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
