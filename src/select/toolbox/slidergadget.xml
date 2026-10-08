@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="Slider Gadget changes">
+<section title="Introduction and Overview">
+<p>
+The Slider gadget was changed in Window 1.83 to 1.85.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="Excessive generation of events">
+<p>
+Previously whilst a slider was being dragged the gadget would repeatedly send itself Mouse_Click events (even if the mouse had yet to move). This meant that it was continually processing these events to no effect. This has been rectified, which makes other applications more responsive during a drag.
+</p>
+<p>
+Previously when a Mouse_Click event was received the slider gadget would generate a Slider_ValueChanged event even if its value had not actually changed. We now notify the client application only when the value changes.
+</p>
+</subsection>
+
+<subsection title="Step size enforcement">
+<p>
+The Slider_SetValue method will now correctly lock the value selected to the step size. This had always been the intended operation, but the code had been non-functional.
+</p>
+</subsection>
+
+<subsection title="Overflow values">
+<p>
+On mouse clicks (or drags) with sliders using large value ranges and/or a large display area, it was possible that an overflow condition would occur. The possibility of this has been reduced by improving the code which translates between screen coordinates and logical range values.
+</p>
+</subsection>
+
+<subsection title="Click/Drag positioning">
+<p>
+On mouse clicks (or drags) a slider's bar would previously align with the step immediately below (or to the left of) the position clicked. This meant that the mouse pointer had to reach or move beyond the next step position before the bar would advance to it. This has been modified slightly such that the closest step position is used. This results in the slider appearing to jump to a position slightly higher or slightly lower than the position clicked. Previously it would always have jumped to the pointer position or a position immediately below it.
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
