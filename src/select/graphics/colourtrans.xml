@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+
+<chapter title="ColourTrans">
+
+<section title="Overview">
+<p>ColourTrans translates colour values between the palettes and colour formats used by the screen and by sprites. This chapter describes the cases where its behaviour is specific to particular modes and output types.</p>
+</section>
+
+<section title="Paletted modes">
+<p>ColourTrans operates faster within the standard paletted 256 colour modes where a fully specified palette is used. Earlier versions of ColourTrans accelerated only VIDC1-compatible palettes on 256 colour modes.</p>
+<p>A similar, but more efficient, translation function is available for greyscale paletted modes.</p>
+</section>
+
+<section title="CMYK output">
+<p>ColourTrans is aware of CMYK sprites (see <reference type="document" href="sprites/cmyk" name="CMYK sprites" />) and generates suitable wide or regular tables for such output.</p>
+</section>
+
+<section title="Alpha-channel output">
+<p>When output is redirected to an alpha-channel mask, the palette is treated as effectively greyscale. This allows simple plot operations to be performed.</p>
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+    <change>Retitled the chapter to describe ColourTrans rather than its changes, and gave the behaviour in each output case under its own section.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>

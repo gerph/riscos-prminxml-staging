@@ -158,6 +158,7 @@
         <page href="blendtable">BlendTable</page>
         <page href="colourmap">Colour Map module</page>
         <page href="colourmapdraw">ColourMapping in Drawfiles</page>
+        <page href="colourtrans">ColourTrans</page>
         <page href="imagefileconvert">ImageFileConvert</page>
         <page href="convertsprite">ConvertSprite</page>
         <page href="convertbmp">ConvertBMP</page>
