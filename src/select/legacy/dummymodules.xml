@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
+
+<riscos-prm>
+<chapter title="DummyModules">
+<section title="Introduction and Overview">
+<p>
+A number of modules which were once required by the operating system, or by applications which ensure that they are present, are retained as dummy modules. They provide no useful function on modern versions of RISC OS, but allow applications which check for their presence to run.
+</p>
+</section>
+
+<section title="Technical Details">
+<subsection title="AUNMsgs">
+<p>
+The AUNMsgs module was provided for network systems to supply resources for the various components (ShareFS, Freeway, etc). Modern versions of RISC OS provide the resources within each component, allowing them to be entirely replaceable without dependencies. The module has been retained for applications which ensure it is present.
+</p>
+</subsection>
+
+<subsection title="BootNet">
+<p>
+The BootNet module was provided for network systems in order to boot off network filing systems. Modern versions of RISC OS contain completely restartable network components and filing systems, and provide boot capabilities on their own. The module has been retained for applications which ensure it is present.
+</p>
+</subsection>
+
+<subsection title="CallASWI">
+<p>
+The CallASWI module was introduced in RISC OS 3.7 to provide a mechanism by which arbitrary numbered SWIs can be called without requiring dynamic code. It was later extended by Pace to introduce additional features which only their operating system provided.
+</p>
+<p>
+The module is redundant on the modern versions of RISC OS as the facilities the soft-load versions provide are part of the operating system. The CallASWI module is provided to ensure that applications ensuring the module do not attempt to load other versions.
+</p>
+</subsection>
+
+<subsection title="IRQUtils">
+<p>
+The IRQUtils module was provided for RISC OS 2 systems where a fault in the interrupt system could cause unnecessarily high latency. The fault was fixed in later versions of the OS, but the module has been retained for applications which ensure it is present.
+</p>
+<p>
+In RISC OS 4, the module was used to hide an Easter Egg. This was removed in Select 4.
+</p>
+</subsection>
+
+<subsection title="WindowUtils">
+<p>
+The WindowUtils module was provided for RISC OS 2 systems where a fault in the WindowManager system needed to be fixed. This was done for later versions of the OS, but the module has been retained for applications which ensure it is present.
+</p>
+</subsection>
+
+</section>
+
+</chapter>
+
+<!-- MetaData -->
+<meta>
+ <maintainer>
+  <email name="Charles Ferguson" address="gerph@gerph.org" />
+ </maintainer>
+ <disclaimer>
+    <p>
+        &copy; Gerph, 2006-2026.
+    </p>
+ </disclaimer>
+
+ <history>
+  <revision number="1" author="gerph" date="2006" title="Initial version">
+    <change>Original documentation.</change>
+    <change>Captured as HTML document version 1.03 (3 Nov 2015).</change>
+  </revision>
+  <revision number="2" author="gerph" date="8 Oct 2026" title="PRM-in-XML version">
+    <change>Recreated documentation in PRM-in-XML format.</change>
+  </revision>
+ </history>
+
+</meta>
+</riscos-prm>
