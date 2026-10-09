@@ -98,11 +98,11 @@ No registers are significant on entry. The SWI decoding table in the Window modu
 
 <section title="Service Calls">
 <service-definition name="ToolboxSubMenu"
-                    number="400C0"
+                    number="44EC0"
                     description="Sub-menu notification and linking">
 <entry>
  <register-use number="0">Handle of client task</register-use>
- <register-use number="1">&hex;400C0 (service number)</register-use>
+ <register-use number="1">&hex;44EC0 (service number)</register-use>
  <register-use number="3">Sub-reason code:
   <value-table head-number="Value" head-value="Meaning">
  <value number="0">Notification that a MenuWarning message has been deferred.</value>
@@ -125,13 +125,13 @@ This service call is used by the Toolbox module and class modules to implement m
 </service-definition>
 
 <service-definition name="ToolboxSubMenu"
-                    number="400C0"
+                    number="44EC0"
                     reason="0"
                     reasonname="ToolboxSubMenu_Warning"
                     description="A sub-menu is about to open">
 <entry>
  <register-use number="0">Handle of client task</register-use>
- <register-use number="1">&hex;400C0 (service number)</register-use>
+ <register-use number="1">&hex;44EC0 (service number)</register-use>
  <register-use number="2">Pointer to menu state (as for Wimp_GetMenuState)</register-use>
  <register-use number="3">0 (a sub-menu is about to open)</register-use>
 </entry>
@@ -154,13 +154,13 @@ For compatibility with existing versions of the Window module the Toolbox module
 </service-definition>
 
 <service-definition name="ToolboxSubMenu"
-                    number="400C0"
+                    number="44EC0"
                     reason="1"
                     reasonname="ToolboxSubMenu_Link"
                     description="Request to link a sub-menu into the current menu tree">
 <entry>
  <register-use number="0">Handle of client task</register-use>
- <register-use number="1">&hex;400C0 (service number)</register-use>
+ <register-use number="1">&hex;44EC0 (service number)</register-use>
  <register-use number="2">Pointer to Wimp data for sub-menu (or window handle)</register-use>
  <register-use number="3">1 (request to link a sub-menu into the current menu tree)</register-use>
  <register-use number="4">Object ID of parent menu</register-use>
