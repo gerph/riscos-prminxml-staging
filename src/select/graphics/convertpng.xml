@@ -131,7 +131,7 @@ Sprite formats other than those described in the above paragraphs are not suppor
 
 <section title="SWI Calls">
 <swi-definition name="ConvertPNG_Info"
-                number="564C2"
+                number="564C0"
                 description="Read simple information about a PNG"
                 irqs="undefined"
                 fiqs="undefined"
