@@ -284,7 +284,7 @@ This SWI is used to enumerate the currently registered converters.
 </swi-definition>
 
 <swi-definition name="ImageFileConvert_ConverterInfo"
-                number="56846"
+                number="56842"
                 description="Read information on a conversion"
                 irqs="undefined"
                 fiqs="undefined"
