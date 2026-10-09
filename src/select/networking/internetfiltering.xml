@@ -124,7 +124,7 @@ supplier for more details.
 </section>
 
 <section title="SWI Calls">
-<swi-definition name="Internet_Filter"
+<swi-definition name="Socket_Filter"
                 number="41223"
                 description="Register or deregister a packet filter"
                 irqs="undefined"
@@ -159,7 +159,7 @@ may act upon it.
 
 <section title="Entry points">
 <entry-definition name="Packet filter code"
-                  description="Entry point of a packet filter registered with Internet_Filter"
+                  description="Entry point of a packet filter registered with Socket_Filter"
                   irqs="undefined"
                   fiqs="undefined"
                   processor-mode="undefined"
@@ -197,13 +197,13 @@ may act upon it.
 </exit>
 <use>
 <p>
-This is the routine registered with <reference type="swi" name="Internet_Filter" />.
+This is the routine registered with <reference type="swi" name="Socket_Filter" />.
 It is called for each input and output packet which matches the mask, and when
 interfaces are added or removed.
 </p>
 </use>
 <related>
-<reference type="swi" name="Internet_Filter" />
+<reference type="swi" name="Socket_Filter" />
 </related>
 </entry-definition>
 </section>

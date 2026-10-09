@@ -691,7 +691,7 @@ the fonts your document uses' in the chapter on Printing for more details.
 
 
 <swi-definition name="ImageFileRender_Info"
-                number="56264"
+                number="562C4"
                 description="Discover miscellaneous image information"
                 irqs="disabled"
                 fiqs="enabled"
@@ -787,7 +787,7 @@ drawing a background behind the image is neccessary or not.</p>
 
 
 <swi-definition name="ImageFileRender_RendererInfo"
-                number="56265"
+                number="562C5"
                 description="Discover information on the renderer"
                 irqs="disabled"
                 fiqs="enabled"
@@ -816,7 +816,7 @@ drawing a background behind the image is neccessary or not.</p>
 
 
 <swi-definition name="ImageFileRender_Register"
-                number="56266"
+                number="562C6"
                 description="Register a renderer"
                 irqs="disabled"
                 fiqs="enabled"
@@ -861,7 +861,7 @@ drawing a background behind the image is neccessary or not.</p>
 
 
 <swi-definition name="ImageFileRender_Deregister"
-                number="56267"
+                number="562C7"
                 description="Deregister a renderer"
                 irqs="disabled"
                 fiqs="enabled"
@@ -890,7 +890,7 @@ drawing a background behind the image is neccessary or not.</p>
 
 
 <swi-definition name="ImageFileRender_EnumerateRenderers"
-                number="56268"
+                number="562C8"
                 description="Enumerate the active renderers"
                 irqs="disabled"
                 fiqs="enabled"
