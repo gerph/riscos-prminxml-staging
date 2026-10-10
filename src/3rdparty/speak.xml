@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
-<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.02//EN"
-                            "http://gerph.org/dtd/102/prm.dtd">
+<!DOCTYPE riscos-prm PUBLIC "-//Gerph//DTD PRM documentation 1.03//EN"
+                            "http://gerph.org/dtd/103/prm.dtd">
 
 <riscos-prm>
 <chapter title="Speak module">
@@ -17,7 +17,7 @@
 
 <swi-definition name="Speak_Ready"
                 number="4AD80"
-                description="Check whether Speak is current speaking"
+                description="Check whether Speak is currently speaking"
                 irqs="undefined"
                 fiqs="enabled"
                 processor-mode="SVC"
@@ -70,7 +70,7 @@
  </register-use>
 </entry>
 <exit>
- <register-use number="0-8">Dependant on reason code</register-use>
+ <register-use number="0-8">Dependent on reason code</register-use>
 </exit>
 
 <use>
@@ -80,7 +80,6 @@
 </use>
 
 <related>
-<!-- <reference type="vector" name="BingleV" /> -->
 </related>
 
 </swi-definition>
@@ -104,13 +103,12 @@
 </exit>
 
 <use>
-<p>This SWI returns the version of the interface provided the the Speak module.</p>
+<p>This SWI returns the version of the interface provided by the Speak module.</p>
 
-<p>Up to version 3.30 of the module the version returned in R0 was 3, and R1 is preserved. After 3.30 the version returns in R0 is 4, and the module version is returned * 100 in R1.
+<p>Up to version 3.30 of the module the version returned in R0 was 3, and R1 is preserved. After 3.30 the version returned in R0 is 4, and the module version is returned * 100 in R1.</p>
 </use>
 
 <related>
-<!-- <reference type="vector" name="BingleV" /> -->
 </related>
 
 </swi-definition>
@@ -139,7 +137,7 @@
  </register-use>
 </entry>
 <exit>
- <register-use number="0">Pointer to zero-terminated phoeme string</register-use>
+ <register-use number="0">Pointer to zero-terminated phoneme string</register-use>
 </exit>
 
 <use>
@@ -147,7 +145,6 @@
 </use>
 
 <related>
-<!-- <reference type="vector" name="BingleV" /> -->
 </related>
 
 </swi-definition>
@@ -177,7 +174,6 @@
 </use>
 
 <related>
-<!-- <reference type="vector" name="BingleV" /> -->
 </related>
 
 </swi-definition>
@@ -241,7 +237,7 @@
 <p>
     <offset-table>
         <offset number="0">Pointer to zero-terminated name of the voice</offset>
-        <offset number="4">Pointer to a list of pairs of priority and language strings which this voice is appropriate for (see eSpeak documentation</offset>
+        <offset number="4">Pointer to a list of pairs of priority and language strings which this voice is appropriate for (see eSpeak documentation)</offset>
         <offset number="8">Pointer to the filename of this voice</offset>
         <offset number="12"><p>(byte) Gender of the voice:</p>
             <value-table>
@@ -276,7 +272,7 @@
 
 <entry>
  <register-use number="0">Pointer to English text string to be spoken, terminated as described by R1</register-use>
- <register-use number="1">Length of the string pointed to by R0, or 0 if the string pointed to by R0 is terminated by a 0 or 13 byte</register-use>
+ <register-use number="1">Length of the string pointed to by R0, or 0 if the string pointed to by R0 is terminated by a 0 or a 13 (carriage return) byte</register-use>
  <register-use number="2">Voice index to use, or -1 for no change</register-use>
  <register-use number="3">Must be 0 (may be used in future versions)</register-use>
 </entry>
@@ -325,7 +321,7 @@ determine when the speaking has finished.
 
 <entry>
  <register-use number="0">Pointer to English text string to be spoken, terminated as described by R1</register-use>
- <register-use number="1">Length of the string pointed to by R0, or 0 if the string pointed to by R0 is terminated by a 0 or 13 byte</register-use>
+ <register-use number="1">Length of the string pointed to by R0, or 0 if the string pointed to by R0 is terminated by a 0 or a 13 (carriage return) byte</register-use>
  <register-use number="2">Voice index to use, or -1 for no change</register-use>
  <register-use number="3">Must be 0 (may be used in future versions)</register-use>
 </entry>
@@ -335,7 +331,7 @@ determine when the speaking has finished.
 <use>
 <p>This SWI is the same as <reference type='swi' name='Speak_Say'/> but waits for the string to complete before returning.</p>
 
-<p>In version 3 of this module, this SWI deoes not wait.</p>
+<p>In version 3 of this module, this SWI does not wait.</p>
 </use>
 
 <related>
@@ -432,7 +428,7 @@ determine when the speaking has finished.
                 re-entrant="no">
 
 <entry>
- <register-use number="0"><p>New value of the 'word gap' parameter':</p>
+ <register-use number="0"><p>New value of the 'word gap' parameter:</p>
  <p>
     <value-table>
         <value number="0">No extra gap between words</value>
@@ -507,7 +503,6 @@ determine when the speaking has finished.
 </use>
 
 <related>
-<!-- <reference type="vector" name="BingleV" /> -->
 </related>
 
 </swi-definition>
@@ -532,7 +527,7 @@ determine when the speaking has finished.
 <use>
 <p>This SWI is used to select a voice by name. For example, "en-us" for the US English voice.</p>
 
-<p>The voice name may be suffixed by a '+' followed by a voice variant name. For example, "en-us+f3+ to use the 'f3' female voice.</p>
+<p>The voice name may be suffixed by a '+' followed by a voice variant name. For example, "en-us+f3" to use the 'f3' female voice.</p>
 </use>
 
 <related>
@@ -566,7 +561,7 @@ determine when the speaking has finished.
     <change>Converted to PRM-in-XML.</change>
   </revision>
 
-  <revision number="2" author="Gerph" date="15 Jan 2021">
+  <revision number="3" author="Gerph" date="15 Jan 2021">
     <change>Updated SWI details with undocumented interfaces and more detail.</change>
   </revision>
  </history>
