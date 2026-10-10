@@ -57,6 +57,7 @@
     <page href="externaledit">External Edit protocol</page>
     <page href="syslog">SysLog module</page>
     <page href="zapredraw">ZapRedraw module</page>
+    <page href="speak">Speak module</page>
 </section>
 
 <section title="RISC OS 5" dir="riscos5">
