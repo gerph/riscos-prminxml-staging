@@ -87,3 +87,37 @@ Format points which cause lint failures:
   document because the stylesheet cannot be fetched; this is an environment
   limitation.
 * `logs/`, `output/`, `tmp/` are build products and are not committed.
+
+## Releases and tags
+
+A release is a lightweight tag `vYYYY-MM-DD`. The continuous integration build
+turns each pushed tag into a GitHub release, so tags need care.
+
+* **Push tags to GitLab only.** GitLab mirrors branches and tags to GitHub.
+  Pushing a tag straight to GitHub makes the two servers disagree, and the
+  next push to GitLab then overwrites GitHub's tag with GitLab's. If a tag has
+  to move, move it on GitLab (a forced push) and let the mirror carry it to
+  GitHub; check with `git ls-remote --tags` on both that they agree.
+* **Every push of a tag creates a new draft release.** The workflow's release
+  step finds no existing release for a tag that is already published, so a
+  re-pushed or moved tag leaves a second, draft release for it. After moving a
+  tag, wait for the run to finish, then delete the stray draft with
+  `gh api -X DELETE repos/<owner>/<repo>/releases/<id>`. Releases are found by
+  id: several drafts can share a tag, and `gh release` by tag is ambiguous.
+* **Every tag run also redeploys GitHub Pages**, from the tagged commit. A tag
+  on an old commit therefore puts old content on the live site until the next
+  release, unless the workflow at that commit disables the deployment (the
+  `release-2023-09-04` branch does).
+* **A tag points at the commit the workflow can build.** The workflow and
+  `build.sh` are taken from the tagged commit, so an old commit fails if the
+  actions it names have been retired or the tools it downloads have gone.
+  `v2023-09-04` is on the branch `release-2023-09-04`, which holds the
+  documents of 2 September 2023 with only the workflow and `build.sh`
+  brought up to date.
+* **Name and describe the release after the build.** The draft is called after
+  the tag; set the title to `Release YYYY-MM-DD` and write the notes (the list
+  of what the release includes), then publish it. Publish an older release
+  with `make_latest=false`, so that the newest release stays "Latest".
+* **Do not delete a release you have not rebuilt.** The assets of an old
+  release cannot always be regenerated; keep the draft until the replacement
+  exists.
